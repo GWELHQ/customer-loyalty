@@ -1,0 +1,165 @@
+/*
+ * Ported verbatim from the Green Wells Energies Claude Design system
+ * (design-system-4fe30cab-9282-4137-9dfd-dc9dfce9942c) so the built app
+ * matches the source-of-truth mockup exactly, not an approximation of it.
+ */
+:root {
+  --gw-green-50: #eafaf0;
+  --gw-green-100: #cdf1db;
+  --gw-green-200: #9fe3ba;
+  --gw-green-300: #6ccf98;
+  --gw-green-400: #48bd7c;
+  --gw-green-500: #33ad5c;
+  --gw-green-600: #278e4a;
+  --gw-green-700: #20713b;
+  --gw-green-800: #1b5931;
+  --gw-green-900: #164627;
+
+  --gw-blue-50: #e8edf5;
+  --gw-blue-100: #c3d0e6;
+  --gw-blue-200: #8fa8d0;
+  --gw-blue-300: #5a7fb8;
+  --gw-blue-400: #2d59a0;
+  --gw-blue-500: #003a88;
+  --gw-blue-600: #003073;
+  --gw-blue-700: #00265d;
+  --gw-blue-800: #001c47;
+  --gw-blue-900: #001330;
+
+  --gw-gray-0: #ffffff;
+  --gw-gray-50: #f6f8f7;
+  --gw-gray-100: #eceff0;
+  --gw-gray-200: #dbe0e1;
+  --gw-gray-300: #bcc4c6;
+  --gw-gray-400: #94a0a2;
+  --gw-gray-500: #6d7a7c;
+  --gw-gray-600: #525f61;
+  --gw-gray-700: #3c4647;
+  --gw-gray-800: #262e2f;
+  --gw-gray-900: #161c1d;
+  --gw-gray-950: #0c1010;
+
+  --gw-amber-500: #e2962e;
+  --gw-amber-600: #c17c1c;
+  --gw-red-500: #d64545;
+  --gw-red-600: #b13333;
+  --gw-teal-500: #2b9d9c;
+
+  --color-primary: var(--gw-green-500);
+  --color-primary-hover: var(--gw-green-600);
+  --color-primary-active: var(--gw-green-700);
+  --color-primary-tint: var(--gw-green-50);
+
+  --color-secondary: var(--gw-blue-500);
+  --color-secondary-hover: var(--gw-blue-600);
+  --color-secondary-active: var(--gw-blue-700);
+  --color-secondary-tint: var(--gw-blue-50);
+
+  --color-bg: var(--gw-gray-50);
+  --color-surface: var(--gw-gray-0);
+  --color-surface-sunken: var(--gw-gray-100);
+  --color-border: var(--gw-gray-200);
+  --color-border-strong: var(--gw-gray-300);
+
+  --color-text: var(--gw-gray-900);
+  --color-text-secondary: var(--gw-gray-600);
+  --color-text-muted: var(--gw-gray-500);
+  --color-text-on-primary: #ffffff;
+  --color-text-on-secondary: #ffffff;
+
+  --color-success: #1d8a4c;
+  --color-success-tint: #e6f6ec;
+  --color-warning: var(--gw-amber-600);
+  --color-warning-tint: #fbf1e2;
+  --color-danger: var(--gw-red-600);
+  --color-danger-tint: #faeaea;
+  --color-info: var(--gw-blue-500);
+  --color-info-tint: var(--gw-blue-50);
+
+  --shadow-sm: 0 1px 2px rgba(12, 16, 16, 0.06);
+  --shadow-md: 0 4px 12px rgba(12, 16, 16, 0.08);
+  --shadow-lg: 0 12px 32px rgba(12, 16, 16, 0.12);
+  --focus-ring: 0 0 0 3px rgba(51, 173, 92, 0.35);
+
+  --font-display: 'Montserrat', system-ui, sans-serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.375rem;
+  --text-4xl: 3rem;
+  --text-5xl: 3.75rem;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.06em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  --container-max: 1200px;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+a {
+  color: var(--color-secondary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-primary);
+}
+button {
+  font-family: inherit;
+}

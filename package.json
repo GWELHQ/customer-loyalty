@@ -1,0 +1,26 @@
+{
+  "name": "loyalty-points-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Green Wells Energies centralized fuel loyalty cashback system",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@loyalty/web",
+    "dev:api": "npm run start:dev --workspace=@loyalty/api",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  }
+}
