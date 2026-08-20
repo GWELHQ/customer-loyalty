@@ -12,6 +12,14 @@
       "collectionGroup": "sales",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "stationId", "order": "ASCENDING" },
+        { "fieldPath": "saleDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "attendantId", "order": "ASCENDING" },
         { "fieldPath": "saleDate", "order": "DESCENDING" }
       ]

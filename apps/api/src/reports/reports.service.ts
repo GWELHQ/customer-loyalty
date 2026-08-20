@@ -22,11 +22,21 @@ export class ReportsService {
     const totalSalesAmountMonth = round2(sales.reduce((s, x) => s + x.amountPaid, 0));
     const uniqueCustomers = new Set(sales.map((s) => s.customerId)).size;
 
-    const pendingSpecialRatesSnap = await this.firestore
-      .collection('specialRateRequests')
-      .where('status', '==', SpecialRateStatus.PENDING)
-      .count()
-      .get();
+    // specialRateRequests has no stationId — this count is unavoidably
+    // company-wide, so only surface it to an unscoped (all-stations)
+    // caller. A station-scoped role (station_supervisor) doesn't hold
+    // SPECIAL_RATES_VIEW at all; returning null here (rather than a
+    // sitewide count) keeps this endpoint from being the one place that
+    // leaks it to them.
+    const pendingSpecialRateRequests = stationId
+      ? null
+      : (
+          await this.firestore
+            .collection('specialRateRequests')
+            .where('status', '==', SpecialRateStatus.PENDING)
+            .count()
+            .get()
+        ).data().count;
 
     let reconQuery = this.firestore.collection('reconciliationDaily').where('date', '==', today) as FirebaseFirestore.Query;
     if (stationId) reconQuery = reconQuery.where('stationId', '==', stationId);
@@ -45,7 +55,7 @@ export class ReportsService {
       totalSalesAmountMonth,
       saleCount: sales.length,
       uniqueCustomers,
-      pendingSpecialRateRequests: pendingSpecialRatesSnap.data().count,
+      pendingSpecialRateRequests,
       reconciliationRecordsNeedingAttention: needsAttention,
       trend,
       stationTotals,

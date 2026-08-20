@@ -25,7 +25,7 @@ interface DashboardData {
   totalSalesAmountMonth: number;
   saleCount: number;
   uniqueCustomers: number;
-  pendingSpecialRateRequests: number;
+  pendingSpecialRateRequests: number | null;
   reconciliationRecordsNeedingAttention: number;
   trend: TrendDay[];
   stationTotals: StationTotal[] | null;
@@ -52,13 +52,17 @@ export function Dashboard() {
         { label: 'Cashback this month', value: `KSh ${format(data.totalCashbackMonth)}`, note: data.month, color: 'var(--color-primary)', go: '/cashback-ledgers' },
         { label: 'Sales amount this month', value: `KSh ${format(data.totalSalesAmountMonth)}`, note: `${data.saleCount} sales`, go: '/sales' },
         { label: 'Customers active this month', value: data.uniqueCustomers, note: 'across all stations', go: '/customers' },
-        {
-          label: 'Special rate requests',
-          value: data.pendingSpecialRateRequests,
-          note: 'awaiting Chairman decision',
-          color: data.pendingSpecialRateRequests > 0 ? 'var(--color-warning)' : undefined,
-          go: '/special-rates',
-        },
+        ...(data.pendingSpecialRateRequests !== null
+          ? [
+              {
+                label: 'Special rate requests',
+                value: data.pendingSpecialRateRequests,
+                note: 'awaiting Chairman decision',
+                color: data.pendingSpecialRateRequests > 0 ? 'var(--color-warning)' : undefined,
+                go: '/special-rates',
+              },
+            ]
+          : []),
         {
           label: 'Reconciliation needs attention',
           value: data.reconciliationRecordsNeedingAttention,
@@ -71,7 +75,7 @@ export function Dashboard() {
 
   const attention = data
     ? [
-        ...(data.pendingSpecialRateRequests > 0
+        ...(data.pendingSpecialRateRequests !== null && data.pendingSpecialRateRequests > 0
           ? [
               {
                 title: `${data.pendingSpecialRateRequests} special rate request(s) waiting`,
@@ -204,23 +208,27 @@ function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals:
       </div>
 
       {stationTotals && stationTotals.length > 0 && (
-        <div
-          style={{
-            marginTop: 12,
-            paddingTop: 12,
-            borderTop: '1px solid var(--color-border)',
-            display: 'grid',
-            gridTemplateColumns: `repeat(${stationTotals.length}, 1fr)`,
-            gap: 10,
-          }}
-        >
-          {stationTotals.map((st) => (
-            <div key={st.stationId}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
-              <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>KSh {format(st.value)}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>today</div>
-            </div>
-          ))}
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
+            Today's sales by station — unrelated to the days above
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${stationTotals.length}, 1fr)`,
+              gap: 10,
+              background: 'var(--color-surface-sunken)',
+              borderRadius: 8,
+              padding: 10,
+            }}
+          >
+            {stationTotals.map((st) => (
+              <div key={st.stationId}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
+                <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>KSh {format(st.value)}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>
