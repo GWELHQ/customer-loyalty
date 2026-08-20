@@ -49,9 +49,25 @@ export function Dashboard() {
 
   const kpis = data
     ? [
-        { label: 'Cashback this month', value: `KSh ${format(data.totalCashbackMonth)}`, note: data.month, color: 'var(--color-primary)', go: '/cashback-ledgers' },
-        { label: 'Sales amount this month', value: `KSh ${format(data.totalSalesAmountMonth)}`, note: `${data.saleCount} sales`, go: '/sales' },
-        { label: 'Customers active this month', value: data.uniqueCustomers, note: 'across all stations', go: '/customers' },
+        {
+          label: 'Cashback this month',
+          value: `KSh ${format(data.totalCashbackMonth)}`,
+          note: data.month,
+          color: 'var(--color-primary)',
+          go: '/cashback-ledgers',
+        },
+        {
+          label: 'Sales amount this month',
+          value: `KSh ${format(data.totalSalesAmountMonth)}`,
+          note: `${data.saleCount} sales`,
+          go: '/sales',
+        },
+        {
+          label: 'Customers active this month',
+          value: data.uniqueCustomers,
+          note: 'across all stations',
+          go: '/customers',
+        },
         ...(data.pendingSpecialRateRequests !== null
           ? [
               {
@@ -103,22 +119,56 @@ export function Dashboard() {
       {loading && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
       {data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+              gap: 12,
+            }}
+          >
             {kpis.map((k) => (
-              <KpiTile key={k.label} label={k.label} value={k.value} note={k.note} color={k.color} onClick={() => navigate(k.go)} />
+              <KpiTile
+                key={k.label}
+                label={k.label}
+                value={k.value}
+                note={k.note}
+                color={k.color}
+                onClick={() => navigate(k.go)}
+              />
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 16, alignItems: 'start' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1.35fr 1fr',
+              gap: 16,
+              alignItems: 'start',
+            }}
+          >
             <TrendCard trend={data.trend} stationTotals={data.stationTotals} />
 
             <Card padding={0}>
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>What needs your attention</div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{attention.length} item(s)</span>
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: '1px solid var(--color-border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                }}
+              >
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>
+                  What needs your attention
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                  {attention.length} item(s)
+                </span>
               </div>
               {attention.length === 0 && (
-                <div style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)' }}>Nothing needs attention right now.</div>
+                <div style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                  Nothing needs attention right now.
+                </div>
               )}
               {attention.map((a) => (
                 <button
@@ -137,10 +187,38 @@ export function Dashboard() {
                     alignItems: 'flex-start',
                   }}
                 >
-                  <span style={{ width: 8, height: 8, borderRadius: 999, background: a.dot, marginTop: 6, flexShrink: 0 }} />
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: a.dot,
+                      marginTop: 6,
+                      flexShrink: 0,
+                    }}
+                  />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{a.title}</span>
-                    <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.45 }}>{a.body}</span>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        color: 'var(--color-text)',
+                      }}
+                    >
+                      {a.title}
+                    </span>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 12.5,
+                        color: 'var(--color-text-secondary)',
+                        marginTop: 2,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {a.body}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -152,7 +230,13 @@ export function Dashboard() {
   );
 }
 
-function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals: StationTotal[] | null }) {
+function TrendCard({
+  trend,
+  stationTotals,
+}: {
+  trend: TrendDay[];
+  stationTotals: StationTotal[] | null;
+}) {
   const [animate, setAnimate] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true));
@@ -165,22 +249,57 @@ function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals:
   return (
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Loyalty sales by product · last 7 days</div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>
+          Loyalty sales by product · last 7 days
+        </div>
+        <div
+          style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--color-text-secondary)' }}
+        >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-primary)' }} />
+            <span
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-primary)' }}
+            />
             Petrol (PMS)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--gw-blue-500)' }} />
+            <span
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--gw-blue-500)' }}
+            />
             Diesel (AGO)
           </span>
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 168, marginTop: 18, paddingBottom: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 14,
+          height: 168,
+          marginTop: 18,
+          paddingBottom: 4,
+        }}
+      >
         {trend.map((d, i) => (
-          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, height: 140 }}>
+          <div
+            key={d.date}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                gap: 3,
+                height: 140,
+              }}
+            >
               <div
                 title={`Petrol: KSh ${format(d.pms)}`}
                 style={{
@@ -209,8 +328,15 @@ function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals:
 
       {stationTotals && stationTotals.length > 0 && (
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
-            Today's sales by station — unrelated to the days above
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--color-text-secondary)',
+              marginBottom: 10,
+            }}
+          >
+            Today's sales by station
           </div>
           <div
             style={{
@@ -225,7 +351,9 @@ function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals:
             {stationTotals.map((st) => (
               <div key={st.stationId}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
-                <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>KSh {format(st.value)}</div>
+                <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
+                  KSh {format(st.value)}
+                </div>
               </div>
             ))}
           </div>
