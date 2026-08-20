@@ -58,24 +58,7 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
         }}
       >
         <div style={{ padding: '20px 18px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--font-display)',
-              fontWeight: 800,
-              fontSize: 15,
-              color: '#fff',
-              flex: 'none',
-            }}
-          >
-            G
-          </div>
+          <img src="/logo-mark.png" alt="Green Wells" style={{ width: 30, height: 30, objectFit: 'contain', flex: 'none' }} />
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, letterSpacing: '0.03em' }}>
               GREEN WELLS

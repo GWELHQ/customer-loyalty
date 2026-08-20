@@ -40,24 +40,7 @@ export function SignIn() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--font-display)',
-              fontWeight: 800,
-              fontSize: 17,
-              color: '#fff',
-              flex: 'none',
-            }}
-          >
-            G
-          </div>
+          <img src="/logo-mark.png" alt="Green Wells" style={{ width: 36, height: 36, objectFit: 'contain', flex: 'none' }} />
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, letterSpacing: '0.02em' }}>
             GREEN WELLS ENERGIES
           </div>
