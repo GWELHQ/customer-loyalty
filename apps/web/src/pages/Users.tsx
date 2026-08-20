@@ -105,7 +105,7 @@ export function Users() {
                   <Td align="right">
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Button variant="secondary" size="sm" onClick={() => setEditingUser(u)}>
-                        Edit role
+                        Edit
                       </Button>
                       <Button variant="secondary" size="sm" disabled={busyId === u.id} onClick={() => toggleStatus(u)}>
                         {busyId === u.id ? 'Working…' : u.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
@@ -147,6 +147,7 @@ function EditUserModal({
   onSaved: () => void;
 }) {
   const api = useApi();
+  const [fullName, setFullName] = useState(user.fullName);
   const [role, setRole] = useState<Role>(user.role);
   const [assignedStationId, setAssignedStationId] = useState(user.assignedStationId ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +158,7 @@ function EditUserModal({
     setBusy(true);
     try {
       await api.users.update(user.id, {
+        fullName,
         role,
         assignedStationId: role === Role.STATION_SUPERVISOR ? assignedStationId : undefined,
       });
@@ -169,21 +171,26 @@ function EditUserModal({
   }
 
   return (
-    <Modal title={`Edit role — ${user.fullName}`} onClose={onClose}>
+    <Modal title={`Edit user — ${user.fullName}`} onClose={onClose}>
       {error && (
         <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
           {error}
         </div>
       )}
-      <Field label="Role">
-        <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
-          {ASSIGNABLE_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r]}
-            </option>
-          ))}
-        </select>
+      <Field label="Full name">
+        <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
+      <div style={{ marginTop: 12 }}>
+        <Field label="Role">
+          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            {ASSIGNABLE_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       {role === Role.STATION_SUPERVISOR && (
         <div style={{ marginTop: 12 }}>
           <Field label="Assigned station (exactly one)">

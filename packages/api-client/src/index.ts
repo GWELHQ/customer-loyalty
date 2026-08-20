@@ -108,6 +108,7 @@ export class LoyaltyApiClient {
       this.http.post<Customer>('/customers', input),
     update: (id: string, input: Partial<{ fullName: string; homeStationId: string }>) =>
       this.http.patch<Customer>(`/customers/${id}`, input),
+    delete: (id: string) => this.http.delete<{ success: boolean }>(`/customers/${id}`),
     uploadImport: (file: File, homeStationId: string) => {
       const form = new FormData();
       form.append('file', file);

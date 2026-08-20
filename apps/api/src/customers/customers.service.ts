@@ -160,6 +160,13 @@ export class CustomersService {
     this.changeEvents.emit(COLLECTION);
   }
 
+  async delete(id: string): Promise<Customer> {
+    const customer = await this.findById(id);
+    await this.col().doc(id).delete();
+    this.changeEvents.emit(COLLECTION);
+    return customer;
+  }
+
   async incrementCashback(id: string, amount: number): Promise<void> {
     await this.firestore.instance.runTransaction(async (tx) => {
       const ref = this.col().doc(id);

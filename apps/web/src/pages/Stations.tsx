@@ -8,7 +8,7 @@ import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const STATION_COLUMNS: ExportColumn<Station>[] = [
   { header: 'Name', value: (s) => s.name },
@@ -26,6 +26,7 @@ export function Stations() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Station | null>(null);
 
   async function toggleActive(station: Station) {
     setError(null);
@@ -88,9 +89,14 @@ export function Stations() {
                   </Td>
                   {canManage && (
                     <Td align="right">
-                      <Button variant="secondary" size="sm" disabled={busyId === s.id} onClick={() => toggleActive(s)}>
-                        {busyId === s.id ? 'Working…' : s.active ? 'Deactivate' : 'Activate'}
-                      </Button>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <Button variant="secondary" size="sm" onClick={() => setEditing(s)}>
+                          Edit
+                        </Button>
+                        <Button variant="secondary" size="sm" disabled={busyId === s.id} onClick={() => toggleActive(s)}>
+                          {busyId === s.id ? 'Working…' : s.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
                     </Td>
                   )}
                 </Tr>
@@ -100,7 +106,66 @@ export function Stations() {
           <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${stations.length} station(s)`} />
         </Card>
       </div>
+
+      {editing && (
+        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+          <EditStationForm
+            station={editing}
+            onDone={() => {
+              setEditing(null);
+              refresh();
+            }}
+          />
+        </Modal>
+      )}
     </AppShell>
+  );
+}
+
+function EditStationForm({ station, onDone }: { station: Station; onDone: () => void }) {
+  const api = useApi();
+  const [name, setName] = useState(station.name);
+  const [location, setLocation] = useState(station.location ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.stations.update(station.id, { name, location: location || undefined });
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save changes');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Field label="Name">
+          <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Location">
+          <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Optional" />
+        </Field>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <Button variant="primary" onClick={submit} disabled={busy || !name}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" onClick={onDone} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -160,5 +161,20 @@ export class CustomersController {
       entityLabel: customer.fullName,
     });
     return customer;
+  }
+
+  @Delete(':id')
+  @RequirePermissions(Permission.CUSTOMERS_DELETE)
+  async remove(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
+    const customer = await this.customers.delete(id);
+    await this.audit.record({
+      actor,
+      action: 'customer.delete',
+      entityType: 'customer',
+      entityId: id,
+      entityLabel: customer.fullName,
+      metadata: { phoneNumber: customer.phoneNumber, totalCashbackEarned: customer.totalCashbackEarned },
+    });
+    return { success: true };
   }
 }
