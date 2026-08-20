@@ -57,11 +57,31 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
           height: '100vh',
         }}
       >
-        <div style={{ padding: '20px 18px 16px' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, letterSpacing: '0.03em' }}>
-            GREEN WELLS
+        <div style={{ padding: '20px 18px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 15,
+              color: '#fff',
+              flex: 'none',
+            }}
+          >
+            G
           </div>
-          <div style={{ fontSize: 12, color: '#8fa8d0', marginTop: 2 }}>Loyalty cashback</div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, letterSpacing: '0.03em' }}>
+              GREEN WELLS
+            </div>
+            <div style={{ fontSize: 12, color: '#8fa8d0', marginTop: 2 }}>Loyalty cashback</div>
+          </div>
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: '0 10px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {nav.map((n) => {

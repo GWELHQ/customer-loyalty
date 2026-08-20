@@ -11,6 +11,7 @@ import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import type { ExportColumn } from '../../lib/exportTable';
 import { ExportButtons } from '../../ui/ExportButtons';
+import { Icon } from '../../ui/Icon';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
 
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
@@ -184,7 +185,13 @@ export function CustomerProfile() {
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8 }}>
                 Permanently deletes this customer record. Their past sales and cashback history stay on record — this only removes the customer profile itself.
               </div>
-              <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)} style={{ marginTop: 12 }}>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                <Icon name="trash" size={13} />
                 Delete customer
               </Button>
             </Card>

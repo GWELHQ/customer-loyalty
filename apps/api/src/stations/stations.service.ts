@@ -57,4 +57,39 @@ export class StationsService {
     this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
+
+  /**
+   * Hard delete is only safe for a station nothing else points at — a
+   * customer's homeStationId, a sale's stationId, an attendant's or
+   * station-supervisor's assignedStationId. Any of those existing means
+   * something in the system still expects this station to resolve
+   * (Android login, reconciliation, reports); deactivating (via `update`)
+   * is the right move there instead of destroying the record.
+   */
+  async delete(id: string): Promise<Station> {
+    const existing = await this.findById(id);
+    if (!existing) throw new NotFoundException('Station not found');
+
+    const blockers: string[] = [];
+    const checks: [string, FirebaseFirestore.Query][] = [
+      ['customers', this.firestore.collection('customers').where('homeStationId', '==', id)],
+      ['sales', this.firestore.collection('sales').where('stationId', '==', id)],
+      ['attendants', this.firestore.collection('attendants').where('assignedStationId', '==', id)],
+      ['users', this.firestore.collection('users').where('assignedStationId', '==', id)],
+    ];
+    const results = await Promise.all(checks.map(([, query]) => query.limit(1).get()));
+    results.forEach((snap, i) => {
+      if (!snap.empty) blockers.push(checks[i]![0]);
+    });
+
+    if (blockers.length > 0) {
+      throw new ConflictException(
+        `Cannot delete "${existing.name}" — it still has ${blockers.join(', ')} referencing it. Deactivate it instead.`,
+      );
+    }
+
+    await this.col().doc(id).delete();
+    this.changeEvents.emit(COLLECTION);
+    return existing;
+  }
 }

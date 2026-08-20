@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
@@ -62,5 +62,20 @@ export class StationsController {
       entityLabel: station.name,
     });
     return station;
+  }
+
+  @Delete(':id')
+  @RequirePermissions(Permission.STATIONS_MANAGE)
+  async remove(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
+    const station = await this.stations.delete(id);
+    await this.audit.record({
+      actor,
+      action: 'station.delete',
+      entityType: 'station',
+      entityId: id,
+      entityLabel: station.name,
+      metadata: { code: station.code },
+    });
+    return { success: true };
   }
 }

@@ -97,6 +97,7 @@ export class LoyaltyApiClient {
     create: (input: { name: string; code: string; location?: string }) => this.http.post<Station>('/stations', input),
     update: (id: string, input: Partial<{ name: string; location: string; active: boolean }>) =>
       this.http.patch<Station>(`/stations/${id}`, input),
+    delete: (id: string) => this.http.delete<{ success: boolean }>(`/stations/${id}`),
   };
 
   customers = {
