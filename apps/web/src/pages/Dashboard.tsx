@@ -6,6 +6,19 @@ import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import { Card, KpiTile } from '../ui/primitives';
 
+interface TrendDay {
+  date: string;
+  label: string;
+  pms: number;
+  ago: number;
+}
+
+interface StationTotal {
+  stationId: string;
+  name: string;
+  value: number;
+}
+
 interface DashboardData {
   month: string;
   totalCashbackMonth: number;
@@ -14,6 +27,8 @@ interface DashboardData {
   uniqueCustomers: number;
   pendingSpecialRateRequests: number;
   reconciliationRecordsNeedingAttention: number;
+  trend: TrendDay[];
+  stationTotals: StationTotal[] | null;
 }
 
 export function Dashboard() {
@@ -54,6 +69,31 @@ export function Dashboard() {
       ]
     : [];
 
+  const attention = data
+    ? [
+        ...(data.pendingSpecialRateRequests > 0
+          ? [
+              {
+                title: `${data.pendingSpecialRateRequests} special rate request(s) waiting`,
+                body: 'Awaiting a decision from the Chairman.',
+                dot: 'var(--gw-amber-500)',
+                go: '/special-rates',
+              },
+            ]
+          : []),
+        ...(data.reconciliationRecordsNeedingAttention > 0
+          ? [
+              {
+                title: `${data.reconciliationRecordsNeedingAttention} station/product day(s) need review`,
+                body: 'Near or over their loyalty-sales limit.',
+                dot: 'var(--color-danger)',
+                go: '/reconciliation',
+              },
+            ]
+          : []),
+      ]
+    : [];
+
   return (
     <AppShell title="Dashboard" subtitle={`Welcome back, ${user?.fullName ?? ''}`}>
       {loading && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
@@ -65,30 +105,125 @@ export function Dashboard() {
             ))}
           </div>
 
-          <Card>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
-              What needs your attention
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-              {data.pendingSpecialRateRequests > 0 && (
-                <div>
-                  • {data.pendingSpecialRateRequests} special rate request(s) are waiting on a decision.
-                </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 16, alignItems: 'start' }}>
+            <TrendCard trend={data.trend} stationTotals={data.stationTotals} />
+
+            <Card padding={0}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>What needs your attention</div>
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{attention.length} item(s)</span>
+              </div>
+              {attention.length === 0 && (
+                <div style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)' }}>Nothing needs attention right now.</div>
               )}
-              {data.reconciliationRecordsNeedingAttention > 0 && (
-                <div>
-                  • {data.reconciliationRecordsNeedingAttention} station/product day(s) are near or over their
-                  loyalty-sales limit.
-                </div>
-              )}
-              {data.pendingSpecialRateRequests === 0 && data.reconciliationRecordsNeedingAttention === 0 && (
-                <div>Nothing needs attention right now.</div>
-              )}
-            </div>
-          </Card>
+              {attention.map((a) => (
+                <button
+                  key={a.title}
+                  onClick={() => navigate(a.go)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: '1px solid var(--color-border)',
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    gap: 11,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: a.dot, marginTop: 6, flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{a.title}</span>
+                    <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.45 }}>{a.body}</span>
+                  </span>
+                </button>
+              ))}
+            </Card>
+          </div>
         </div>
       )}
     </AppShell>
+  );
+}
+
+function TrendCard({ trend, stationTotals }: { trend: TrendDay[]; stationTotals: StationTotal[] | null }) {
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const max = Math.max(1, ...trend.flatMap((d) => [d.pms, d.ago]));
+  const barHeight = (v: number) => `${Math.max(v > 0 ? 3 : 0, (v / max) * 100)}%`;
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Loyalty sales by product · last 7 days</div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-primary)' }} />
+            Petrol (PMS)
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--gw-blue-500)' }} />
+            Diesel (AGO)
+          </span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 168, marginTop: 18, paddingBottom: 4 }}>
+        {trend.map((d, i) => (
+          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, height: 140 }}>
+              <div
+                title={`Petrol: KSh ${format(d.pms)}`}
+                style={{
+                  width: '40%',
+                  height: animate ? barHeight(d.pms) : '0%',
+                  background: 'var(--color-primary)',
+                  borderRadius: '3px 3px 0 0',
+                  transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms`,
+                }}
+              />
+              <div
+                title={`Diesel: KSh ${format(d.ago)}`}
+                style={{
+                  width: '40%',
+                  height: animate ? barHeight(d.ago) : '0%',
+                  background: 'var(--gw-blue-500)',
+                  borderRadius: '3px 3px 0 0',
+                  transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45 + 60}ms`,
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{d.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {stationTotals && stationTotals.length > 0 && (
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--color-border)',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${stationTotals.length}, 1fr)`,
+            gap: 10,
+          }}
+        >
+          {stationTotals.map((st) => (
+            <div key={st.stationId}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
+              <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>KSh {format(st.value)}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>today</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ReconciliationStatus, SpecialRateStatus, type Sale } from '@loyalty/shared';
+import { Product, ReconciliationStatus, SpecialRateStatus, type Sale, type Station } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
 
@@ -36,6 +36,9 @@ export class ReportsService {
       return status === ReconciliationStatus.EXCEEDED || status === ReconciliationStatus.NEEDS_REVIEW;
     }).length;
 
+    const trend = await this.salesTrend(stationId);
+    const stationTotals = stationId ? null : await this.todayStationTotals(sales, today);
+
     return {
       month: today.slice(0, 7),
       totalCashbackMonth,
@@ -44,7 +47,59 @@ export class ReportsService {
       uniqueCustomers,
       pendingSpecialRateRequests: pendingSpecialRatesSnap.data().count,
       reconciliationRecordsNeedingAttention: needsAttention,
+      trend,
+      stationTotals,
     };
+  }
+
+  /** Last 7 days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
+  private async salesTrend(stationId?: string): Promise<Array<{ date: string; label: string; pms: number; ago: number }>> {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+
+    let query = this.firestore.collection('sales').where('saleDate', '>=', start.toISOString()) as FirebaseFirestore.Query;
+    if (stationId) query = query.where('stationId', '==', stationId);
+    const snap = await query.get();
+    const sales = snap.docs.map((d) => fromDoc<Sale>(d));
+
+    const byDay = new Map<string, { pms: number; ago: number }>();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      byDay.set(d.toISOString().slice(0, 10), { pms: 0, ago: 0 });
+    }
+    for (const sale of sales) {
+      const day = sale.saleDate.slice(0, 10);
+      const bucket = byDay.get(day);
+      if (!bucket) continue;
+      if (sale.product === Product.PMS) bucket.pms += sale.amountPaid;
+      else if (sale.product === Product.AGO) bucket.ago += sale.amountPaid;
+    }
+
+    return [...byDay.entries()].map(([date, v]) => ({
+      date,
+      label: new Date(`${date}T00:00:00.000Z`).toLocaleDateString('en-KE', { weekday: 'short', timeZone: 'UTC' }),
+      pms: round2(v.pms),
+      ago: round2(v.ago),
+    }));
+  }
+
+  /** Today's loyalty sales amount per station — only meaningful for an unscoped (all-stations) view. */
+  private async todayStationTotals(
+    monthToDateSales: Sale[],
+    today: string,
+  ): Promise<Array<{ stationId: string; name: string; value: number }>> {
+    const stationsSnap = await this.firestore.collection('stations').orderBy('name').get();
+    const stations = stationsSnap.docs.map((d) => fromDoc<Station>(d));
+
+    const byStation = new Map<string, number>();
+    for (const sale of monthToDateSales) {
+      if (!sale.saleDate.startsWith(today)) continue;
+      byStation.set(sale.stationId, (byStation.get(sale.stationId) ?? 0) + sale.amountPaid);
+    }
+
+    return stations.map((s) => ({ stationId: s.id, name: s.name, value: round2(byStation.get(s.id) ?? 0) }));
   }
 
   async salesReport(filters: { stationId?: string; from?: string; to?: string }) {
