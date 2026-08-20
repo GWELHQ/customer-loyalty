@@ -1,0 +1,62 @@
+name: Deploy backend to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: backend-deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_ID: loyalty-points-413d5
+  REGION: us-central1
+  REPOSITORY: loyalty
+  SERVICE: loyalty-api
+  RUNTIME_SA: loyalty-api-run@loyalty-points-413d5.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: projects/220192479053/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}"
+          docker build -t "$IMAGE" -f apps/api/Dockerfile .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --project=${{ env.PROJECT_ID }} \
+            --region=${{ env.REGION }} \
+            --image="${{ env.IMAGE }}" \
+            --service-account="${{ env.RUNTIME_SA }}" \
+            --allow-unauthenticated \
+            --quiet

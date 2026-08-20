@@ -32,7 +32,7 @@ gcloud firestore databases create --location=<REGION> --type=firestore-native
 gsutil mb -l <REGION> gs://<PROJECT_ID>-loyalty-files
 ```
 
-Deploy indexes and (optional, defense-in-depth) security rules:
+Deploy indexes and (optional, defense-in-depth) security rules — `firestore.rules`/`firestore.indexes.json` live at the repo root, alongside `firebase.json`:
 
 ```bash
 firebase deploy --only firestore:indexes --project <PROJECT_ID>
@@ -101,12 +101,12 @@ gcloud run deploy loyalty-api \
 
 Pick one:
 
-**A. Firebase Hosting** (simplest, free CDN, easiest custom domain + TLS):
+**A. Firebase Hosting** (simplest, free CDN, easiest custom domain + TLS) — this is what's actually wired up, see "CI/CD" below:
 ```bash
 npm run build --workspace=@loyalty/web
 firebase deploy --only hosting --project <PROJECT_ID>
 ```
-(see `infra/google-cloud/firebase.json` for the `dist/` rewrite config)
+(see `firebase.json` at the repo root for the `dist/` rewrite config — it and `.firebaserc` must live at the repo root, not nested, or the Firebase CLI rejects `public: apps/web/dist` as outside the project directory)
 
 **B. Cloud Storage + Cloud CDN**:
 ```bash
@@ -138,6 +138,36 @@ gcloud scheduler jobs create http price-reminder-check \
 ```
 
 The job endpoint itself checks whether a reminder is actually due (`priceReminderSettings.nextReminderAt`) and no-ops otherwise, so it's safe — and cheap — to run this check hourly rather than trying to compute the exact monthly cron expression.
+
+## CI/CD
+
+`.github/workflows/backend-deploy.yml` and `.github/workflows/frontend-deploy.yml` redeploy on every push to `main` that touches the relevant paths (or via manual `workflow_dispatch`). Both authenticate to GCP keylessly via Workload Identity Federation — no service account key lives in GitHub. One-time setup already done for `loyalty-points-413d5`:
+
+```bash
+gcloud iam workload-identity-pools create github-actions --location=global
+gcloud iam workload-identity-pools providers create-oidc github \
+  --location=global --workload-identity-pool=github-actions \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
+  --attribute-condition="assertion.repository=='verisence/customer-loyalty'" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+gcloud iam service-accounts create github-actions-deployer
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com" --role="roles/run.admin"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com" --role="roles/artifactregistry.writer"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com" --role="roles/firebasehosting.admin"
+gcloud iam service-accounts add-iam-policy-binding loyalty-api-run@<PROJECT_ID>.iam.gserviceaccount.com \
+  --member="serviceAccount:github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com" --role="roles/iam.serviceAccountUser"
+gcloud iam service-accounts add-iam-policy-binding github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository/<gh-owner>/<gh-repo>"
+```
+
+Neither workflow passes `--set-env-vars`/`--set-secrets` on redeploy — `gcloud run deploy` carries over the previous revision's env vars and secret mounts automatically, so those are only set once (see "Deploying the API to Cloud Run" above) and CI just ships a new image on top. Bump an env var or secret binding by re-running that `gcloud run deploy` command by hand with the new value; CI will keep it on every push after.
+
+The backend workflow builds `apps/api/Dockerfile` directly on the runner and pushes to Artifact Registry before `gcloud run deploy`. The frontend workflow runs a normal `npm ci && npm run build --workspace=@loyalty/web` (with `VITE_*` build-time env baked into the static bundle — see the `env:` block in the workflow, not a runtime secret since a public SPA's tenant/client ID is visible in the shipped JS regardless) and pushes `apps/web/dist` via `firebase deploy --only hosting`.
 
 ## Environments
 

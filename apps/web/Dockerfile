@@ -5,15 +5,18 @@
 FROM node:20-slim AS build
 WORKDIR /repo
 COPY package.json package-lock.json* ./
-COPY packages/shared/package.json packages/shared/package.json
+COPY tsconfig.base.json tsconfig.base.json
+# @loyalty/shared has a `prepare` script (tsc build) that npm runs off its
+# full source even with --ignore-scripts skipping *other* lifecycle hooks —
+# its package.json alone isn't enough at this stage, unlike the two below.
+COPY packages/shared packages/shared
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm install --workspaces --if-present --ignore-scripts
 
-COPY packages/shared packages/shared
 COPY packages/api-client packages/api-client
 COPY apps/web apps/web
-COPY tsconfig.base.json tsconfig.base.json
+RUN npm run build --workspace=@loyalty/shared
 ARG VITE_API_BASE_URL
 ARG VITE_MS_ENTRA_TENANT_ID
 ARG VITE_MS_ENTRA_CLIENT_ID
