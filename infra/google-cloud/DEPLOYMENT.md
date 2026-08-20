@@ -128,16 +128,19 @@ gcloud run deploy loyalty-web --image <REGION>-docker.pkg.dev/<PROJECT_ID>/loyal
 
 ## Cloud Scheduler: monthly price reminder
 
+Already created for `loyalty-points-413d5` (`price-reminder-check`, `us-central1`, `Africa/Nairobi` time zone):
+
 ```bash
 gcloud scheduler jobs create http price-reminder-check \
   --location=<REGION> \
   --schedule="0 * * * *" \
+  --time-zone="Africa/Nairobi" \
   --uri="https://<api-domain>/api/v1/jobs/price-reminders" \
   --http-method=POST \
   --headers="x-scheduler-secret=<value-of-scheduler-shared-secret>"
 ```
 
-The job endpoint itself checks whether a reminder is actually due (`priceReminderSettings.nextReminderAt`) and no-ops otherwise, so it's safe — and cheap — to run this check hourly rather than trying to compute the exact monthly cron expression.
+The job endpoint itself checks whether a reminder is actually due (`priceReminderSettings.nextReminderAt`) and no-ops otherwise, so it's safe — and cheap — to run this check hourly rather than trying to compute the exact monthly cron expression. Default reminder day is the 15th (`PriceRemindersService.createDefault`); admins can change day/hour/recipients/on-off from the Prices page, or via `PATCH /price-reminders`.
 
 ## CI/CD
 

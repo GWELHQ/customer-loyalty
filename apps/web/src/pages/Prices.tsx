@@ -19,6 +19,7 @@ export function Prices() {
   const [pricePerLitre, setPricePerLitre] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingReminders, setEditingReminders] = useState(false);
 
   function reload() {
     api.prices.current().then(setCurrent);
@@ -129,11 +130,20 @@ export function Prices() {
             </Card>
 
             <Card>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Monthly price reminder</div>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                An email goes out before the monthly change so prices are never missed.
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Monthly price reminder</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                    An email goes out before the monthly change so prices are never missed.
+                  </div>
+                </div>
+                {reminders && !editingReminders && (
+                  <Button variant="secondary" size="sm" onClick={() => setEditingReminders(true)}>
+                    Edit
+                  </Button>
+                )}
               </div>
-              {reminders && (
+              {reminders && !editingReminders && (
                 <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
                   <Row label="Reminder">
                     <Badge tone={reminders.enabled ? 'success' : 'neutral'}>{reminders.enabled ? 'On' : 'Off'}</Badge>
@@ -153,6 +163,7 @@ export function Prices() {
                   <div>
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 6 }}>Recipients</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {reminders.recipientEmails.length === 0 && <span style={{ color: 'var(--color-text-muted)' }}>None configured</span>}
                       {reminders.recipientEmails.map((e) => (
                         <span key={e} style={{ fontSize: 12, background: 'var(--color-surface-sunken)', border: '1px solid var(--color-border)', borderRadius: 999, padding: '4px 10px' }}>
                           {e}
@@ -162,11 +173,113 @@ export function Prices() {
                   </div>
                 </div>
               )}
+              {reminders && editingReminders && (
+                <ReminderSettingsForm
+                  settings={reminders}
+                  onCancel={() => setEditingReminders(false)}
+                  onSaved={() => {
+                    setEditingReminders(false);
+                    reload();
+                  }}
+                />
+              )}
             </Card>
           </div>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function ReminderSettingsForm({
+  settings,
+  onCancel,
+  onSaved,
+}: {
+  settings: PriceReminderSetting;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const api = useApi();
+  const [enabled, setEnabled] = useState(settings.enabled);
+  const [dayOfMonth, setDayOfMonth] = useState(String(settings.dayOfMonth));
+  const [hourOfDay, setHourOfDay] = useState(String(settings.hourOfDay));
+  const [emails, setEmails] = useState(settings.recipientEmails.join(', '));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setError(null);
+    const day = Number(dayOfMonth);
+    const hour = Number(hourOfDay);
+    if (!Number.isInteger(day) || day < 1 || day > 28) {
+      setError('Day of month must be between 1 and 28 (every month has at least 28 days).');
+      return;
+    }
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      setError('Hour must be between 0 and 23.');
+      return;
+    }
+    const recipientEmails = emails
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean);
+    setBusy(true);
+    try {
+      await api.prices.updateReminderSettings({ enabled, dayOfMonth: day, hourOfDay: hour, recipientEmails });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save reminder settings');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+          {error}
+        </div>
+      )}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        Reminder enabled
+      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Day of month (1–28)">
+          <input
+            type="number"
+            min={1}
+            max={28}
+            style={inputStyle}
+            value={dayOfMonth}
+            onChange={(e) => setDayOfMonth(e.target.value)}
+          />
+        </Field>
+        <Field label="Hour (0–23, Africa/Nairobi)">
+          <input
+            type="number"
+            min={0}
+            max={23}
+            style={inputStyle}
+            value={hourOfDay}
+            onChange={(e) => setHourOfDay(e.target.value)}
+          />
+        </Field>
+      </div>
+      <Field label="Recipient emails (comma-separated)">
+        <input style={inputStyle} value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="finance@greenwellsenergies.co.ke, chairman@greenwellsenergies.co.ke" />
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 

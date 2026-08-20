@@ -24,11 +24,11 @@ export class PriceRemindersService {
     const now = nowIso();
     const doc: Omit<PriceReminderSetting, 'id'> = {
       enabled: true,
-      dayOfMonth: 27,
+      dayOfMonth: 15,
       hourOfDay: 8,
       timezone: DEFAULT_TIMEZONE,
       recipientEmails: [],
-      nextReminderAt: computeNextReminderAt(27, 8, DEFAULT_TIMEZONE),
+      nextReminderAt: computeNextReminderAt(15, 8, DEFAULT_TIMEZONE),
       createdAt: now,
       updatedAt: now,
     };
