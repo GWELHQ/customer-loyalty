@@ -18,12 +18,12 @@ import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
-import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import type { StaffPrincipal } from '../common/types/principal';
 import { CustomerImportsService } from './customer-imports.service';
 import { CustomersService } from './customers.service';
 import { ConfirmImportDto, normalizeDuplicateDecisions } from './dto/confirm-import.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
+import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { RemapImportDto } from './dto/remap-import.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
@@ -40,11 +40,8 @@ export class CustomersController {
 
   @Get()
   @RequirePermissions(Permission.CUSTOMERS_VIEW)
-  list(
-    @Query() pagination: PaginationQueryDto,
-    @Query('name') name?: string,
-    @Query('stationId') stationId?: string,
-  ) {
+  list(@Query() query: ListCustomersQueryDto) {
+    const { name, stationId, ...pagination } = query;
     return this.customers.list(pagination, { name, stationId });
   }
 
@@ -83,6 +80,7 @@ export class CustomersController {
       action: 'customer_import.upload',
       entityType: 'importJob',
       entityId: job.id,
+      entityLabel: job.fileName,
       metadata: { fileName: job.fileName, totalRows: job.totalRows, homeStationId: job.homeStationId },
     });
     return job;
@@ -101,6 +99,7 @@ export class CustomersController {
       action: 'customer_import.remap',
       entityType: 'importJob',
       entityId: job.id,
+      entityLabel: job.fileName,
       metadata: { columnMapping: job.columnMapping },
     });
     return job;
@@ -119,6 +118,7 @@ export class CustomersController {
       action: 'customer_import.confirm',
       entityType: 'importJob',
       entityId: job.id,
+      entityLabel: job.fileName,
       metadata: { createdCount: job.createdCount, duplicateCount: job.duplicateCount, rejectedCount: job.rejectedCount },
     });
     return job;
@@ -139,6 +139,7 @@ export class CustomersController {
       action: 'customer.create',
       entityType: 'customer',
       entityId: customer.id,
+      entityLabel: customer.fullName,
     });
     return customer;
   }
@@ -156,6 +157,7 @@ export class CustomersController {
       action: 'customer.update',
       entityType: 'customer',
       entityId: id,
+      entityLabel: customer.fullName,
     });
     return customer;
   }

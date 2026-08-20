@@ -3,9 +3,25 @@ import { Permission, ReconciliationStatus } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { usePagedRows } from '../data/usePagedRows';
+import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, Field, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+function reconciliationColumns(stations: Station[]): ExportColumn<ReconciliationDaily>[] {
+  return [
+    { header: 'Station', value: (r) => stations.find((s) => s.id === r.stationId)?.name ?? 'Unknown station' },
+    { header: 'Product', value: (r) => r.product },
+    { header: 'Total sales (KSh)', value: (r) => r.totalSales },
+    { header: 'Loyalty sales (KSh)', value: (r) => r.loyaltySales },
+    { header: 'Percentage', value: (r) => r.percentage },
+    { header: 'Headroom (KSh)', value: (r) => r.headroom },
+    { header: 'Status', value: (r) => r.status },
+  ];
+}
 
 const STATUS_TONE: Record<ReconciliationStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
   [ReconciliationStatus.PENDING]: 'neutral',
@@ -23,11 +39,13 @@ export function Reconciliation() {
   const [records, setRecords] = useState<ReconciliationDaily[]>([]);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [showIngest, setShowIngest] = useState(false);
+  const { paged, page, pageCount, setPage } = usePagedRows(records);
 
   function reload() {
     api.reconciliation.daily({ date }).then(setRecords);
   }
   useEffect(reload, [api, date]);
+  useRealtimeRefresh(['reconciliationDaily'], reload);
 
   return (
     <AppShell title="Daily reconciliation" subtitle="Loyalty sales must never exceed an attendant's total sales for the day">
@@ -35,6 +53,7 @@ export function Reconciliation() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="date" style={{ ...inputStyle, maxWidth: 180 }} value={date} onChange={(e) => setDate(e.target.value)} />
           <div style={{ flex: 1 }} />
+          <ExportButtons filename={`reconciliation-${date}`} title={`Reconciliation — ${date}`} columns={reconciliationColumns(stations)} rows={records} />
           {canManage && (
             <Button variant="primary" onClick={() => setShowIngest((v) => !v)}>
               {showIngest ? 'Cancel' : 'Record daily totals'}
@@ -69,9 +88,9 @@ export function Reconciliation() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
+                {paged.map((r) => (
                   <Tr key={r.id}>
-                    <Td>{stations.find((s) => s.id === r.stationId)?.name ?? r.stationId}</Td>
+                    <Td>{stations.find((s) => s.id === r.stationId)?.name ?? 'Unknown station'}</Td>
                     <Td>{r.product}</Td>
                     <Td align="right">KSh {r.totalSales.toLocaleString('en-KE')}</Td>
                     <Td align="right">KSh {r.loyaltySales.toLocaleString('en-KE')}</Td>
@@ -85,6 +104,7 @@ export function Reconciliation() {
               </tbody>
             </Table>
           )}
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${records.length} record(s)`} />
         </Card>
       </div>
     </AppShell>

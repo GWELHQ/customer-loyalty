@@ -1,17 +1,24 @@
 import type { Notification } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
 import { useApi } from '../data/client';
+import { useNotificationsCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
-import { Card, EmptyState } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Card, EmptyState, Pagination } from '../ui/primitives';
+
+const NOTIFICATION_COLUMNS: ExportColumn<Notification>[] = [
+  { header: 'Title', value: (n) => n.title },
+  { header: 'Body', value: (n) => n.body },
+  { header: 'Type', value: (n) => n.type },
+  { header: 'Read', value: (n) => (n.read ? 'Yes' : 'No') },
+  { header: 'Created', value: (n) => new Date(n.createdAt).toLocaleString('en-KE') },
+];
 
 export function Notifications() {
   const api = useApi();
-  const [items, setItems] = useState<Notification[]>([]);
-
-  function reload() {
-    api.notifications.list().then(setItems);
-  }
-  useEffect(reload, [api]);
+  const { items, refresh: reload } = useNotificationsCache();
+  const { paged, page, pageCount, setPage } = usePagedRows(items);
 
   async function open(n: Notification) {
     if (!n.read) {
@@ -22,9 +29,14 @@ export function Notifications() {
 
   return (
     <AppShell title="Notifications" subtitle="Everything routed to you specifically">
+      {items.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14, maxWidth: 720 }}>
+          <ExportButtons filename="notifications" title="Notifications" columns={NOTIFICATION_COLUMNS} rows={items} />
+        </div>
+      )}
       <Card padding={0} style={{ maxWidth: 720 }}>
         {items.length === 0 && <EmptyState title="You're all caught up" />}
-        {items.map((n) => (
+        {paged.map((n) => (
           <button
             key={n.id}
             onClick={() => open(n)}
@@ -62,6 +74,7 @@ export function Notifications() {
             </span>
           </button>
         ))}
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${items.length} notification(s)`} />
       </Card>
     </AppShell>
   );

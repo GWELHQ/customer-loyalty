@@ -41,6 +41,7 @@ export class StationsController {
       action: 'station.create',
       entityType: 'station',
       entityId: station.id,
+      entityLabel: station.name,
     });
     return station;
   }
@@ -58,6 +59,7 @@ export class StationsController {
       action: 'station.update',
       entityType: 'station',
       entityId: id,
+      entityLabel: station.name,
     });
     return station;
   }

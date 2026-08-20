@@ -2,8 +2,21 @@ import type { Customer, Sale } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useApi } from '../../data/client';
+import { usePagedRows } from '../../data/usePagedRows';
+import { useRealtimeRefresh } from '../../data/realtime';
 import { AppShell } from '../../layout/AppShell';
-import { Badge, Card, CardHeader, EmptyState, Table, Td, Th, Tr } from '../../ui/primitives';
+import type { ExportColumn } from '../../lib/exportTable';
+import { ExportButtons } from '../../ui/ExportButtons';
+import { Badge, Card, CardHeader, EmptyState, Pagination, Table, Td, Th, Tr } from '../../ui/primitives';
+
+const SALE_COLUMNS: ExportColumn<Sale>[] = [
+  { header: 'Date', value: (s) => new Date(s.saleDate).toLocaleDateString('en-KE') },
+  { header: 'Station', value: (s) => s.stationNameAtSale },
+  { header: 'Product', value: (s) => s.product },
+  { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
+  { header: 'Litres', value: (s) => s.snapshot.wholeLitres },
+  { header: 'Cashback (KSh)', value: (s) => s.snapshot.cashbackEarned },
+];
 
 export function CustomerProfile() {
   const { id } = useParams<{ id: string }>();
@@ -11,8 +24,9 @@ export function CustomerProfile() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
+  const { paged, page, pageCount, setPage } = usePagedRows(sales);
 
-  useEffect(() => {
+  function reload() {
     if (!id) return;
     Promise.all([api.customers.get(id), api.reports.customerActivity(id)])
       .then(([c, activity]) => {
@@ -20,7 +34,9 @@ export function CustomerProfile() {
         setSales((activity as { sales: Sale[] }).sales ?? []);
       })
       .finally(() => setLoading(false));
-  }, [api, id]);
+  }
+  useEffect(reload, [api, id]);
+  useRealtimeRefresh(['customers', 'sales'], reload);
 
   if (loading) return <AppShell title="Customer">Loading…</AppShell>;
   if (!customer) return <AppShell title="Customer not found">This customer could not be found.</AppShell>;
@@ -31,7 +47,11 @@ export function CustomerProfile() {
     <AppShell title={customer.fullName} subtitle={customer.phoneNumber}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
         <Card>
-          <CardHeader title="Sales history" subtitle={`${sales.length} sale(s) recorded`} />
+          <CardHeader
+            title="Sales history"
+            subtitle={`${sales.length} sale(s) recorded`}
+            right={sales.length > 0 && <ExportButtons filename={`customer-${customer.id}-sales`} title={`${customer.fullName} — sales history`} columns={SALE_COLUMNS} rows={sales} />}
+          />
           <div style={{ marginTop: 12 }}>
             {sales.length === 0 && <EmptyState title="No sales yet" body="This customer hasn't fuelled at any station yet." />}
             {sales.length > 0 && (
@@ -47,7 +67,7 @@ export function CustomerProfile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s) => (
+                  {paged.map((s) => (
                     <Tr key={s.id}>
                       <Td>{new Date(s.saleDate).toLocaleDateString('en-KE')}</Td>
                       <Td>{s.stationNameAtSale}</Td>
@@ -62,6 +82,7 @@ export function CustomerProfile() {
                 </tbody>
               </Table>
             )}
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${sales.length} sale(s)`} />
           </div>
         </Card>
 

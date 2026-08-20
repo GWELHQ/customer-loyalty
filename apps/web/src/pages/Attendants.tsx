@@ -1,24 +1,33 @@
 import type { Attendant, Station } from '@loyalty/shared';
 import { UserStatus } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useApi } from '../data/client';
+import { useAttendantsCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, Field, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+function attendantColumns(stations: Station[]): ExportColumn<Attendant>[] {
+  return [
+    { header: 'Name', value: (a) => a.fullName },
+    { header: 'Employee ID', value: (a) => a.employeeId },
+    { header: 'Station', value: (a) => stations.find((s) => s.id === a.assignedStationId)?.name ?? 'Unknown station' },
+    { header: 'Status', value: (a) => a.status },
+  ];
+}
 
 export function Attendants() {
   const api = useApi();
-  const [attendants, setAttendants] = useState<Attendant[]>([]);
+  const { items: attendants, refresh: reload } = useAttendantsCache();
   const { stations } = useStations();
+  const { paged, page, pageCount, setPage } = usePagedRows(attendants);
   const [showForm, setShowForm] = useState(false);
   const [pinModalFor, setPinModalFor] = useState<Attendant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  function reload() {
-    api.attendants.list().then(setAttendants);
-  }
-  useEffect(reload, [api]);
 
   async function toggleStatus(a: Attendant) {
     setError(null);
@@ -41,10 +50,12 @@ export function Attendants() {
             {error}
           </div>
         )}
-        <div>
+        <div style={{ display: 'flex', gap: 10 }}>
           <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'Cancel' : 'Add attendant'}
           </Button>
+          <div style={{ flex: 1 }} />
+          <ExportButtons filename="attendants" title="Attendants" columns={attendantColumns(stations)} rows={attendants} />
         </div>
         {showForm && (
           <AttendantForm
@@ -68,11 +79,11 @@ export function Attendants() {
               </tr>
             </thead>
             <tbody>
-              {attendants.map((a) => (
+              {paged.map((a) => (
                 <Tr key={a.id}>
                   <Td>{a.fullName}</Td>
                   <Td>{a.employeeId}</Td>
-                  <Td>{stations.find((s) => s.id === a.assignedStationId)?.name ?? a.assignedStationId}</Td>
+                  <Td>{stations.find((s) => s.id === a.assignedStationId)?.name ?? 'Unknown station'}</Td>
                   <Td>
                     <Badge tone={a.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>{a.status}</Badge>
                   </Td>
@@ -90,6 +101,7 @@ export function Attendants() {
               ))}
             </tbody>
           </Table>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${attendants.length} attendant(s)`} />
         </Card>
       </div>
 

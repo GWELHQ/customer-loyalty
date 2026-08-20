@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import { Card, KpiTile } from '../ui/primitives';
 
@@ -22,12 +23,14 @@ export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function reload() {
     api.reports
       .dashboard()
       .then((d) => setData(d as DashboardData))
       .finally(() => setLoading(false));
-  }, [api]);
+  }
+  useEffect(reload, [api]);
+  useRealtimeRefresh(['sales', 'customers', 'specialRateRequests', 'reconciliationDaily'], reload);
 
   const kpis = data
     ? [

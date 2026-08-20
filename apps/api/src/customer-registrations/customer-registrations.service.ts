@@ -11,6 +11,7 @@ import {
 import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 import { PricesService } from '../prices/prices.service';
 import { SalesService } from '../sales/sales.service';
 import { StationsService } from '../stations/stations.service';
@@ -35,6 +36,7 @@ export class CustomerRegistrationsService {
     private readonly stations: StationsService,
     private readonly prices: PricesService,
     private readonly sales: SalesService,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private col() {
@@ -111,6 +113,7 @@ export class CustomerRegistrationsService {
       updatedAt: now,
     };
     await ref.set(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: params.idempotencyKey };
   }
 
@@ -148,6 +151,7 @@ export class CustomerRegistrationsService {
         decidedAt: now,
         updatedAt: now,
       });
+      this.changeEvents.emit(COLLECTION);
       return this.findById(id);
     }
 
@@ -187,6 +191,7 @@ export class CustomerRegistrationsService {
       saleId: sale.id,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 

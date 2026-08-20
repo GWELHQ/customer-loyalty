@@ -3,12 +3,16 @@ import { Product, type ProductPrice } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'productPrices';
 
 @Injectable()
 export class PricesService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -80,6 +84,7 @@ export class PricesService {
       return newRef;
     });
 
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 

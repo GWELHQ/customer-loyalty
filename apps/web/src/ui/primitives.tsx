@@ -282,3 +282,42 @@ export function Tr({ children, onClick }: PropsWithChildren<{ onClick?: () => vo
     </tr>
   );
 }
+
+export function Pagination({
+  page,
+  pageCount,
+  onChange,
+  totalLabel,
+}: {
+  page: number;
+  pageCount: number;
+  onChange: (page: number) => void;
+  totalLabel?: string;
+}) {
+  if (pageCount <= 1) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 12,
+        padding: '12px 14px',
+        borderTop: '1px solid var(--color-border)',
+      }}
+    >
+      <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+        Page {page} of {pageCount}
+        {totalLabel ? ` · ${totalLabel}` : ''}
+      </span>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <Button variant="secondary" size="sm" onClick={() => onChange(page - 1)} disabled={page <= 1}>
+          Previous
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => onChange(page + 1)} disabled={page >= pageCount}>
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}

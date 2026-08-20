@@ -1,10 +1,14 @@
 import type { Station, User } from '@loyalty/shared';
 import { Role, UserStatus } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useApi } from '../data/client';
+import { useUsersCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, Field, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.ADMIN]: 'Admin',
@@ -18,19 +22,25 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const ASSIGNABLE_ROLES = [Role.ADMIN, Role.CHAIRMAN, Role.FINANCE, Role.RTSM, Role.STATION_SUPERVISOR, Role.EXEC_VIEWER];
 
+function userColumns(stations: Station[]): ExportColumn<User>[] {
+  return [
+    { header: 'Name', value: (u) => u.fullName },
+    { header: 'Email', value: (u) => u.email },
+    { header: 'Role', value: (u) => ROLE_LABELS[u.role] },
+    { header: 'Station', value: (u) => stations.find((s) => s.id === u.assignedStationId)?.name ?? '' },
+    { header: 'Status', value: (u) => u.status },
+  ];
+}
+
 export function Users() {
   const api = useApi();
-  const [users, setUsers] = useState<User[]>([]);
+  const { items: users, refresh: reload } = useUsersCache();
   const { stations } = useStations();
+  const { paged, page, pageCount, setPage } = usePagedRows(users);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  function reload() {
-    api.users.list().then(setUsers);
-  }
-  useEffect(reload, [api]);
 
   async function toggleStatus(user: User) {
     setError(null);
@@ -53,10 +63,12 @@ export function Users() {
             {error}
           </div>
         )}
-        <div>
+        <div style={{ display: 'flex', gap: 10 }}>
           <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'Cancel' : 'Add user'}
           </Button>
+          <div style={{ flex: 1 }} />
+          <ExportButtons filename="users" title="Users" columns={userColumns(stations)} rows={users} />
         </div>
         {showForm && (
           <UserForm
@@ -81,7 +93,7 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {paged.map((u) => (
                 <Tr key={u.id}>
                   <Td>{u.fullName}</Td>
                   <Td>{u.email}</Td>
@@ -104,6 +116,7 @@ export function Users() {
               ))}
             </tbody>
           </Table>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${users.length} user(s)`} />
         </Card>
       </div>
 

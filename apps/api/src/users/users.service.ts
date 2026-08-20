@@ -2,12 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Role, UserStatus, type User } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'users';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -65,6 +69,7 @@ export class UsersService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -89,6 +94,7 @@ export class UsersService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -106,6 +112,7 @@ export class UsersService {
     await this.col()
       .doc(id)
       .update({ ...input, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
 
@@ -113,6 +120,7 @@ export class UsersService {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
     await this.col().doc(id).update({ status, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
 

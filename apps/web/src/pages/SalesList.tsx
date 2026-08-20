@@ -1,25 +1,63 @@
 import type { Sale } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+const PAGE_SIZE = 25;
+
+const SALE_COLUMNS: ExportColumn<Sale>[] = [
+  { header: 'Date', value: (s) => new Date(s.saleDate).toLocaleString('en-KE') },
+  { header: 'Station', value: (s) => s.stationNameAtSale },
+  { header: 'Attendant', value: (s) => s.attendantNameAtSale },
+  { header: 'Product', value: (s) => s.product },
+  { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
+  { header: 'Litres', value: (s) => s.snapshot.litres },
+  { header: 'Cashback rate (KSh/L)', value: (s) => s.snapshot.cashbackRatePerLitre },
+  { header: 'Cashback earned (KSh)', value: (s) => s.snapshot.cashbackEarned },
+  { header: 'SMS status', value: (s) => s.smsStatus },
+  { header: 'Source', value: (s) => s.source },
+];
 
 export function SalesList() {
   const api = useApi();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [total, setTotal] = useState(0);
   const { stations } = useStations();
   const [stationId, setStationId] = useState('');
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sale | null>(null);
 
-  useEffect(() => {
+  function reload() {
     setLoading(true);
     api.sales
-      .list({ page: 1, pageSize: 50, stationId: stationId || undefined })
-      .then((res) => setSales(res.items))
+      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined })
+      .then((res) => {
+        setSales(res.items);
+        setTotal(res.total);
+      })
       .finally(() => setLoading(false));
-  }, [api, stationId]);
+  }
+  useEffect(reload, [api, stationId, page]);
+  useRealtimeRefresh(['sales'], reload);
+  useEffect(() => setPage(1), [stationId]);
+
+  async function fetchAllForExport(): Promise<Sale[]> {
+    const all: Sale[] = [];
+    for (let p = 1; ; p++) {
+      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined });
+      all.push(...res.items);
+      if (res.items.length < 100 || all.length >= res.total) break;
+    }
+    return all;
+  }
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   async function retrySms(sale: Sale) {
     await api.sales.retrySms(sale.id);
@@ -27,7 +65,7 @@ export function SalesList() {
 
   return (
     <AppShell title="Sales activity" subtitle="Every sale keeps an immutable snapshot of how its cashback was calculated">
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         {stations.length > 0 && (
           <select style={{ ...inputStyle, maxWidth: 220 }} value={stationId} onChange={(e) => setStationId(e.target.value)}>
             <option value="">All stations</option>
@@ -38,6 +76,8 @@ export function SalesList() {
             ))}
           </select>
         )}
+        <div style={{ flex: 1 }} />
+        <ExportButtons filename="sales" title="Sales activity" columns={SALE_COLUMNS} rows={fetchAllForExport} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
@@ -78,6 +118,7 @@ export function SalesList() {
               </tbody>
             </Table>
           )}
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${total} sale(s)`} />
         </Card>
 
         {selected && (

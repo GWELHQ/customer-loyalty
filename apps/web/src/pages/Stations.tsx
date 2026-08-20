@@ -3,15 +3,26 @@ import { Permission } from '@loyalty/shared';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { usePagedRows } from '../data/usePagedRows';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, Field, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+const STATION_COLUMNS: ExportColumn<Station>[] = [
+  { header: 'Name', value: (s) => s.name },
+  { header: 'Code', value: (s) => s.code },
+  { header: 'Location', value: (s) => s.location ?? '' },
+  { header: 'Status', value: (s) => (s.active ? 'Active' : 'Inactive') },
+];
 
 export function Stations() {
   const api = useApi();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.STATIONS_MANAGE);
   const { stations, refresh } = useStations();
+  const { paged, page, pageCount, setPage } = usePagedRows(stations);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -37,13 +48,15 @@ export function Stations() {
             {error}
           </div>
         )}
-        {canManage && (
-          <div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {canManage && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
               {showForm ? 'Cancel' : 'Add station'}
             </Button>
-          </div>
-        )}
+          )}
+          <div style={{ flex: 1 }} />
+          <ExportButtons filename="stations" title="Stations" columns={STATION_COLUMNS} rows={stations} />
+        </div>
         {showForm && (
           <StationForm
             onDone={() => {
@@ -65,7 +78,7 @@ export function Stations() {
               </tr>
             </thead>
             <tbody>
-              {stations.map((s) => (
+              {paged.map((s) => (
                 <Tr key={s.id}>
                   <Td>{s.name}</Td>
                   <Td>{s.code}</Td>
@@ -84,6 +97,7 @@ export function Stations() {
               ))}
             </tbody>
           </Table>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${stations.length} station(s)`} />
         </Card>
       </div>
     </AppShell>

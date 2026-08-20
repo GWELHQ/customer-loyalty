@@ -4,6 +4,7 @@ import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'specialRateRequests';
 
@@ -12,6 +13,7 @@ export class SpecialRateRequestsService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly customers: CustomersService,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private col() {
@@ -57,6 +59,7 @@ export class SpecialRateRequestsService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -86,6 +89,7 @@ export class SpecialRateRequestsService {
       decidedAt: now,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
 
     if (status === SpecialRateStatus.APPROVED) {
       await this.customers.applySpecialRate(request.customerId, {

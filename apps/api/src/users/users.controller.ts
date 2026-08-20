@@ -42,6 +42,7 @@ export class UsersController {
       action: 'user.create',
       entityType: 'user',
       entityId: user.id,
+      entityLabel: user.fullName,
       metadata: { role: user.role },
     });
     return user;
@@ -55,7 +56,7 @@ export class UsersController {
     @CurrentUser() actor: StaffPrincipal,
   ) {
     const user = await this.users.update(id, dto);
-    await this.audit.record({ actor, action: 'user.update', entityType: 'user', entityId: id });
+    await this.audit.record({ actor, action: 'user.update', entityType: 'user', entityId: id, entityLabel: user.fullName });
     return user;
   }
 
@@ -72,6 +73,7 @@ export class UsersController {
       action: 'user.status_change',
       entityType: 'user',
       entityId: id,
+      entityLabel: user.fullName,
       metadata: { status: dto.status },
     });
     return user;

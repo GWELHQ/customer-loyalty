@@ -46,6 +46,7 @@ export class CustomerRegistrationsController {
       action: 'customer_registration_request.approve',
       entityType: 'customerRegistrationRequest',
       entityId: id,
+      entityLabel: request.customerFullName,
       metadata: { customerId: request.customerId, saleId: request.saleId },
     });
     return request;
@@ -64,6 +65,7 @@ export class CustomerRegistrationsController {
       action: 'customer_registration_request.reject',
       entityType: 'customerRegistrationRequest',
       entityId: id,
+      entityLabel: request.customerFullName,
     });
     return request;
   }

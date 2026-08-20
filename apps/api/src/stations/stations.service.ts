@@ -2,12 +2,16 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Station } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'stations';
 
 @Injectable()
 export class StationsService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -37,6 +41,7 @@ export class StationsService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -49,6 +54,7 @@ export class StationsService {
     await this.col()
       .doc(id)
       .update({ ...input, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
 }

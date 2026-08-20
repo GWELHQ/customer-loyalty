@@ -1,6 +1,7 @@
 import type { Station } from '@loyalty/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { useApi } from './client';
+import { useRealtimeRefresh } from './realtime';
 
 // Stations rarely change, but ~7 different pages each fetched their own
 // copy on every visit. One shared, session-lived cache instead of a
@@ -46,6 +47,8 @@ export function useStations(): { stations: Station[]; loading: boolean; refresh:
     cache = null;
     load();
   }, [load]);
+
+  useRealtimeRefresh(['stations'], refresh);
 
   return { stations, loading, refresh };
 }

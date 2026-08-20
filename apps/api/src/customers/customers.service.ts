@@ -3,12 +3,16 @@ import { normalizePhoneNumber, type Customer } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { PaginatedResult, PaginationQueryDto } from '../common/dto/pagination.dto';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'customers';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   col() {
     return this.firestore.collection(COLLECTION);
@@ -125,6 +129,7 @@ export class CustomersService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -136,6 +141,7 @@ export class CustomersService {
     await this.col()
       .doc(id)
       .update({ ...input, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 
@@ -151,6 +157,7 @@ export class CustomersService {
       specialRateEffectiveTo: rate.effectiveTo ?? null,
       updatedAt: nowIso(),
     });
+    this.changeEvents.emit(COLLECTION);
   }
 
   async incrementCashback(id: string, amount: number): Promise<void> {
@@ -161,5 +168,6 @@ export class CustomersService {
       const current = (snap.data()?.totalCashbackEarned as number) ?? 0;
       tx.update(ref, { totalCashbackEarned: current + amount, updatedAt: nowIso() });
     });
+    this.changeEvents.emit(COLLECTION);
   }
 }

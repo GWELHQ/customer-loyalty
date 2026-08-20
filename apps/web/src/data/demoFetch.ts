@@ -54,7 +54,7 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
     });
   }
   if (path === '/sales' && method === 'GET') return json({ items: [], page: 1, pageSize: 20, total: 0, nextCursor: null });
-  if (path === '/audit-events') return json([]);
+  if (path === '/audit-events') return json({ items: [], page: 1, pageSize: 50, total: 0, nextCursor: null });
   if (path.startsWith('/reconciliation/daily')) return json([]);
   if (path === '/disbursement-batches') return json([]);
 

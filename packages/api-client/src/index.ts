@@ -230,7 +230,7 @@ export class LoyaltyApiClient {
   };
 
   auditEvents = {
-    list: (params: { entityType?: string; entityId?: string; limit?: number } = {}) =>
-      this.http.get<AuditEvent[]>(`/audit-events${toQueryString(params)}`),
+    list: (params: { entityType?: string; entityId?: string; cursor?: string } = {}) =>
+      this.http.get<PaginatedResult<AuditEvent>>(`/audit-events${toQueryString(params)}`),
   };
 }

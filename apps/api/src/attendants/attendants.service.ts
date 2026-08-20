@@ -3,12 +3,16 @@ import * as argon2 from 'argon2';
 import { PIN_LOCKOUT_MINUTES, PIN_MAX_FAILED_ATTEMPTS, UserStatus, type Attendant } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'attendants';
 
 @Injectable()
 export class AttendantsService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -53,6 +57,7 @@ export class AttendantsService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -66,12 +71,14 @@ export class AttendantsService {
       lockedUntil: null,
       updatedAt: nowIso(),
     });
+    this.changeEvents.emit(COLLECTION);
   }
 
   async setStatus(id: string, status: UserStatus): Promise<Attendant> {
     const attendant = await this.findById(id);
     if (!attendant) throw new NotFoundException('Attendant not found');
     await this.col().doc(id).update({ status, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
 
@@ -79,6 +86,7 @@ export class AttendantsService {
     const attendant = await this.findById(id);
     if (!attendant) throw new NotFoundException('Attendant not found');
     await this.col().doc(id).update({ assignedStationId, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
 

@@ -12,6 +12,7 @@ import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { StorageService } from '../common/storage/storage.service';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 import { StationsService } from '../stations/stations.service';
 import { CustomersService } from './customers.service';
 
@@ -47,6 +48,7 @@ export class CustomerImportsService {
     private readonly storage: StorageService,
     private readonly customers: CustomersService,
     private readonly stations: StationsService,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private jobsCol() {
@@ -354,6 +356,8 @@ export class CustomerImportsService {
       errorReportGcsPath,
       updatedAt: nowIso(),
     });
+    this.changeEvents.emit('imports');
+    if (created > 0 || merged > 0) this.changeEvents.emit('customers');
 
     return this.findJob(id);
   }

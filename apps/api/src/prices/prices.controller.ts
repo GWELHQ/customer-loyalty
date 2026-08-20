@@ -49,6 +49,7 @@ export class PricesController {
       action: 'price.publish',
       entityType: 'productPrice',
       entityId: price.id,
+      entityLabel: `${price.product} @ KSh ${price.pricePerLitre}/L`,
       metadata: { product: price.product, pricePerLitre: price.pricePerLitre },
     });
     return price;

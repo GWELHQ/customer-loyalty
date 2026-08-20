@@ -10,6 +10,7 @@ import { CashbackLedgersService } from '../cashback-ledgers/cashback-ledgers.ser
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'disbursementBatches';
 
@@ -18,6 +19,7 @@ export class DisbursementBatchesService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly ledgers: CashbackLedgersService,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private col() {
@@ -67,6 +69,7 @@ export class DisbursementBatchesService {
     };
     const ref = await this.col().add(doc);
     await this.ledgers.setStatus(month, LedgerStatus.DISBURSEMENT_IN_PROGRESS);
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 
@@ -82,6 +85,7 @@ export class DisbursementBatchesService {
       confirmedAt: now,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 
@@ -91,6 +95,7 @@ export class DisbursementBatchesService {
       throw new BadRequestException('Batch must be confirmed before processing');
     }
     await this.col().doc(id).update({ status: DisbursementBatchStatus.PROCESSING, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 
@@ -125,6 +130,7 @@ export class DisbursementBatchesService {
     await this.col().doc(id).update({ entries, status, completedAt: now, updatedAt: now });
 
     await this.ledgers.setStatus(batch.month, anyFailed ? LedgerStatus.FAILED : LedgerStatus.DISBURSED);
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 
@@ -134,6 +140,7 @@ export class DisbursementBatchesService {
       .doc(id)
       .update({ status: DisbursementBatchStatus.HELD, holdReason: reason, updatedAt: nowIso() });
     await this.ledgers.setStatus(batch.month, LedgerStatus.HELD);
+    this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
 }

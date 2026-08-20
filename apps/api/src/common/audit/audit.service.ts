@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { AuditEvent } from '@loyalty/shared';
+import { ChangeEventsService } from '../../events/change-events.service';
 import { FirestoreService } from '../firestore/firestore.service';
 import type { AuthPrincipal } from '../types/principal';
 
@@ -8,6 +9,8 @@ export interface RecordAuditEventInput {
   action: string;
   entityType: string;
   entityId: string;
+  /** Human-readable name for the affected record — shown in the UI instead of entityId. */
+  entityLabel?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -19,7 +22,10 @@ export interface RecordAuditEventInput {
  */
 @Injectable()
 export class AuditService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   async record(input: RecordAuditEventInput): Promise<void> {
     const actorName =
@@ -42,10 +48,12 @@ export class AuditService {
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId,
+      entityLabel: input.entityLabel,
       metadata: input.metadata,
       createdAt: now,
       updatedAt: now,
     };
     await this.firestore.collection('auditEvents').add(doc);
+    this.changeEvents.emit('auditEvents');
   }
 }

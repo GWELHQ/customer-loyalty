@@ -42,6 +42,7 @@ export class ReconciliationController {
       action: 'reconciliation.ingest_daily_total',
       entityType: 'reconciliationDaily',
       entityId: record.id,
+      entityLabel: `${record.product} · ${record.date}`,
       metadata: { stationId: dto.stationId, product: dto.product, date: dto.date, totalSales: dto.totalSales },
     });
     return record;

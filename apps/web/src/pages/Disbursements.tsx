@@ -1,10 +1,21 @@
 import type { DisbursementBatch } from '@loyalty/shared';
 import { DisbursementBatchStatus, Permission } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useDisbursementBatchesCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
+  { header: 'Month', value: (b) => b.month },
+  { header: 'Total amount (KSh)', value: (b) => b.totalAmount },
+  { header: 'Customers', value: (b) => b.entries.length },
+  { header: 'Status', value: (b) => b.status },
+];
 
 const STATUS_TONE: Record<DisbursementBatchStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
   [DisbursementBatchStatus.DRAFT]: 'neutral',
@@ -18,15 +29,11 @@ export function Disbursements() {
   const api = useApi();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.DISBURSEMENTS_MANAGE);
-  const [batches, setBatches] = useState<DisbursementBatch[]>([]);
+  const { items: batches, refresh: reload } = useDisbursementBatchesCache();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selected, setSelected] = useState<DisbursementBatch | null>(null);
   const [busy, setBusy] = useState(false);
-
-  function reload() {
-    api.disbursementBatches.list().then(setBatches);
-  }
-  useEffect(reload, [api]);
+  const { paged, page, pageCount, setPage } = usePagedRows(batches);
 
   async function createBatch() {
     setBusy(true);
@@ -75,14 +82,18 @@ export function Disbursements() {
   return (
     <AppShell title="Disbursement batches" subtitle="A batch is only shown as disbursed once every payment is confirmed">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {canManage && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
-            <Button variant="primary" onClick={createBatch} disabled={busy}>
-              Create batch from approved ledger
-            </Button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {canManage && (
+            <>
+              <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
+              <Button variant="primary" onClick={createBatch} disabled={busy}>
+                Create batch from approved ledger
+              </Button>
+            </>
+          )}
+          <div style={{ flex: 1 }} />
+          <ExportButtons filename="disbursement-batches" title="Disbursement batches" columns={BATCH_COLUMNS} rows={batches} />
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
           <Card padding={0}>
@@ -98,7 +109,7 @@ export function Disbursements() {
                   </tr>
                 </thead>
                 <tbody>
-                  {batches.map((b) => (
+                  {paged.map((b) => (
                     <Tr key={b.id} onClick={() => setSelected(b)}>
                       <Td>{b.month}</Td>
                       <Td align="right">KSh {b.totalAmount.toLocaleString('en-KE')}</Td>
@@ -111,6 +122,7 @@ export function Disbursements() {
                 </tbody>
               </Table>
             )}
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${batches.length} batch(es)`} />
           </Card>
 
           {selected && (

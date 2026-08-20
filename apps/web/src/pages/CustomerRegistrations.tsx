@@ -1,25 +1,34 @@
 import type { CustomerRegistrationRequest } from '@loyalty/shared';
 import { CustomerRegistrationStatus, Permission } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useCustomerRegistrationsCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, CardHeader, Field, Modal, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, CardHeader, Field, Modal, Pagination, inputStyle } from '../ui/primitives';
+
+const REGISTRATION_COLUMNS: ExportColumn<CustomerRegistrationRequest>[] = [
+  { header: 'Customer', value: (r) => r.customerFullName },
+  { header: 'Phone', value: (r) => r.customerPhoneNumber },
+  { header: 'Station', value: (r) => r.stationNameAtRequest },
+  { header: 'Product', value: (r) => r.product },
+  { header: 'Amount paid (KSh)', value: (r) => r.amountPaid },
+  { header: 'Cashback (preview, KSh)', value: (r) => r.snapshot.cashbackEarned },
+  { header: 'Registered by', value: (r) => r.attendantNameAtRequest },
+  { header: 'Status', value: (r) => r.status },
+  { header: 'Decided by', value: (r) => r.decidedByName ?? '' },
+];
 
 export function CustomerRegistrations() {
-  const api = useApi();
   const { hasPermission } = useAuth();
-  const [requests, setRequests] = useState<CustomerRegistrationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  function reload() {
-    setLoading(true);
-    api.customerRegistrations.list().then(setRequests).finally(() => setLoading(false));
-  }
-  useEffect(reload, [api]);
+  const { items: requests, loading, refresh: reload } = useCustomerRegistrationsCache();
 
   const pending = requests.filter((r) => r.status === CustomerRegistrationStatus.PENDING);
   const decided = requests.filter((r) => r.status !== CustomerRegistrationStatus.PENDING);
+  const { paged: pagedDecided, page, pageCount, setPage } = usePagedRows(decided, 10);
 
   return (
     <AppShell
@@ -27,6 +36,9 @@ export function CustomerRegistrations() {
       subtitle="New customers registered by attendants during a sale — approving creates the customer and records the sale"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <ExportButtons filename="customer-registrations" title="Customer registrations" columns={REGISTRATION_COLUMNS} rows={requests} />
+        </div>
         <Card padding={0}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
             <CardHeader
@@ -57,9 +69,10 @@ export function CustomerRegistrations() {
             >
               Decided requests
             </div>
-            {decided.map((r) => (
+            {pagedDecided.map((r) => (
               <RequestRow key={r.id} request={r} canApprove={false} onDecided={reload} />
             ))}
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${decided.length} decided`} />
           </Card>
         )}
       </div>

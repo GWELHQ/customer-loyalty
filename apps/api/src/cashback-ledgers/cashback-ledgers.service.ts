@@ -8,12 +8,16 @@ import {
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'monthlyCashbackLedgers';
 
 @Injectable()
 export class CashbackLedgersService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -85,6 +89,7 @@ export class CashbackLedgersService {
       updatedAt: now,
     };
     await this.col().doc(month).set(doc, { merge: true });
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: month };
   }
 
@@ -116,6 +121,7 @@ export class CashbackLedgersService {
       submittedAt: now,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
     return this.findByMonth(month);
   }
 
@@ -131,6 +137,7 @@ export class CashbackLedgersService {
       approvedAt: now,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
     return this.findByMonth(month);
   }
 
@@ -147,6 +154,7 @@ export class CashbackLedgersService {
       rejectionReason: reason,
       updatedAt: now,
     });
+    this.changeEvents.emit(COLLECTION);
     return this.findByMonth(month);
   }
 
@@ -158,6 +166,7 @@ export class CashbackLedgersService {
 
   async setStatus(month: string, status: LedgerStatus): Promise<void> {
     await this.col().doc(month).update({ status, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
   }
 }
 

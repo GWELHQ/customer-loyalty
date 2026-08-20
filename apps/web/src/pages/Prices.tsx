@@ -3,6 +3,7 @@ import { Permission, Product } from '@loyalty/shared';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import { Icon } from '../ui/Icon';
 import { Badge, Button, Card, Field, inputStyle } from '../ui/primitives';
@@ -24,6 +25,7 @@ export function Prices() {
     api.prices.reminderSettings().then(setReminders);
   }
   useEffect(reload, [api]);
+  useRealtimeRefresh(['productPrices'], reload);
 
   async function publish() {
     setError(null);

@@ -264,6 +264,8 @@ export interface AuditEvent extends BaseDoc {
   action: string;
   entityType: string;
   entityId: string;
+  /** Human-readable name for the affected record (e.g. a customer's or station's name) — the UI shows this instead of the raw Firestore document ID. */
+  entityLabel?: string;
   metadata?: Record<string, unknown>;
 }
 

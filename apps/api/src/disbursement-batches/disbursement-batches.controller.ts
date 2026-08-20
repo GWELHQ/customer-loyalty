@@ -42,6 +42,7 @@ export class DisbursementBatchesController {
       action: 'disbursement_batch.create',
       entityType: 'disbursementBatch',
       entityId: batch.id,
+      entityLabel: batch.month,
       metadata: { month: dto.month, totalAmount: batch.totalAmount },
     });
     return batch;
@@ -51,7 +52,7 @@ export class DisbursementBatchesController {
   @RequirePermissions(Permission.DISBURSEMENTS_MANAGE)
   async confirm(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
     const batch = await this.batches.confirm(id, actor);
-    await this.audit.record({ actor, action: 'disbursement_batch.confirm', entityType: 'disbursementBatch', entityId: id });
+    await this.audit.record({ actor, action: 'disbursement_batch.confirm', entityType: 'disbursementBatch', entityId: id, entityLabel: batch.month });
     return batch;
   }
 
@@ -59,7 +60,7 @@ export class DisbursementBatchesController {
   @RequirePermissions(Permission.DISBURSEMENTS_MANAGE)
   async markProcessing(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
     const batch = await this.batches.markProcessing(id);
-    await this.audit.record({ actor, action: 'disbursement_batch.mark_processing', entityType: 'disbursementBatch', entityId: id });
+    await this.audit.record({ actor, action: 'disbursement_batch.mark_processing', entityType: 'disbursementBatch', entityId: id, entityLabel: batch.month });
     return batch;
   }
 
@@ -76,6 +77,7 @@ export class DisbursementBatchesController {
       action: 'disbursement_batch.complete',
       entityType: 'disbursementBatch',
       entityId: id,
+      entityLabel: batch.month,
       metadata: { status: batch.status },
     });
     return batch;
@@ -90,6 +92,7 @@ export class DisbursementBatchesController {
       action: 'disbursement_batch.hold',
       entityType: 'disbursementBatch',
       entityId: id,
+      entityLabel: batch.month,
       metadata: { reason: dto.reason },
     });
     return batch;

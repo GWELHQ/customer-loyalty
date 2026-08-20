@@ -1,44 +1,57 @@
-import type { Customer } from '@loyalty/shared';
+import type { Customer, Station } from '@loyalty/shared';
 import { Permission } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { useApi } from '../../data/client';
+import { usePagedRows } from '../../data/usePagedRows';
+import { useCustomersCache } from '../../data/useCustomersCache';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
-import { Button, EmptyState, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
+import type { ExportColumn } from '../../lib/exportTable';
+import { ExportButtons } from '../../ui/ExportButtons';
+import { Button, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
+
+function customerColumns(stations: Station[]): ExportColumn<Customer>[] {
+  return [
+    { header: 'Name', value: (c) => c.fullName },
+    { header: 'Phone', value: (c) => c.phoneNumber },
+    { header: 'Home station', value: (c) => stations.find((s) => s.id === c.homeStationId)?.name ?? '' },
+    { header: 'Total cashback earned (KSh)', value: (c) => c.totalCashbackEarned },
+    { header: 'Special rate (KSh/L)', value: (c) => c.specialRateKesPerLitre ?? '' },
+    { header: 'Source', value: (c) => c.source },
+  ];
+}
 
 export function CustomersList() {
-  const api = useApi();
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const { stations } = useStations();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [total, setTotal] = useState(0);
+  // Loaded once and kept fresh silently via realtime updates — search below
+  // filters this in-memory list instead of hitting the API per keystroke.
+  const { customers, loading } = useCustomersCache();
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setLoading(true);
-    api.customers
-      .list({ page: 1, pageSize: 50, name: search || undefined })
-      .then((res) => {
-        setCustomers(res.items);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [api, search]);
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return customers;
+    return customers.filter(
+      (c) => c.fullName.toLowerCase().includes(needle) || c.phoneNumber.toLowerCase().includes(needle),
+    );
+  }, [customers, search]);
+
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   return (
-    <AppShell title="Customers" subtitle={`${total} centralised across every station`}>
+    <AppShell title="Customers" subtitle={`${customers.length} centralised across every station`}>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
-          placeholder="Search by name…"
+          placeholder="Search by name or phone…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...inputStyle, maxWidth: 280 }}
         />
         <div style={{ flex: 1 }} />
+        <ExportButtons filename="customers" title="Customers" columns={customerColumns(stations)} rows={filtered} />
         {hasPermission(Permission.CUSTOMERS_IMPORT) && (
           <Button variant="secondary" onClick={() => navigate('/customers/import')}>
             Import from Excel
@@ -53,8 +66,8 @@ export function CustomersList() {
 
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
         {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-        {!loading && customers.length === 0 && <EmptyState title="No customers found" body="Try a different search, or add one." />}
-        {!loading && customers.length > 0 && (
+        {!loading && filtered.length === 0 && <EmptyState title="No customers found" body="Try a different search, or add one." />}
+        {!loading && filtered.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -65,7 +78,7 @@ export function CustomersList() {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {paged.map((c) => (
                 <Tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)}>
                   <Td>
                     <span style={{ fontWeight: 700 }}>{c.fullName}</span>
@@ -89,6 +102,7 @@ export function CustomersList() {
             </tbody>
           </Table>
         )}
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} customer(s)`} />
       </div>
     </AppShell>
   );

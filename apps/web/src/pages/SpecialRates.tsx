@@ -1,45 +1,58 @@
 import type { Customer, SpecialRateRequest } from '@loyalty/shared';
 import { Permission, SpecialRateStatus } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useCustomersCache } from '../data/useCustomersCache';
+import { useSpecialRateRequestsCache } from '../data/entityCaches';
+import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
-import { Badge, Button, Card, CardHeader, Field, inputStyle } from '../ui/primitives';
+import type { ExportColumn } from '../lib/exportTable';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, CardHeader, Field, Pagination, inputStyle } from '../ui/primitives';
+
+function specialRateColumns(customers: Record<string, Customer>): ExportColumn<SpecialRateRequest>[] {
+  return [
+    { header: 'Customer', value: (r) => customers[r.customerId]?.fullName ?? 'Unknown customer' },
+    { header: 'Phone', value: (r) => customers[r.customerId]?.phoneNumber ?? '' },
+    { header: 'Proposed rate (KSh/L)', value: (r) => r.proposedKesPerLitre },
+    { header: 'Effective from', value: (r) => new Date(r.effectiveFrom).toLocaleDateString('en-KE') },
+    { header: 'Requested by', value: (r) => r.requestedByName },
+    { header: 'Reason', value: (r) => r.reason },
+    { header: 'Status', value: (r) => r.status },
+    { header: 'Decided by', value: (r) => r.decidedByName ?? '' },
+  ];
+}
 
 export function SpecialRates() {
-  const api = useApi();
   const { hasPermission } = useAuth();
   const canApprove = hasPermission(Permission.SPECIAL_RATES_APPROVE);
   const canRequest = hasPermission(Permission.SPECIAL_RATES_REQUEST);
-  const [requests, setRequests] = useState<SpecialRateRequest[]>([]);
-  const [customers, setCustomers] = useState<Record<string, Customer>>({});
+  const { items: requests, refresh: reload } = useSpecialRateRequestsCache();
+  const { customers: allCustomers } = useCustomersCache();
+  const customers = useMemo(() => {
+    const map: Record<string, Customer> = {};
+    for (const c of allCustomers) map[c.id] = c;
+    return map;
+  }, [allCustomers]);
   const [showForm, setShowForm] = useState(false);
-
-  function reload() {
-    api.specialRateRequests.list().then(async (list) => {
-      setRequests(list);
-      const missingIds = [...new Set(list.map((r) => r.customerId))];
-      const fetched = await Promise.all(missingIds.map((id) => api.customers.get(id).catch(() => null)));
-      const map: Record<string, Customer> = {};
-      fetched.forEach((c) => c && (map[c.id] = c));
-      setCustomers(map);
-    });
-  }
-  useEffect(reload, [api]);
 
   const pending = requests.filter((r) => r.status === SpecialRateStatus.PENDING);
   const decided = requests.filter((r) => r.status !== SpecialRateStatus.PENDING);
+  const { paged: pagedDecided, page, pageCount, setPage } = usePagedRows(decided, 10);
 
   return (
     <AppShell title="Special cashback rates" subtitle="Only the Chairman can approve or reject a request">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
-        {canRequest && (
-          <div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {canRequest && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
               {showForm ? 'Cancel' : 'Request a special rate'}
             </Button>
-          </div>
-        )}
+          )}
+          <div style={{ flex: 1 }} />
+          <ExportButtons filename="special-rate-requests" title="Special rate requests" columns={specialRateColumns(customers)} rows={requests} />
+        </div>
         {showForm && <RequestForm onDone={() => { setShowForm(false); reload(); }} />}
 
         <Card padding={0}>
@@ -57,9 +70,10 @@ export function SpecialRates() {
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
               Decided requests
             </div>
-            {decided.map((r) => (
+            {pagedDecided.map((r) => (
               <RequestRow key={r.id} request={r} customer={customers[r.customerId]} canApprove={false} onDecided={reload} />
             ))}
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${decided.length} decided`} />
           </Card>
         )}
       </div>
@@ -96,7 +110,7 @@ function RequestRow({
     <div style={{ padding: 16, borderBottom: '1px solid var(--color-border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{customer?.fullName ?? request.customerId}</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{customer?.fullName ?? 'Unknown customer'}</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{customer?.phoneNumber}</div>
         </div>
         <Badge tone={request.status === SpecialRateStatus.APPROVED ? 'success' : request.status === SpecialRateStatus.REJECTED ? 'danger' : 'warning'}>
@@ -147,19 +161,29 @@ function RequestRow({
 
 function RequestForm({ onDone }: { onDone: () => void }) {
   const api = useApi();
-  const [customerId, setCustomerId] = useState('');
+  const { customers } = useCustomersCache();
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [showMatches, setShowMatches] = useState(false);
   const [rate, setRate] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const matches = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!q) return [];
+    return customers.filter((c) => c.fullName.toLowerCase().includes(q) || c.phoneNumber.includes(q)).slice(0, 8);
+  }, [customers, customerQuery]);
+
   async function submit() {
+    if (!selectedCustomer) return;
     setError(null);
     setBusy(true);
     try {
       await api.specialRateRequests.create({
-        customerId,
+        customerId: selectedCustomer.id,
         proposedKesPerLitre: Number(rate),
         effectiveFrom: new Date(effectiveFrom).toISOString(),
         reason,
@@ -180,9 +204,86 @@ function RequestForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Customer ID">
-          <input style={inputStyle} value={customerId} onChange={(e) => setCustomerId(e.target.value)} placeholder="Paste from the customer profile" />
-        </Field>
+        <div style={{ position: 'relative' }}>
+          <Field label="Customer">
+            {selectedCustomer ? (
+              <div
+                style={{
+                  ...inputStyle,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  cursor: 'default',
+                }}
+              >
+                <span>
+                  {selectedCustomer.fullName} <span style={{ color: 'var(--color-text-muted)' }}>· {selectedCustomer.phoneNumber}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setCustomerQuery('');
+                  }}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 16 }}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <input
+                style={inputStyle}
+                value={customerQuery}
+                onChange={(e) => {
+                  setCustomerQuery(e.target.value);
+                  setShowMatches(true);
+                }}
+                onFocus={() => setShowMatches(true)}
+                onBlur={() => setTimeout(() => setShowMatches(false), 150)}
+                placeholder="Search by name or phone"
+              />
+            )}
+          </Field>
+          {showMatches && !selectedCustomer && matches.length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border-strong)',
+                borderRadius: 'var(--radius-md)',
+                marginTop: 4,
+                maxHeight: 220,
+                overflowY: 'auto',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+              }}
+            >
+              {matches.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedCustomer(c);
+                    setShowMatches(false);
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '9px 12px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: 13.5,
+                  }}
+                >
+                  {c.fullName} <span style={{ color: 'var(--color-text-muted)' }}>· {c.phoneNumber}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <Field label="Proposed rate (KSh per litre)">
           <input type="number" style={inputStyle} value={rate} onChange={(e) => setRate(e.target.value)} />
         </Field>
@@ -195,7 +296,7 @@ function RequestForm({ onDone }: { onDone: () => void }) {
           </Field>
         </div>
       </div>
-      <Button variant="primary" onClick={submit} disabled={busy || !customerId || !rate || !effectiveFrom || !reason} style={{ marginTop: 14 }}>
+      <Button variant="primary" onClick={submit} disabled={busy || !selectedCustomer || !rate || !effectiveFrom || !reason} style={{ marginTop: 14 }}>
         {busy ? 'Submitting…' : 'Submit request'}
       </Button>
     </Card>

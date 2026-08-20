@@ -16,9 +16,12 @@
     "@azure/msal-browser": "^3.27.0",
     "@loyalty/api-client": "*",
     "@loyalty/shared": "*",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.1"
+    "react-router-dom": "^6.26.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0",

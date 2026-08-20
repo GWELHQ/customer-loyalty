@@ -8,8 +8,11 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import type { LoyaltyApiClient } from '@loyalty/api-client';
 import { setRefreshHandler, setTokenGetter, setUnauthorizedHandler, useApi } from '../data/client';
+import { connectRealtime, disconnectRealtime } from '../data/realtime';
 import { env } from '../env';
+import { isTokenExpiringSoon } from '../lib/jwt';
 import { msalInstance, msalReady, msalScopes } from './msal';
 
 export interface StaffUser {
@@ -55,6 +58,18 @@ function saveSession(session: StoredSession | null) {
   else localStorage.removeItem(STORAGE_KEY);
 }
 
+/** Exchanges the stored refresh token for a new session. Used both as the reactive post-401 handler and proactively wherever a call is about to be made with a token that's about to expire. */
+async function refreshStoredSession(api: LoyaltyApiClient): Promise<StoredSession | null> {
+  const stored = loadStoredSession();
+  if (!stored) return null;
+  try {
+    const refreshed = await api.auth.refresh(stored.refreshToken);
+    return { ...refreshed };
+  } catch {
+    return null;
+  }
+}
+
 export function landingPathForRole(role: Role): string {
   switch (role) {
     case Role.CHAIRMAN:
@@ -79,6 +94,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setTokenGetter(() => session?.accessToken ?? null);
   }, [session]);
 
+  // Live-update channel: reconnects whenever the access token changes
+  // (login, token refresh) and tears down on sign-out. Demo mode has no
+  // real backend to stream from. Skips connecting with a token that's
+  // already expiring — the SSE fetch has no retry-on-401 logic of its own
+  // (unlike HttpClient), so connecting with a stale token would just log a
+  // guaranteed-to-fail request. The mount-validation effect below refreshes
+  // proactively, which updates `session` and re-runs this effect.
+  useEffect(() => {
+    if (!session?.accessToken || env.dataMode === 'demo') {
+      disconnectRealtime();
+      return;
+    }
+    if (isTokenExpiringSoon(session.accessToken)) return;
+    connectRealtime(session.accessToken);
+  }, [session?.accessToken]);
+
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setSession(null);
@@ -91,23 +122,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // and the refresh token (7d TTL) is almost always still good.
   useEffect(() => {
     setRefreshHandler(async () => {
-      const stored = loadStoredSession();
-      if (!stored) return null;
-      try {
-        const refreshed = await api.auth.refresh(stored.refreshToken);
-        const next: StoredSession = { ...refreshed };
-        setSession(next);
-        saveSession(next);
-        return next.accessToken;
-      } catch {
-        return null;
-      }
+      const next = await refreshStoredSession(api);
+      if (!next) return null;
+      setSession(next);
+      saveSession(next);
+      return next.accessToken;
     });
   }, [api]);
 
-  // Validate the session on load. If the access token has expired, the
-  // request transparently refreshes and retries via the handler above; a
-  // real failure (refresh token also dead) clears the session there too.
+  // Validate the session on load. An already-expired access token is
+  // refreshed proactively here rather than left to fail its first request
+  // — that first failure would still self-correct via the retry-on-401
+  // handler above, but it'd also log a guaranteed-to-fail request to the
+  // console for no benefit. A real failure (refresh token also dead)
+  // clears the session.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -115,9 +143,29 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setLoading(false);
         return;
       }
-      if (!loadStoredSession()) {
+      const stored = loadStoredSession();
+      if (!stored) {
         setLoading(false);
         return;
+      }
+      if (isTokenExpiringSoon(stored.accessToken)) {
+        const refreshed = await refreshStoredSession(api);
+        if (!refreshed) {
+          if (!cancelled) {
+            setSession(null);
+            saveSession(null);
+            setLoading(false);
+          }
+          return;
+        }
+        // setSession's effect (which re-registers the token getter) only
+        // takes effect on the next render — set it directly too so the
+        // api.auth.me() call right below doesn't race it with the stale token.
+        setTokenGetter(() => refreshed.accessToken);
+        if (!cancelled) {
+          setSession(refreshed);
+          saveSession(refreshed);
+        }
       }
       try {
         await api.auth.me();

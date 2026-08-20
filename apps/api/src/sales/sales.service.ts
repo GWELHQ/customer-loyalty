@@ -12,6 +12,7 @@ import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { AttendantPrincipal, AuthPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 import { PricesService } from '../prices/prices.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import { SmsService } from '../sms/sms.service';
@@ -50,6 +51,7 @@ export class SalesService {
     private readonly stations: StationsService,
     private readonly reconciliation: ReconciliationService,
     private readonly sms: SmsService,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private col() {
@@ -188,6 +190,10 @@ export class SalesService {
       tx.set(saleRef, doc);
       return { ...doc, id: saleId };
     });
+
+    this.changeEvents.emit('sales');
+    this.changeEvents.emit('customers');
+    this.changeEvents.emit('reconciliationDaily');
 
     // Fire SMS + monthly total outside the transaction (non-critical path).
     const monthKey = saleDate.slice(0, 7);

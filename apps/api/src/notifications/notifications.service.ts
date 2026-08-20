@@ -2,12 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Notification, NotificationType } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'notifications';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -32,6 +36,7 @@ export class NotificationsService {
       updatedAt: now,
     };
     await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
   }
 
   async notifyMany(userIds: string[], rest: Omit<Parameters<typeof this.notify>[0], 'userId'>): Promise<void> {
@@ -53,6 +58,7 @@ export class NotificationsService {
     const notification = fromDoc<Notification>(snap);
     if (notification.userId !== userId) throw new NotFoundException('Notification not found');
     await this.col().doc(id).update({ read: true, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
     return { ...notification, read: true };
   }
 }

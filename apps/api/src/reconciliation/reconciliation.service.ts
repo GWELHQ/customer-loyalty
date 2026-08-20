@@ -9,6 +9,7 @@ import {
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
+import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'reconciliationDaily';
 
@@ -26,7 +27,10 @@ function computeStatus(totalSales: number, loyaltySales: number): Reconciliation
 
 @Injectable()
 export class ReconciliationService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly changeEvents: ChangeEventsService,
+  ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
@@ -62,6 +66,9 @@ export class ReconciliationService {
       };
       tx.set(ref, doc, { merge: true });
       return { ...doc, id };
+    }).then((result) => {
+      this.changeEvents.emit(COLLECTION);
+      return result;
     });
   }
 

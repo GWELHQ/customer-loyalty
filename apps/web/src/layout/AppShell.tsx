@@ -1,8 +1,9 @@
 import { Role } from '@loyalty/shared';
-import { useEffect, useState, type PropsWithChildren } from 'react';
+import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
 import { Icon } from '../ui/Icon';
 import { navItemsForRole } from './nav';
 
@@ -23,13 +24,16 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
   const api = useApi();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
+  const reloadUnreadCount = useCallback(() => {
     if (!user) return;
     api.notifications
       .list()
       .then((list) => setUnreadCount(list.filter((n) => !n.read).length))
       .catch(() => {});
-  }, [api, user, location.pathname]);
+  }, [api, user]);
+
+  useEffect(reloadUnreadCount, [reloadUnreadCount, location.pathname]);
+  useRealtimeRefresh(['notifications'], reloadUnreadCount);
 
   if (!user) return null;
   const nav = navItemsForRole(user.role, hasPermission);

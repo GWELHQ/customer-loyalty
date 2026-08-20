@@ -59,6 +59,7 @@ export class AuthService {
         action: 'auth.microsoft_login_rejected_inactive',
         entityType: 'user',
         entityId: user.id,
+        entityLabel: user.fullName,
       });
       throw new UnauthorizedException(
         'Your account is not yet active. Ask an Admin to activate it and assign your role.',
@@ -85,6 +86,7 @@ export class AuthService {
       action: 'auth.microsoft_login',
       entityType: 'user',
       entityId: user.id,
+      entityLabel: user.fullName,
     });
 
     return { accessToken, refreshToken, user: principal };
@@ -133,6 +135,7 @@ export class AuthService {
       action: 'auth.attendant_login',
       entityType: 'attendant',
       entityId: attendant.id,
+      entityLabel: attendant.fullName,
     });
 
     return { accessToken, attendant: principal };

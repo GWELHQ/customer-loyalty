@@ -47,6 +47,7 @@ export class AttendantsController {
       action: 'attendant.create',
       entityType: 'attendant',
       entityId: attendant.id,
+      entityLabel: attendant.fullName,
       metadata: { assignedStationId: attendant.assignedStationId },
     });
     return attendant;
@@ -58,12 +59,14 @@ export class AttendantsController {
     @Body() dto: ResetPinDto,
     @CurrentUser() actor: StaffPrincipal,
   ) {
+    const attendant = await this.attendants.findById(id);
     await this.attendants.resetPin(id, dto.newPin);
     await this.audit.record({
       actor,
       action: 'attendant.pin_reset',
       entityType: 'attendant',
       entityId: id,
+      entityLabel: attendant?.fullName,
     });
     return { success: true };
   }
@@ -80,6 +83,7 @@ export class AttendantsController {
       action: 'attendant.status_change',
       entityType: 'attendant',
       entityId: id,
+      entityLabel: attendant.fullName,
       metadata: { status: dto.status },
     });
     return attendant;
@@ -97,6 +101,7 @@ export class AttendantsController {
       action: 'attendant.station_assign',
       entityType: 'attendant',
       entityId: id,
+      entityLabel: attendant.fullName,
       metadata: { stationId: dto.stationId },
     });
     return attendant;
