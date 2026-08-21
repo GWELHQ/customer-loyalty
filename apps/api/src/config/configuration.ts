@@ -26,6 +26,15 @@ export interface AppConfig {
       senderId: string;
     };
   };
+  email: {
+    provider: string;
+    microsoftGraph: {
+      tenantId: string;
+      clientId: string;
+      clientSecret: string;
+      senderAddress: string;
+    };
+  };
   schedulerSharedSecret: string;
 }
 
@@ -55,6 +64,15 @@ export default (): AppConfig => ({
       apiKey: process.env.AFRICASTALKING_API_KEY ?? '',
       baseUrl: process.env.AFRICASTALKING_BASE_URL ?? 'https://api.africastalking.com',
       senderId: process.env.AFRICASTALKING_SENDER_ID ?? '',
+    },
+  },
+  email: {
+    provider: process.env.EMAIL_PROVIDER ?? 'mock',
+    microsoftGraph: {
+      tenantId: process.env.MS_GRAPH_TENANT_ID ?? '',
+      clientId: process.env.MS_GRAPH_CLIENT_ID ?? '',
+      clientSecret: process.env.MS_GRAPH_CLIENT_SECRET ?? '',
+      senderAddress: process.env.MS_GRAPH_SENDER_ADDRESS ?? '',
     },
   },
   schedulerSharedSecret: process.env.SCHEDULER_SHARED_SECRET ?? '',

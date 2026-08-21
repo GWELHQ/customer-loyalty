@@ -1,15 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { EMAIL_PROVIDER, type EmailProvider } from './email-provider.interface';
 
-/**
- * Minimal email adapter. Logs in dev/demo; swap the body of send() for a
- * real provider (e.g. SendGrid, SES) in production — nothing else in the
- * codebase needs to change since callers only depend on this interface.
- */
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger('EmailService');
 
+  constructor(@Inject(EMAIL_PROVIDER) private readonly provider: EmailProvider) {}
+
+  /**
+   * Fire-and-forget — an email failing to send must never break the
+   * workflow that triggered it (matches the SMS service's philosophy).
+   */
   async send(to: string[], subject: string, body: string): Promise<void> {
-    this.logger.log(`[MOCK EMAIL] -> ${to.join(', ')} | ${subject}\n${body}`);
+    if (to.length === 0) return;
+    try {
+      const result = await this.provider.send(to, subject, body);
+      if (!result.success) {
+        this.logger.warn(`Email "${subject}" to ${to.join(', ')} failed: ${result.errorReason}`);
+      }
+    } catch (err) {
+      this.logger.error(`Email "${subject}" to ${to.join(', ')} threw`, err instanceof Error ? err.stack : err);
+    }
   }
 }

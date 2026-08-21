@@ -192,10 +192,13 @@ export interface MonthlyCashbackLedger extends BaseDoc {
   entries: MonthlyCashbackLedgerEntry[];
   totalCashback: number;
   submittedByUserId?: string;
+  submittedByName?: string;
   submittedAt?: ISODateString;
   approvedByUserId?: string;
+  approvedByName?: string;
   approvedAt?: ISODateString;
   rejectedByUserId?: string;
+  rejectedByName?: string;
   rejectedAt?: ISODateString;
   rejectionReason?: string;
 }

@@ -74,8 +74,10 @@ export function landingPathForRole(role: Role): string {
   switch (role) {
     case Role.CHAIRMAN:
       return '/special-rates';
-    case Role.FINANCE:
+    case Role.FINANCE_APPROVER:
       return '/cashback-ledgers';
+    case Role.FINANCE_DISBURSER:
+      return '/disbursements';
     case Role.STATION_SUPERVISOR:
       return '/reconciliation';
     default:

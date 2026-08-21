@@ -30,7 +30,7 @@ const finance: StaffPrincipal = {
   userId: 'finance-1',
   email: 'finance@greenwellsenergies.co.ke',
   fullName: 'Finance Person',
-  role: Role.FINANCE,
+  role: Role.FINANCE_APPROVER,
 };
 const admin: StaffPrincipal = {
   kind: 'staff',

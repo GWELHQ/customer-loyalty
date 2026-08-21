@@ -7,9 +7,10 @@ import { usePagedRows } from '../data/usePagedRows';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
-import { formatNairobiDateTime, nairobiThisMonth } from '../lib/time';
+import { formatNairobiDate, formatNairobiDateTime, nairobiThisMonth } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { StepIndicator, type StepIndicatorStep, type StepState } from '../ui/StepIndicator';
 
 const LEDGER_ENTRY_COLUMNS: ExportColumn<MonthlyCashbackLedgerEntry>[] = [
   { header: 'Customer', value: (e) => e.customerName },
@@ -29,6 +30,48 @@ const STATUS_TONE: Record<LedgerStatus, 'neutral' | 'success' | 'warning' | 'dan
   [LedgerStatus.FAILED]: 'danger',
   [LedgerStatus.HELD]: 'danger',
 };
+
+/** RTSM releases -> Finance Approver approves -> Finance Disburser pays out. */
+function ledgerSteps(ledger: MonthlyCashbackLedger): StepIndicatorStep[] {
+  const s = ledger.status;
+  const notYetReleased = s === LedgerStatus.OPEN_ACCRUING || s === LedgerStatus.READY_FOR_REVIEW;
+
+  const releasedState: StepState = notYetReleased ? 'current' : 'done';
+  const approvedState: StepState = notYetReleased
+    ? 'pending'
+    : s === LedgerStatus.SUBMITTED_FOR_APPROVAL
+      ? 'current'
+      : s === LedgerStatus.REJECTED
+        ? 'rejected'
+        : 'done';
+  const disbursedState: StepState =
+    s === LedgerStatus.DISBURSED
+      ? 'done'
+      : s === LedgerStatus.FAILED
+        ? 'rejected'
+        : s === LedgerStatus.APPROVED || s === LedgerStatus.DISBURSEMENT_IN_PROGRESS || s === LedgerStatus.HELD
+          ? 'current'
+          : 'pending';
+
+  return [
+    {
+      label: 'Released',
+      state: releasedState,
+      subtext: ledger.submittedAt ? `${ledger.submittedByName ?? 'Unknown'} · ${formatNairobiDate(ledger.submittedAt)}` : undefined,
+    },
+    {
+      label: 'Approved',
+      state: approvedState,
+      subtext:
+        approvedState === 'rejected' && ledger.rejectedAt
+          ? `${ledger.rejectedByName ?? 'Unknown'} · ${formatNairobiDate(ledger.rejectedAt)}`
+          : ledger.approvedAt
+            ? `${ledger.approvedByName ?? 'Unknown'} · ${formatNairobiDate(ledger.approvedAt)}`
+            : undefined,
+    },
+    { label: 'Disbursed', state: disbursedState },
+  ];
+}
 
 export function CashbackLedgers() {
   const api = useApi();
@@ -78,7 +121,7 @@ export function CashbackLedgers() {
   }
 
   return (
-    <AppShell title="Monthly cashback ledger" subtitle="One customer total per month, with a full approval trail">
+    <AppShell title="Monthly cashback ledger" subtitle="RTSM releases, Finance Approver checks and approves, Finance Disburser pays out">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1000 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
@@ -86,7 +129,7 @@ export function CashbackLedgers() {
           <div style={{ flex: 1 }} />
           {ledger && canManage && (ledger.status === LedgerStatus.OPEN_ACCRUING || ledger.status === LedgerStatus.READY_FOR_REVIEW) && (
             <Button variant="primary" onClick={submit} disabled={busy}>
-              Submit for approval
+              Release for approval
             </Button>
           )}
           {ledger && canApprove && ledger.status === LedgerStatus.SUBMITTED_FOR_APPROVAL && (
@@ -103,7 +146,13 @@ export function CashbackLedgers() {
 
         {ledger && (
           <Card>
-            <div style={{ display: 'flex', gap: 24 }}>
+            <StepIndicator steps={ledgerSteps(ledger)} />
+            {ledger.status === LedgerStatus.REJECTED && ledger.rejectionReason && (
+              <div style={{ marginTop: 14, fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+                <strong>Rejection reason:</strong> {ledger.rejectionReason}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 24, marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
               <div>
                 <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Total cashback</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>

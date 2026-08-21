@@ -10,7 +10,8 @@ import { navItemsForRole } from './nav';
 const ROLE_LABELS: Record<Role, string> = {
   [Role.ADMIN]: 'Admin',
   [Role.CHAIRMAN]: 'Chairman',
-  [Role.FINANCE]: 'Finance',
+  [Role.FINANCE_APPROVER]: 'Finance Approver',
+  [Role.FINANCE_DISBURSER]: 'Finance Disburser',
   [Role.RTSM]: 'Retail Sales Manager',
   [Role.STATION_SUPERVISOR]: 'Station Supervisor',
   [Role.ATTENDANT]: 'Attendant',

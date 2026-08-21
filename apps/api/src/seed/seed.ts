@@ -51,12 +51,19 @@ async function seed() {
   });
   await usersSvc.setStatus(chairman.id, UserStatus.ACTIVE);
 
-  const finance = await usersSvc.create({
+  const financeApprover = await usersSvc.create({
     fullName: 'Grace Mwangi',
     email: 'g.mwangi@greenwellsenergies.co.ke',
-    role: Role.FINANCE,
+    role: Role.FINANCE_APPROVER,
   });
-  await usersSvc.setStatus(finance.id, UserStatus.ACTIVE);
+  await usersSvc.setStatus(financeApprover.id, UserStatus.ACTIVE);
+
+  const financeDisburser = await usersSvc.create({
+    fullName: 'Peter Njoroge',
+    email: 'p.njoroge@greenwellsenergies.co.ke',
+    role: Role.FINANCE_DISBURSER,
+  });
+  await usersSvc.setStatus(financeDisburser.id, UserStatus.ACTIVE);
 
   const rtsm = await usersSvc.create({
     fullName: 'Brian Kiplagat',

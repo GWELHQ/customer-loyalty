@@ -1,7 +1,10 @@
 export enum Role {
   ADMIN = 'admin',
   CHAIRMAN = 'chairman',
-  FINANCE = 'finance',
+  /** Checks and approves the monthly cashback ledger RTSM releases — does not execute payouts. */
+  FINANCE_APPROVER = 'finance_approver',
+  /** Downloads/executes approved disbursement batches — cannot approve a ledger (segregation of duties). */
+  FINANCE_DISBURSER = 'finance_disburser',
   RTSM = 'rtsm',
   STATION_SUPERVISOR = 'station_supervisor',
   ATTENDANT = 'attendant',
@@ -13,7 +16,8 @@ export enum Role {
 export const MICROSOFT_AUTH_ROLES: readonly Role[] = [
   Role.ADMIN,
   Role.CHAIRMAN,
-  Role.FINANCE,
+  Role.FINANCE_APPROVER,
+  Role.FINANCE_DISBURSER,
   Role.RTSM,
   Role.STATION_SUPERVISOR,
   Role.EXEC_VIEWER,

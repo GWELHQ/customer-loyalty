@@ -88,7 +88,11 @@ const EXEC_VIEWER_PERMISSIONS: Permission[] = CHAIRMAN_PERMISSIONS.filter(
   (p) => p !== Permission.SPECIAL_RATES_APPROVE,
 );
 
-const FINANCE_PERMISSIONS: Permission[] = [
+// Checks and approves the monthly ledger RTSM releases. Deliberately does
+// NOT hold DISBURSEMENTS_MANAGE — approving and executing a payout are
+// different people by design (segregation of duties), see
+// FINANCE_DISBURSER_PERMISSIONS below.
+const FINANCE_APPROVER_PERMISSIONS: Permission[] = [
   Permission.CUSTOMERS_VIEW,
   Permission.STATIONS_VIEW,
   Permission.PRICES_VIEW,
@@ -97,9 +101,18 @@ const FINANCE_PERMISSIONS: Permission[] = [
   Permission.RECONCILIATION_VIEW_ALL,
   Permission.LEDGERS_VIEW,
   Permission.LEDGERS_APPROVE,
-  Permission.DISBURSEMENTS_MANAGE,
   Permission.DISBURSEMENTS_VIEW,
   Permission.REPORTS_VIEW_ALL,
+  Permission.NOTIFICATIONS_VIEW_OWN,
+  Permission.AUDIT_VIEW,
+];
+
+// Executes payout on an already-approved ledger — cannot approve one
+// itself (no LEDGERS_APPROVE).
+const FINANCE_DISBURSER_PERMISSIONS: Permission[] = [
+  Permission.LEDGERS_VIEW,
+  Permission.DISBURSEMENTS_VIEW,
+  Permission.DISBURSEMENTS_MANAGE,
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.AUDIT_VIEW,
 ];
@@ -114,6 +127,9 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.SPECIAL_RATES_VIEW,
   Permission.SPECIAL_RATES_REQUEST,
   Permission.RECONCILIATION_VIEW_ALL,
+  // Releases the monthly cashback ledger for Finance Approver review.
+  Permission.LEDGERS_VIEW,
+  Permission.LEDGERS_MANAGE,
   Permission.REPORTS_VIEW_ALL,
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
@@ -141,7 +157,8 @@ const ATTENDANT_PERMISSIONS: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.ADMIN]: ADMIN_PERMISSIONS,
   [Role.CHAIRMAN]: CHAIRMAN_PERMISSIONS,
-  [Role.FINANCE]: FINANCE_PERMISSIONS,
+  [Role.FINANCE_APPROVER]: FINANCE_APPROVER_PERMISSIONS,
+  [Role.FINANCE_DISBURSER]: FINANCE_DISBURSER_PERMISSIONS,
   [Role.RTSM]: RTSM_PERMISSIONS,
   [Role.STATION_SUPERVISOR]: STATION_SUPERVISOR_PERMISSIONS,
   [Role.ATTENDANT]: ATTENDANT_PERMISSIONS,

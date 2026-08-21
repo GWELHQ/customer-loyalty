@@ -25,10 +25,20 @@ describe('RBAC permission matrix', () => {
     expect(roleHasPermission(Role.CHAIRMAN, Permission.PRICES_MANAGE)).toBe(false);
   });
 
-  it('Finance can manage disbursements and approve ledgers, but not special rates', () => {
-    expect(roleHasPermission(Role.FINANCE, Permission.DISBURSEMENTS_MANAGE)).toBe(true);
-    expect(roleHasPermission(Role.FINANCE, Permission.LEDGERS_APPROVE)).toBe(true);
-    expect(roleHasPermission(Role.FINANCE, Permission.SPECIAL_RATES_APPROVE)).toBe(false);
+  it('Finance Approver can approve ledgers but not execute disbursements or special rates', () => {
+    expect(roleHasPermission(Role.FINANCE_APPROVER, Permission.LEDGERS_APPROVE)).toBe(true);
+    expect(roleHasPermission(Role.FINANCE_APPROVER, Permission.DISBURSEMENTS_MANAGE)).toBe(false);
+    expect(roleHasPermission(Role.FINANCE_APPROVER, Permission.SPECIAL_RATES_APPROVE)).toBe(false);
+  });
+
+  it('Finance Disburser can manage disbursements but not approve a ledger (segregation of duties)', () => {
+    expect(roleHasPermission(Role.FINANCE_DISBURSER, Permission.DISBURSEMENTS_MANAGE)).toBe(true);
+    expect(roleHasPermission(Role.FINANCE_DISBURSER, Permission.LEDGERS_APPROVE)).toBe(false);
+  });
+
+  it('RTSM can release the monthly ledger but not approve it', () => {
+    expect(roleHasPermission(Role.RTSM, Permission.LEDGERS_MANAGE)).toBe(true);
+    expect(roleHasPermission(Role.RTSM, Permission.LEDGERS_APPROVE)).toBe(false);
   });
 
   it('RTSM can request special rates but not approve them', () => {

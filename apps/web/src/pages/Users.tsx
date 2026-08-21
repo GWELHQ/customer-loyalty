@@ -25,7 +25,8 @@ import {
 const ROLE_LABELS: Record<Role, string> = {
   [Role.ADMIN]: 'Admin',
   [Role.CHAIRMAN]: 'Chairman',
-  [Role.FINANCE]: 'Finance',
+  [Role.FINANCE_APPROVER]: 'Finance Approver',
+  [Role.FINANCE_DISBURSER]: 'Finance Disburser',
   [Role.RTSM]: 'RTSM',
   [Role.STATION_SUPERVISOR]: 'Station Supervisor',
   [Role.ATTENDANT]: 'Attendant',
@@ -35,7 +36,8 @@ const ROLE_LABELS: Record<Role, string> = {
 const ASSIGNABLE_ROLES = [
   Role.ADMIN,
   Role.CHAIRMAN,
-  Role.FINANCE,
+  Role.FINANCE_APPROVER,
+  Role.FINANCE_DISBURSER,
   Role.RTSM,
   Role.STATION_SUPERVISOR,
   Role.EXEC_VIEWER,
@@ -83,7 +85,7 @@ export function Users() {
   return (
     <AppShell
       title="Users"
-      subtitle="Admin, Chairman, Finance, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)"
+      subtitle="Admin, Chairman, Finance Approver, Finance Disburser, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (

@@ -118,6 +118,7 @@ export class CashbackLedgersService {
     await this.col().doc(month).update({
       status: LedgerStatus.SUBMITTED_FOR_APPROVAL,
       submittedByUserId: actor.userId,
+      submittedByName: actor.fullName,
       submittedAt: now,
       updatedAt: now,
     });
@@ -134,6 +135,7 @@ export class CashbackLedgersService {
     await this.col().doc(month).update({
       status: LedgerStatus.APPROVED,
       approvedByUserId: actor.userId,
+      approvedByName: actor.fullName,
       approvedAt: now,
       updatedAt: now,
     });
@@ -150,6 +152,7 @@ export class CashbackLedgersService {
     await this.col().doc(month).update({
       status: LedgerStatus.REJECTED,
       rejectedByUserId: actor.userId,
+      rejectedByName: actor.fullName,
       rejectedAt: now,
       rejectionReason: reason,
       updatedAt: now,
