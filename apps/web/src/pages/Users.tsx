@@ -8,7 +8,19 @@ import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  Modal,
+  Pagination,
+  Table,
+  Td,
+  Th,
+  Tr,
+  inputStyle,
+} from '../ui/primitives';
 
 const ROLE_LABELS: Record<Role, string> = {
   [Role.ADMIN]: 'Admin',
@@ -20,14 +32,24 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.EXEC_VIEWER]: 'Exec Viewer',
 };
 
-const ASSIGNABLE_ROLES = [Role.ADMIN, Role.CHAIRMAN, Role.FINANCE, Role.RTSM, Role.STATION_SUPERVISOR, Role.EXEC_VIEWER];
+const ASSIGNABLE_ROLES = [
+  Role.ADMIN,
+  Role.CHAIRMAN,
+  Role.FINANCE,
+  Role.RTSM,
+  Role.STATION_SUPERVISOR,
+  Role.EXEC_VIEWER,
+];
 
 function userColumns(stations: Station[]): ExportColumn<User>[] {
   return [
     { header: 'Name', value: (u) => u.fullName },
     { header: 'Email', value: (u) => u.email },
     { header: 'Role', value: (u) => ROLE_LABELS[u.role] },
-    { header: 'Station', value: (u) => stations.find((s) => s.id === u.assignedStationId)?.name ?? '' },
+    {
+      header: 'Station',
+      value: (u) => stations.find((s) => s.id === u.assignedStationId)?.name ?? '',
+    },
     { header: 'Status', value: (u) => u.status },
   ];
 }
@@ -46,7 +68,10 @@ export function Users() {
     setError(null);
     setBusyId(user.id);
     try {
-      await api.users.setStatus(user.id, user.status === UserStatus.ACTIVE ? UserStatus.INACTIVE : UserStatus.ACTIVE);
+      await api.users.setStatus(
+        user.id,
+        user.status === UserStatus.ACTIVE ? UserStatus.INACTIVE : UserStatus.ACTIVE,
+      );
       reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Could not update ${user.fullName}'s status`);
@@ -56,10 +81,21 @@ export function Users() {
   }
 
   return (
-    <AppShell title="Users" subtitle="Admin, Chairman, Finance, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)">
+    <AppShell
+      title="Users"
+      subtitle="Admin, Chairman, Finance, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)"
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (
-          <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: 'var(--color-danger)',
+              background: 'var(--color-danger-tint)',
+              borderRadius: 8,
+              padding: 12,
+            }}
+          >
             {error}
           </div>
         )}
@@ -68,7 +104,12 @@ export function Users() {
             {showForm ? 'Cancel' : 'Add user'}
           </Button>
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="users" title="Users" columns={userColumns(stations)} rows={users} />
+          <ExportButtons
+            filename="users"
+            title="Users"
+            columns={userColumns(stations)}
+            rows={users}
+          />
         </div>
         {showForm && (
           <UserForm
@@ -100,15 +141,26 @@ export function Users() {
                   <Td>{ROLE_LABELS[u.role]}</Td>
                   <Td>{stations.find((s) => s.id === u.assignedStationId)?.name ?? '—'}</Td>
                   <Td>
-                    <Badge tone={u.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>{u.status}</Badge>
+                    <Badge tone={u.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>
+                      {u.status}
+                    </Badge>
                   </Td>
                   <Td align="right">
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Button variant="secondary" size="sm" onClick={() => setEditingUser(u)}>
                         Edit
                       </Button>
-                      <Button variant="secondary" size="sm" disabled={busyId === u.id} onClick={() => toggleStatus(u)}>
-                        {busyId === u.id ? 'Working…' : u.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={busyId === u.id}
+                        onClick={() => toggleStatus(u)}
+                      >
+                        {busyId === u.id
+                          ? 'Working…'
+                          : u.status === UserStatus.ACTIVE
+                            ? 'Deactivate'
+                            : 'Activate'}
                       </Button>
                     </div>
                   </Td>
@@ -116,7 +168,12 @@ export function Users() {
               ))}
             </tbody>
           </Table>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${users.length} user(s)`} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onChange={setPage}
+            totalLabel={`${users.length} user(s)`}
+          />
         </Card>
       </div>
 
@@ -173,7 +230,16 @@ function EditUserModal({
   return (
     <Modal title={`Edit user — ${user.fullName}`} onClose={onClose}>
       {error && (
-        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--color-danger)',
+            background: 'var(--color-danger-tint)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+          }}
+        >
           {error}
         </div>
       )}
@@ -194,7 +260,11 @@ function EditUserModal({
       {role === Role.STATION_SUPERVISOR && (
         <div style={{ marginTop: 12 }}>
           <Field label="Assigned station (exactly one)">
-            <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
+            <select
+              style={inputStyle}
+              value={assignedStationId}
+              onChange={(e) => setAssignedStationId(e.target.value)}
+            >
               <option value="">Choose station</option>
               {stations.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -251,16 +321,34 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
   return (
     <Card>
       {error && (
-        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--color-danger)',
+            background: 'var(--color-danger-tint)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+          }}
+        >
           {error}
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Full name">
-          <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <input
+            style={inputStyle}
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
         </Field>
         <Field label="Work email">
-          <input style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@greenwells.co.ke" />
+          <input
+            style={inputStyle}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@greenwellsenergies.co.ke"
+          />
         </Field>
         <Field label="Role">
           <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
@@ -273,7 +361,11 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
         </Field>
         {role === Role.STATION_SUPERVISOR && (
           <Field label="Assigned station (exactly one)">
-            <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
+            <select
+              style={inputStyle}
+              value={assignedStationId}
+              onChange={(e) => setAssignedStationId(e.target.value)}
+            >
               <option value="">Choose station</option>
               {stations.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -287,7 +379,9 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
       <Button
         variant="primary"
         onClick={submit}
-        disabled={busy || !fullName || !email || (role === Role.STATION_SUPERVISOR && !assignedStationId)}
+        disabled={
+          busy || !fullName || !email || (role === Role.STATION_SUPERVISOR && !assignedStationId)
+        }
         style={{ marginTop: 14 }}
       >
         {busy ? 'Creating…' : 'Create user'}

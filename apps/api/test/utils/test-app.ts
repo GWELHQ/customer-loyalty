@@ -22,7 +22,7 @@ export async function mintStaffToken(
   const principal: StaffPrincipal = {
     kind: 'staff',
     userId: overrides.userId ?? 'test-user-1',
-    email: overrides.email ?? 'test@greenwells.co.ke',
+    email: overrides.email ?? 'test@greenwellsenergies.co.ke',
     fullName: overrides.fullName ?? 'Test User',
     role: overrides.role ?? Role.ADMIN,
     assignedStationId: overrides.assignedStationId,

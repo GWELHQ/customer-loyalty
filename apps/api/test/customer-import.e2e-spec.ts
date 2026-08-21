@@ -9,7 +9,7 @@ import { createTestApp } from './utils/test-app';
 const admin: StaffPrincipal = {
   kind: 'staff',
   userId: 'admin-import',
-  email: 'admin@greenwells.co.ke',
+  email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: 'admin' as never,
 };
@@ -36,7 +36,10 @@ describe('Customer Excel import (e2e)', () => {
     const imports = app.get(CustomerImportsService);
     const customers = app.get(CustomersService);
 
-    const existing = await customers.create({ fullName: 'Already Here', phoneNumber: '0798765432' });
+    const existing = await customers.create({
+      fullName: 'Already Here',
+      phoneNumber: '0798765432',
+    });
 
     const buffer = buildWorkbookBuffer([
       { 'Customer name': 'New Person One', 'Phone number': '0711111111' },
@@ -46,7 +49,11 @@ describe('Customer Excel import (e2e)', () => {
     ]);
 
     const job = await imports.uploadAndPreview(
-      { originalname: 'test.xlsx', buffer, mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      {
+        originalname: 'test.xlsx',
+        buffer,
+        mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
       admin,
     );
 
@@ -55,8 +62,12 @@ describe('Customer Excel import (e2e)', () => {
     expect(job.rejectedCount).toBe(2);
 
     const rows = await imports.listRows(job.id);
-    expect(rows.find((r) => r.rawData.fullName === 'New Person One')?.result).toBe(ImportRowResult.CREATED);
-    expect(rows.find((r) => r.customerId === existing.id)?.result).toBe(ImportRowResult.DUPLICATE_SKIPPED);
+    expect(rows.find((r) => r.rawData.fullName === 'New Person One')?.result).toBe(
+      ImportRowResult.CREATED,
+    );
+    expect(rows.find((r) => r.customerId === existing.id)?.result).toBe(
+      ImportRowResult.DUPLICATE_SKIPPED,
+    );
 
     const completed = await imports.confirm(job.id, {}, admin);
     expect(completed.createdCount).toBe(1);

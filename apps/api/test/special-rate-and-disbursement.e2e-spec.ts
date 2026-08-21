@@ -14,28 +14,28 @@ import { createTestApp } from './utils/test-app';
 const rtsm: StaffPrincipal = {
   kind: 'staff',
   userId: 'rtsm-1',
-  email: 'rtsm@greenwells.co.ke',
+  email: 'rtsm@greenwellsenergies.co.ke',
   fullName: 'RTSM Person',
   role: Role.RTSM,
 };
 const chairman: StaffPrincipal = {
   kind: 'staff',
   userId: 'chairman-1',
-  email: 'chairman@greenwells.co.ke',
+  email: 'chairman@greenwellsenergies.co.ke',
   fullName: 'Chairman Person',
   role: Role.CHAIRMAN,
 };
 const finance: StaffPrincipal = {
   kind: 'staff',
   userId: 'finance-1',
-  email: 'finance@greenwells.co.ke',
+  email: 'finance@greenwellsenergies.co.ke',
   fullName: 'Finance Person',
   role: Role.FINANCE,
 };
 const admin: StaffPrincipal = {
   kind: 'staff',
   userId: 'admin-1',
-  email: 'admin@greenwells.co.ke',
+  email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: Role.ADMIN,
 };
@@ -60,9 +60,16 @@ describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => 
     const ledgers = app.get(CashbackLedgersService);
     const batches = app.get(DisbursementBatchesService);
 
-    const station = await stations.create({ name: 'Ugunja', code: `UGJ-${randomUUID().slice(0, 6)}` });
+    const station = await stations.create({
+      name: 'Ugunja',
+      code: `UGJ-${randomUUID().slice(0, 6)}`,
+    });
     await prices.create(
-      { product: Product.PMS, pricePerLitre: 200, effectiveFrom: new Date(Date.now() - 86_400_000).toISOString() },
+      {
+        product: Product.PMS,
+        pricePerLitre: 200,
+        effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      },
       admin,
     );
     const customer = await customers.create({
@@ -72,7 +79,12 @@ describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => 
 
     // RTSM requests a special rate; RTSM cannot approve its own request.
     const req = await specialRates.create(
-      { customerId: customer.id, proposedKesPerLitre: 5, effectiveFrom: new Date(Date.now() - 1000).toISOString(), reason: 'High-volume fleet customer' },
+      {
+        customerId: customer.id,
+        proposedKesPerLitre: 5,
+        effectiveFrom: new Date(Date.now() - 1000).toISOString(),
+        reason: 'High-volume fleet customer',
+      },
       rtsm,
     );
     expect(req.status).toBe(SpecialRateStatus.PENDING);
@@ -81,7 +93,12 @@ describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => 
     // guard in production; the service-level check is defense in depth).
     expect(() => specialRates.assertCanApprove(admin)).toThrow();
 
-    const approved = await specialRates.decide(req.id, 'approved', 'Approved for FY26 fleet contract', chairman);
+    const approved = await specialRates.decide(
+      req.id,
+      'approved',
+      'Approved for FY26 fleet contract',
+      chairman,
+    );
     expect(approved.status).toBe(SpecialRateStatus.APPROVED);
 
     // A second decision on an already-decided request is rejected.
@@ -121,7 +138,11 @@ describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => 
 
     const completed = await batches.complete(
       batch.id,
-      batch.entries.map((e) => ({ customerId: e.customerId, status: 'paid' as const, reference: 'MPESA123' })),
+      batch.entries.map((e) => ({
+        customerId: e.customerId,
+        status: 'paid' as const,
+        reference: 'MPESA123',
+      })),
     );
     expect(completed.status).toBe('completed');
 

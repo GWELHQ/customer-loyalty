@@ -202,7 +202,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       user: session?.user ?? null,
       loading,
-      hasPermission: (permission) => (session ? getPermissionsForRole(session.user.role).includes(permission) : false),
+      hasPermission: (permission) =>
+        session ? getPermissionsForRole(session.user.role).includes(permission) : false,
       signInWithMicrosoft,
       signOut,
       landingPath: session ? landingPathForRole(session.user.role) : '/',
@@ -226,7 +227,7 @@ function demoSession(): StoredSession {
     user: {
       kind: 'staff',
       userId: 'u-admin',
-      email: 'a.wanjiru@greenwells.co.ke',
+      email: 'a.wanjiru@greenwellsenergies.co.ke',
       fullName: 'Amina Wanjiru',
       role: Role.ADMIN,
     },

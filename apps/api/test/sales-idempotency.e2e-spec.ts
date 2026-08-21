@@ -25,12 +25,25 @@ describe('Sales idempotency (e2e)', () => {
     const prices = app.get(PricesService);
     const customers = app.get(CustomersService);
 
-    const station = await stations.create({ name: 'Kisumu 1', code: `KIS1-${randomUUID().slice(0, 6)}` });
+    const station = await stations.create({
+      name: 'Kisumu 1',
+      code: `KIS1-${randomUUID().slice(0, 6)}`,
+    });
     stationId = station.id;
 
     await prices.create(
-      { product: Product.PMS, pricePerLitre: 200, effectiveFrom: new Date(Date.now() - 86_400_000).toISOString() },
-      { kind: 'staff', userId: 'seed', email: 'seed@greenwells.co.ke', fullName: 'Seed', role: 'admin' as never },
+      {
+        product: Product.PMS,
+        pricePerLitre: 200,
+        effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+      {
+        kind: 'staff',
+        userId: 'seed',
+        email: 'seed@greenwellsenergies.co.ke',
+        fullName: 'Seed',
+        role: 'admin' as never,
+      },
     );
 
     await customers.create({ fullName: 'Jane Doe', phoneNumber: '0712345678' });

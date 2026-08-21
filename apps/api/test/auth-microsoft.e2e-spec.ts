@@ -34,7 +34,7 @@ describe('Microsoft login (e2e, mocked id_token verification)', () => {
   it('rejects a first-time Microsoft sign-in because the provisioned account starts inactive', async () => {
     mockVerify.mockResolvedValueOnce({
       oid: 'ms-oid-new-user',
-      email: 'new.person@greenwells.co.ke',
+      email: 'new.person@greenwellsenergies.co.ke',
       name: 'New Person',
     });
 
@@ -48,7 +48,7 @@ describe('Microsoft login (e2e, mocked id_token verification)', () => {
   it('issues an app session once the Admin has activated the provisioned account', async () => {
     mockVerify.mockResolvedValueOnce({
       oid: 'ms-oid-active-user',
-      email: 'active.person@greenwells.co.ke',
+      email: 'active.person@greenwellsenergies.co.ke',
       name: 'Active Person',
     });
     // First call provisions the inactive user.
@@ -57,14 +57,14 @@ describe('Microsoft login (e2e, mocked id_token verification)', () => {
       .send({ idToken: 'irrelevant' });
 
     const users = app.get(UsersService);
-    const provisioned = await users.findByEmail('active.person@greenwells.co.ke');
+    const provisioned = await users.findByEmail('active.person@greenwellsenergies.co.ke');
     expect(provisioned).not.toBeNull();
     await users.update(provisioned!.id, { role: Role.RTSM });
     await users.setStatus(provisioned!.id, UserStatus.ACTIVE);
 
     mockVerify.mockResolvedValueOnce({
       oid: 'ms-oid-active-user',
-      email: 'active.person@greenwells.co.ke',
+      email: 'active.person@greenwellsenergies.co.ke',
       name: 'Active Person',
     });
     const res = await request(app.getHttpServer())

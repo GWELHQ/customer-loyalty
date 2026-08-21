@@ -1,28 +1,135 @@
 import { LedgerStatus, Role, SpecialRateStatus, UserStatus } from '@loyalty/shared';
 
 export const demoStations = [
-  { id: 'st-kis1', name: 'Kisumu 1', code: 'KIS1', active: true, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'st-kis2', name: 'Kisumu 2', code: 'KIS2', active: true, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'st-ugj', name: 'Ugunja', code: 'UGJ', active: true, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'st-mbt', name: 'Mbita', code: 'MBT', active: true, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+  {
+    id: 'st-kis1',
+    name: 'Kisumu 1',
+    code: 'KIS1',
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'st-kis2',
+    name: 'Kisumu 2',
+    code: 'KIS2',
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'st-ugj',
+    name: 'Ugunja',
+    code: 'UGJ',
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'st-mbt',
+    name: 'Mbita',
+    code: 'MBT',
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
 ];
 
 export const demoUsers = [
-  { id: 'u-admin', fullName: 'Amina Wanjiru', email: 'a.wanjiru@greenwells.co.ke', role: Role.ADMIN, status: UserStatus.ACTIVE, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'u-chair', fullName: 'James Otieno', email: 'j.otieno@greenwells.co.ke', role: Role.CHAIRMAN, status: UserStatus.ACTIVE, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'u-fin', fullName: 'Grace Mwangi', email: 'g.mwangi@greenwells.co.ke', role: Role.FINANCE, status: UserStatus.ACTIVE, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'u-rtsm', fullName: 'Brian Kiplagat', email: 'b.kiplagat@greenwells.co.ke', role: Role.RTSM, status: UserStatus.ACTIVE, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
-  { id: 'u-sup', fullName: 'Susan Adhiambo', email: 's.adhiambo@greenwells.co.ke', role: Role.STATION_SUPERVISOR, assignedStationId: 'st-kis1', status: UserStatus.ACTIVE, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+  {
+    id: 'u-admin',
+    fullName: 'Amina Wanjiru',
+    email: 'a.wanjiru@greenwellsenergies.co.ke',
+    role: Role.ADMIN,
+    status: UserStatus.ACTIVE,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'u-chair',
+    fullName: 'James Otieno',
+    email: 'j.otieno@greenwellsenergies.co.ke',
+    role: Role.CHAIRMAN,
+    status: UserStatus.ACTIVE,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'u-fin',
+    fullName: 'Grace Mwangi',
+    email: 'g.mwangi@greenwellsenergies.co.ke',
+    role: Role.FINANCE,
+    status: UserStatus.ACTIVE,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'u-rtsm',
+    fullName: 'Brian Kiplagat',
+    email: 'b.kiplagat@greenwellsenergies.co.ke',
+    role: Role.RTSM,
+    status: UserStatus.ACTIVE,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'u-sup',
+    fullName: 'Susan Adhiambo',
+    email: 's.adhiambo@greenwellsenergies.co.ke',
+    role: Role.STATION_SUPERVISOR,
+    assignedStationId: 'st-kis1',
+    status: UserStatus.ACTIVE,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  },
 ];
 
 export const demoCustomers = [
-  { id: 'c-1', fullName: 'Alice Nyambura', phoneNumber: '+254712345678', homeStationId: 'st-kis1', totalCashbackEarned: 640, source: 'manual' as const, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'c-2', fullName: 'David Kiplangat', phoneNumber: '+254722345678', homeStationId: 'st-mbt', totalCashbackEarned: 220, source: 'import' as const, createdAt: '2026-02-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'c-3', fullName: 'Faith Wambui', phoneNumber: '+254733345678', homeStationId: 'st-kis2', totalCashbackEarned: 1180, source: 'manual' as const, specialRateKesPerLitre: 5, specialRateEffectiveFrom: '2026-06-01T00:00:00.000Z', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  {
+    id: 'c-1',
+    fullName: 'Alice Nyambura',
+    phoneNumber: '+254712345678',
+    homeStationId: 'st-kis1',
+    totalCashbackEarned: 640,
+    source: 'manual' as const,
+    createdAt: '2026-01-10T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'c-2',
+    fullName: 'David Kiplangat',
+    phoneNumber: '+254722345678',
+    homeStationId: 'st-mbt',
+    totalCashbackEarned: 220,
+    source: 'import' as const,
+    createdAt: '2026-02-15T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'c-3',
+    fullName: 'Faith Wambui',
+    phoneNumber: '+254733345678',
+    homeStationId: 'st-kis2',
+    totalCashbackEarned: 1180,
+    source: 'manual' as const,
+    specialRateKesPerLitre: 5,
+    specialRateEffectiveFrom: '2026-06-01T00:00:00.000Z',
+    createdAt: '2026-03-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  },
 ];
 
 export const demoPrices = {
-  PMS: { id: 'p-pms', product: 'PMS' as const, pricePerLitre: 194.5, effectiveFrom: '2026-08-01T00:00:00.000Z', createdByUserId: 'u-admin', createdByName: 'Amina Wanjiru', createdAt: '2026-07-27T08:00:00.000Z', updatedAt: '2026-07-27T08:00:00.000Z' },
+  PMS: {
+    id: 'p-pms',
+    product: 'PMS' as const,
+    pricePerLitre: 194.5,
+    effectiveFrom: '2026-08-01T00:00:00.000Z',
+    createdByUserId: 'u-admin',
+    createdByName: 'Amina Wanjiru',
+    createdAt: '2026-07-27T08:00:00.000Z',
+    updatedAt: '2026-07-27T08:00:00.000Z',
+  },
   AGO: null,
 };
 
@@ -73,6 +180,24 @@ export const demoLedger = {
 };
 
 export const demoNotifications = [
-  { id: 'n-1', userId: 'u-chair', type: 'special_rate_request', title: 'New special rate request', body: 'Brian Kiplagat requested a special rate for David Kiplangat.', read: false, createdAt: '2026-08-10T09:00:00.000Z', updatedAt: '2026-08-10T09:00:00.000Z' },
-  { id: 'n-2', userId: 'u-chair', type: 'price_reminder', title: 'Diesel price not set for September', body: 'AGO has no active price configured for September 2026.', read: false, createdAt: '2026-08-18T08:00:00.000Z', updatedAt: '2026-08-18T08:00:00.000Z' },
+  {
+    id: 'n-1',
+    userId: 'u-chair',
+    type: 'special_rate_request',
+    title: 'New special rate request',
+    body: 'Brian Kiplagat requested a special rate for David Kiplangat.',
+    read: false,
+    createdAt: '2026-08-10T09:00:00.000Z',
+    updatedAt: '2026-08-10T09:00:00.000Z',
+  },
+  {
+    id: 'n-2',
+    userId: 'u-chair',
+    type: 'price_reminder',
+    title: 'Diesel price not set for September',
+    body: 'AGO has no active price configured for September 2026.',
+    read: false,
+    createdAt: '2026-08-18T08:00:00.000Z',
+    updatedAt: '2026-08-18T08:00:00.000Z',
+  },
 ];

@@ -37,43 +37,97 @@ async function seed() {
   }
 
   console.log('Seeding staff users (Microsoft login roles)...');
-  const admin = await usersSvc.create({ fullName: 'Amina Wanjiru', email: 'a.wanjiru@greenwells.co.ke', role: Role.ADMIN });
+  const admin = await usersSvc.create({
+    fullName: 'Amina Wanjiru',
+    email: 'a.wanjiru@greenwellsenergies.co.ke',
+    role: Role.ADMIN,
+  });
   await usersSvc.setStatus(admin.id, UserStatus.ACTIVE);
 
-  const chairman = await usersSvc.create({ fullName: 'James Otieno', email: 'j.otieno@greenwells.co.ke', role: Role.CHAIRMAN });
+  const chairman = await usersSvc.create({
+    fullName: 'James Otieno',
+    email: 'j.otieno@greenwellsenergies.co.ke',
+    role: Role.CHAIRMAN,
+  });
   await usersSvc.setStatus(chairman.id, UserStatus.ACTIVE);
 
-  const finance = await usersSvc.create({ fullName: 'Grace Mwangi', email: 'g.mwangi@greenwells.co.ke', role: Role.FINANCE });
+  const finance = await usersSvc.create({
+    fullName: 'Grace Mwangi',
+    email: 'g.mwangi@greenwellsenergies.co.ke',
+    role: Role.FINANCE,
+  });
   await usersSvc.setStatus(finance.id, UserStatus.ACTIVE);
 
-  const rtsm = await usersSvc.create({ fullName: 'Brian Kiplagat', email: 'b.kiplagat@greenwells.co.ke', role: Role.RTSM });
+  const rtsm = await usersSvc.create({
+    fullName: 'Brian Kiplagat',
+    email: 'b.kiplagat@greenwellsenergies.co.ke',
+    role: Role.RTSM,
+  });
   await usersSvc.setStatus(rtsm.id, UserStatus.ACTIVE);
 
   const supervisor = await usersSvc.create({
     fullName: 'Susan Adhiambo',
-    email: 's.adhiambo@greenwells.co.ke',
+    email: 's.adhiambo@greenwellsenergies.co.ke',
     role: Role.STATION_SUPERVISOR,
     assignedStationId: stations.KIS1!,
   });
   await usersSvc.setStatus(supervisor.id, UserStatus.ACTIVE);
 
   console.log('Seeding attendants (PIN login)...');
-  await attendantsSvc.create({ fullName: 'Peter Omondi', employeeId: 'KIS1-001', assignedStationId: stations.KIS1!, pin: '1234' });
-  await attendantsSvc.create({ fullName: 'Mary Achieng', employeeId: 'KIS2-001', assignedStationId: stations.KIS2!, pin: '1234' });
+  await attendantsSvc.create({
+    fullName: 'Peter Omondi',
+    employeeId: 'KIS1-001',
+    assignedStationId: stations.KIS1!,
+    pin: '1234',
+  });
+  await attendantsSvc.create({
+    fullName: 'Mary Achieng',
+    employeeId: 'KIS2-001',
+    assignedStationId: stations.KIS2!,
+    pin: '1234',
+  });
 
   console.log('Seeding current prices...');
   await pricesSvc.create(
-    { product: 'PMS' as never, pricePerLitre: 194.5, effectiveFrom: new Date(Date.now() - 86_400_000).toISOString() },
-    { kind: 'staff', userId: admin.id, email: admin.email, fullName: admin.fullName, role: Role.ADMIN },
+    {
+      product: 'PMS' as never,
+      pricePerLitre: 194.5,
+      effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+    },
+    {
+      kind: 'staff',
+      userId: admin.id,
+      email: admin.email,
+      fullName: admin.fullName,
+      role: Role.ADMIN,
+    },
   );
   await pricesSvc.create(
-    { product: 'AGO' as never, pricePerLitre: 223.08, effectiveFrom: new Date(Date.now() - 86_400_000).toISOString() },
-    { kind: 'staff', userId: admin.id, email: admin.email, fullName: admin.fullName, role: Role.ADMIN },
+    {
+      product: 'AGO' as never,
+      pricePerLitre: 223.08,
+      effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+    },
+    {
+      kind: 'staff',
+      userId: admin.id,
+      email: admin.email,
+      fullName: admin.fullName,
+      role: Role.ADMIN,
+    },
   );
 
   console.log('Seeding customers...');
-  await customersSvc.create({ fullName: 'Alice Nyambura', phoneNumber: '0712345678', homeStationId: stations.KIS1 });
-  await customersSvc.create({ fullName: 'David Kiplangat', phoneNumber: '0722345678', homeStationId: stations.MBT });
+  await customersSvc.create({
+    fullName: 'Alice Nyambura',
+    phoneNumber: '0712345678',
+    homeStationId: stations.KIS1,
+  });
+  await customersSvc.create({
+    fullName: 'David Kiplangat',
+    phoneNumber: '0722345678',
+    homeStationId: stations.MBT,
+  });
 
   console.log('Seed complete.');
   await app.close();
