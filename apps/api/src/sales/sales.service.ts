@@ -48,6 +48,17 @@ export interface SyncedSaleOutcome {
   result: SyncRecordResult;
   saleId?: string;
   errorReason?: string;
+  /**
+   * Populated only when a sale was actually (re-)created (ACCEPTED /
+   * NEEDS_REVIEW) — everything the Android app needs to compose and send
+   * the customer's confirmation SMS itself once it's back online, without
+   * an extra round trip. Backend does not send SMS for attendant-sourced
+   * sales (see SalesService.createSale) — the app owns that for its own
+   * sales, both the immediate-online and offline-synced-later cases.
+   */
+  customerPhone?: string;
+  cashbackEarned?: number;
+  monthToDateCashback?: number;
 }
 
 @Injectable()
@@ -205,15 +216,20 @@ export class SalesService {
     this.changeEvents.emit('customers');
     this.changeEvents.emit('reconciliationDaily');
 
-    // Fire SMS + monthly total outside the transaction (non-critical path).
-    const monthKey = nairobiMonthKey(saleDate);
-    const summary = await this.monthlySummary(customer.id, monthKey);
-    await this.sms.sendSaleConfirmation({
-      saleId: sale.id,
-      customerPhone: customer.phoneNumber,
-      cashbackEarned: sale.snapshot.cashbackEarned,
-      monthToDateCashback: summary.totalCashback,
-    });
+    // Attendant-recorded sales send their SMS from the Android app itself
+    // (direct Africa's Talking call — see MobileController), so the phone
+    // isn't dependent on a data connection back to this API. This backend
+    // only sends for web/admin-entered sales (source: 'admin_manual').
+    if (actor.kind !== 'attendant') {
+      const monthKey = nairobiMonthKey(saleDate);
+      const summary = await this.monthlySummary(customer.id, monthKey);
+      await this.sms.sendSaleConfirmation({
+        saleId: sale.id,
+        customerPhone: customer.phoneNumber,
+        cashbackEarned: sale.snapshot.cashbackEarned,
+        monthToDateCashback: summary.totalCashback,
+      });
+    }
 
     return sale;
   }
@@ -236,6 +252,7 @@ export class SalesService {
       }
 
       const sale = await this.createSale(params, actor);
+      const summary = await this.monthlySummary(sale.customerId, nairobiMonthKey(sale.saleDate));
 
       const needsReview = this.detectStaleClientCache(params, sale);
       return {
@@ -243,6 +260,9 @@ export class SalesService {
         idempotencyKey: params.idempotencyKey,
         result: needsReview ? SyncRecordResult.NEEDS_REVIEW : SyncRecordResult.ACCEPTED,
         saleId: sale.id,
+        customerPhone: sale.customerPhoneAtSale,
+        cashbackEarned: sale.snapshot.cashbackEarned,
+        monthToDateCashback: summary.totalCashback,
       };
     } catch (err) {
       if (err instanceof ConflictException) {

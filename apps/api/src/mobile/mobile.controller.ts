@@ -1,20 +1,22 @@
-import { Body, Controller, Get, NotFoundException, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificationType, Role } from '@loyalty/shared';
 import { AttendantOnly } from '../common/decorators/attendant-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { nairobiDayBoundsUtc, nairobiToday } from '../common/time/nairobi';
+import { nairobiDayBoundsUtc, nairobiMonthKey, nairobiToday } from '../common/time/nairobi';
 import { CustomerRegistrationsService } from '../customer-registrations/customer-registrations.service';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PricesService } from '../prices/prices.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import { SalesService } from '../sales/sales.service';
+import { buildSaleConfirmationMessage, SmsService } from '../sms/sms.service';
 import { StationsService } from '../stations/stations.service';
 import { UsersService } from '../users/users.service';
 import type { AttendantPrincipal } from '../common/types/principal';
 import { BulkSyncDto } from './dto/bulk-sync.dto';
 import { MobileCreateSaleDto } from './dto/mobile-create-sale.dto';
+import { ReportSmsStatusDto } from './dto/report-sms-status.dto';
 import { SubmitCustomerRegistrationDto } from './dto/submit-customer-registration.dto';
 import { SyncOperationsService } from './sync-operations.service';
 
@@ -39,6 +41,7 @@ export class MobileController {
     private readonly customerRegistrations: CustomerRegistrationsService,
     private readonly notifications: NotificationsService,
     private readonly users: UsersService,
+    private readonly sms: SmsService,
   ) {}
 
   @Get('bootstrap')
@@ -70,9 +73,48 @@ export class MobileController {
     return this.prices.getCurrent();
   }
 
+  /**
+   * `monthToDateCashback` is included so the app can compose the same SMS
+   * text it would need to send itself (see POST sales/:id/sms-status) —
+   * this backend does not send SMS for attendant-sourced sales.
+   */
   @Post('sales')
-  createSale(@Body() dto: MobileCreateSaleDto, @CurrentUser() actor: AttendantPrincipal) {
-    return this.sales.createSale(dto, actor);
+  async createSale(@Body() dto: MobileCreateSaleDto, @CurrentUser() actor: AttendantPrincipal) {
+    const sale = await this.sales.createSale(dto, actor);
+    const summary = await this.sales.monthlySummary(sale.customerId, nairobiMonthKey(sale.saleDate));
+    return { ...sale, monthToDateCashback: summary.totalCashback };
+  }
+
+  /**
+   * Called after the app sends the sale-confirmation SMS itself directly
+   * via Africa's Talking — records the outcome for the audit trail and
+   * keeps `sale.smsStatus` (shown in the web app) accurate. Looks the sale
+   * up server-side rather than trusting a client-supplied phone/amount.
+   */
+  @Post('sales/:id/sms-status')
+  async reportSmsStatus(
+    @Param('id') id: string,
+    @Body() dto: ReportSmsStatusDto,
+    @CurrentUser() actor: AttendantPrincipal,
+  ) {
+    const sale = await this.sales.findById(id);
+    if (sale.attendantId !== actor.attendantId) {
+      throw new NotFoundException('Sale not found');
+    }
+    const summary = await this.sales.monthlySummary(sale.customerId, nairobiMonthKey(sale.saleDate));
+    const message = buildSaleConfirmationMessage({
+      cashbackEarned: sale.snapshot.cashbackEarned,
+      monthToDateCashback: summary.totalCashback,
+    });
+    return this.sms.recordExternalOutcome({
+      saleId: sale.id,
+      customerPhone: sale.customerPhoneAtSale,
+      message,
+      success: dto.success,
+      providerName: 'africastalking-android',
+      providerResponse: dto.providerResponse,
+      errorReason: dto.errorReason,
+    });
   }
 
   /**
