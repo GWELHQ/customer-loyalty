@@ -1,16 +1,12 @@
 import type { DisbursementBatch } from '@loyalty/shared';
 
 /**
- * Tab-delimited bulk-payment file, matching the bank's own upload template
- * (see PESAPAL_TRANSITION_PROPOSAL.md history / the "STAFF SALARY ADVANCES"
- * sample the format was copied from). Every disbursement is via M-Pesa, so
- * Bank/Branch/BIC are fixed constants — only Beneficiary Name,
- * AccountNo./PhoneNumber, and Net Pay/Amount vary per row.
- *
- * ASSUMPTION worth confirming with Finance: the debit account and branch
- * BIC/SORT code below were copied from a staff-salary-advances template,
- * not a customer-cashback one — update DEBIT_ACCOUNT/BRANCH_BIC_SORT_CODE
- * here if the customer disbursement account differs.
+ * Tab-delimited bulk-payment file, matching the bank's own upload template.
+ * Every disbursement is via M-Pesa, so Debit Account/Branch code/Bank/
+ * Branch/BIC are fixed constants (confirmed correct for customer cashback,
+ * not just the staff-advances template they were originally copied from) —
+ * only Beneficiary Name, AccountNo./PhoneNumber, and Net Pay/Amount vary
+ * per row.
  */
 const DEBIT_ACCOUNT = '1138112682';
 const BRANCH_BIC_SORT_CODE = '01105';
@@ -41,7 +37,7 @@ function monthTitle(month: string): string {
   const monthName = new Date(Date.UTC(year, monthNum - 1, 1))
     .toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })
     .toUpperCase();
-  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER CASHBACK DISBURSEMENT`;
+  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER LOYALTY CASHBACK`;
 }
 
 function round2(n: number): number {
