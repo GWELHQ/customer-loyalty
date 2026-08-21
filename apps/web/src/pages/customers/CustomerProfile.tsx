@@ -10,12 +10,13 @@ import { useRealtimeRefresh } from '../../data/realtime';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import type { ExportColumn } from '../../lib/exportTable';
+import { formatNairobiDate } from '../../lib/time';
 import { ExportButtons } from '../../ui/ExportButtons';
 import { Icon } from '../../ui/Icon';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
 
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
-  { header: 'Date', value: (s) => new Date(s.saleDate).toLocaleDateString('en-KE') },
+  { header: 'Date', value: (s) => formatNairobiDate(s.saleDate) },
   { header: 'Station', value: (s) => s.stationNameAtSale },
   { header: 'Product', value: (s) => s.product },
   { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
@@ -97,7 +98,7 @@ export function CustomerProfile() {
                 <tbody>
                   {paged.map((s) => (
                     <Tr key={s.id}>
-                      <Td>{new Date(s.saleDate).toLocaleDateString('en-KE')}</Td>
+                      <Td>{formatNairobiDate(s.saleDate)}</Td>
                       <Td>{s.stationNameAtSale}</Td>
                       <Td>{s.product}</Td>
                       <Td align="right">KSh {s.amountPaid.toLocaleString('en-KE')}</Td>
@@ -159,8 +160,8 @@ export function CustomerProfile() {
               <div style={{ marginTop: 8 }}>
                 <Badge tone="info">Special rate: KSh {customer.specialRateKesPerLitre} / litre</Badge>
                 <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 8 }}>
-                  Effective from {customer.specialRateEffectiveFrom && new Date(customer.specialRateEffectiveFrom).toLocaleDateString('en-KE')}
-                  {customer.specialRateEffectiveTo && ` to ${new Date(customer.specialRateEffectiveTo).toLocaleDateString('en-KE')}`}
+                  Effective from {customer.specialRateEffectiveFrom && formatNairobiDate(customer.specialRateEffectiveFrom)}
+                  {customer.specialRateEffectiveTo && ` to ${formatNairobiDate(customer.specialRateEffectiveTo)}`}
                 </div>
               </div>
             ) : (
@@ -175,7 +176,7 @@ export function CustomerProfile() {
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8 }}>
               {customer.source === 'import' ? 'Bulk Excel import' : customer.source === 'android' ? 'Registered on Android' : 'Added manually'}
               {' · '}
-              {new Date(customer.createdAt).toLocaleDateString('en-KE')}
+              {formatNairobiDate(customer.createdAt)}
             </div>
           </Card>
 

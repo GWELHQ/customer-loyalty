@@ -8,6 +8,7 @@ import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
+import { formatNairobiDate, formatNairobiDateTime } from '../lib/time';
 import { Badge, Button, Card, CardHeader, Field, Modal, Pagination, inputStyle } from '../ui/primitives';
 
 const REGISTRATION_COLUMNS: ExportColumn<CustomerRegistrationRequest>[] = [
@@ -153,7 +154,7 @@ function RequestRow({
 
       <div style={{ marginTop: 11, fontSize: 13, color: 'var(--color-text-secondary)' }}>
         <strong style={{ color: 'var(--color-text)' }}>Registered by:</strong> {request.attendantNameAtRequest} ·{' '}
-        {new Date(request.createdAt).toLocaleString('en-KE')}
+        {formatNairobiDateTime(request.createdAt)}
       </div>
 
       {request.status === CustomerRegistrationStatus.PENDING && canApprove && (
@@ -174,7 +175,7 @@ function RequestRow({
       {request.decidedByName && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-text-muted)' }}>
           Decided by {request.decidedByName}
-          {request.decidedAt && ` · ${new Date(request.decidedAt).toLocaleDateString('en-KE')}`}
+          {request.decidedAt && ` · ${formatNairobiDate(request.decidedAt)}`}
           {request.decisionNote && ` — "${request.decisionNote}"`}
         </div>
       )}

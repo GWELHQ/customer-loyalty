@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PricesModule } from '../prices/prices.module';
+import { ReconciliationModule } from '../reconciliation/reconciliation.module';
+import { StationsModule } from '../stations/stations.module';
+import { UsersModule } from '../users/users.module';
 import { JobsController } from './jobs.controller';
 
 @Module({
-  imports: [PricesModule],
+  imports: [PricesModule, ReconciliationModule, StationsModule, UsersModule, NotificationsModule],
   controllers: [JobsController],
 })
 export class JobsModule {}

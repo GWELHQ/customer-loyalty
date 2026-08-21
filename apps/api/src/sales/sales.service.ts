@@ -11,6 +11,7 @@ import {
 import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { nairobiDateKey, nairobiMonthBoundsUtc, nairobiMonthKey } from '../common/time/nairobi';
 import type { AttendantPrincipal, AuthPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
 import { PricesService } from '../prices/prices.service';
@@ -92,12 +93,11 @@ export class SalesService {
   }
 
   async monthlySummary(customerId: string, month: string): Promise<{ month: string; totalCashback: number; saleCount: number }> {
-    const start = `${month}-01T00:00:00.000Z`;
-    const end = `${month}-31T23:59:59.999Z`;
+    const { startUtc, endUtc } = nairobiMonthBoundsUtc(month);
     const snap = await this.col()
       .where('customerId', '==', customerId)
-      .where('saleDate', '>=', start)
-      .where('saleDate', '<=', end)
+      .where('saleDate', '>=', startUtc)
+      .where('saleDate', '<', endUtc)
       .get();
     const sales = snap.docs.map((d) => fromDoc<Sale>(d));
     return {
@@ -156,7 +156,10 @@ export class SalesService {
       await this.reconciliation.reserveLoyaltySaleAmount(tx, {
         stationId: params.stationId,
         product: params.product,
-        date: saleDate,
+        // The ceiling is enforced per Nairobi business day, not per UTC
+        // calendar day — a sale just after midnight Nairobi time (still
+        // the previous UTC day) must land in *today's* bucket.
+        date: nairobiDateKey(saleDate),
         amountPaid: params.amountPaid,
         saleId,
       });
@@ -196,7 +199,7 @@ export class SalesService {
     this.changeEvents.emit('reconciliationDaily');
 
     // Fire SMS + monthly total outside the transaction (non-critical path).
-    const monthKey = saleDate.slice(0, 7);
+    const monthKey = nairobiMonthKey(saleDate);
     const summary = await this.monthlySummary(customer.id, monthKey);
     await this.sms.sendSaleConfirmation({
       saleId: sale.id,

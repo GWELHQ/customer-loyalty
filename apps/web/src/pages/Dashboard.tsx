@@ -238,6 +238,7 @@ function TrendCard({
   stationTotals: StationTotal[] | null;
 }) {
   const [animate, setAnimate] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true));
     return () => cancelAnimationFrame(id);
@@ -282,14 +283,47 @@ function TrendCard({
         {trend.map((d, i) => (
           <div
             key={d.date}
+            onMouseEnter={() => setHovered(d.date)}
+            onMouseLeave={() => setHovered((h) => (h === d.date ? null : h))}
             style={{
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: 6,
+              position: 'relative',
             }}
           >
+            {hovered === d.date && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginBottom: 8,
+                  background: 'var(--color-text)',
+                  color: 'var(--color-surface)',
+                  borderRadius: 8,
+                  padding: '8px 11px',
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 6px 16px rgba(0,0,0,.18)',
+                  zIndex: 2,
+                  pointerEvents: 'none',
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 3 }}>{d.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-primary)' }} />
+                  Petrol: KSh {format(d.pms)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--gw-blue-500)' }} />
+                  Diesel: KSh {format(d.ago)}
+                </div>
+              </div>
+            )}
             <div
               style={{
                 width: '100%',
@@ -301,27 +335,29 @@ function TrendCard({
               }}
             >
               <div
-                title={`Petrol: KSh ${format(d.pms)}`}
                 style={{
                   width: '40%',
                   height: animate ? barHeight(d.pms) : '0%',
                   background: 'var(--color-primary)',
                   borderRadius: '3px 3px 0 0',
                   transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms`,
+                  opacity: hovered && hovered !== d.date ? 0.45 : 1,
                 }}
               />
               <div
-                title={`Diesel: KSh ${format(d.ago)}`}
                 style={{
                   width: '40%',
                   height: animate ? barHeight(d.ago) : '0%',
                   background: 'var(--gw-blue-500)',
                   borderRadius: '3px 3px 0 0',
                   transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45 + 60}ms`,
+                  opacity: hovered && hovered !== d.date ? 0.45 : 1,
                 }}
               />
             </div>
-            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{d.label}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', fontWeight: hovered === d.date ? 800 : 400 }}>
+              {d.label}
+            </div>
           </div>
         ))}
       </div>

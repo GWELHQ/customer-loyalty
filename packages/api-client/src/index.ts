@@ -89,6 +89,9 @@ export class LoyaltyApiClient {
     resetPin: (id: string, newPin: string) => this.http.post<{ success: boolean }>(`/attendants/${id}/reset-pin`, { newPin }),
     setStatus: (id: string, status: 'active' | 'inactive') => this.http.patch<Attendant>(`/attendants/${id}/status`, { status }),
     assignStation: (id: string, stationId: string) => this.http.patch<Attendant>(`/attendants/${id}/station`, { stationId }),
+    update: (id: string, input: Partial<{ fullName: string; employeeId: string }>) =>
+      this.http.patch<Attendant>(`/attendants/${id}`, input),
+    delete: (id: string) => this.http.delete<{ success: boolean }>(`/attendants/${id}`),
   };
 
   stations = {
@@ -223,7 +226,8 @@ export class LoyaltyApiClient {
     reconciliation: (params: { stationId?: string; date?: string } = {}) =>
       this.http.get(`/reports/reconciliation${toQueryString(params)}`),
     disbursements: (month?: string) => this.http.get(`/reports/disbursements${toQueryString({ month })}`),
-    customerActivity: (customerId: string) => this.http.get(`/reports/customer-activity${toQueryString({ customerId })}`),
+    customerActivity: (customerId: string) =>
+      this.http.get<{ customer: Customer | null; sales: Sale[] }>(`/reports/customer-activity${toQueryString({ customerId })}`),
   };
 
   notifications = {

@@ -142,6 +142,22 @@ gcloud scheduler jobs create http price-reminder-check \
 
 The job endpoint itself checks whether a reminder is actually due (`priceReminderSettings.nextReminderAt`) and no-ops otherwise, so it's safe — and cheap — to run this check hourly rather than trying to compute the exact monthly cron expression. Default reminder day is the 15th (`PriceRemindersService.createDefault`); admins can change day/hour/recipients/on-off from the Prices page, or via `PATCH /price-reminders`.
 
+## Cloud Scheduler: end-of-shift reconciliation reminder
+
+Already created for `loyalty-points-413d5` (`reconciliation-reminder-check`, `us-central1`, `Africa/Nairobi` time zone, daily at 20:00):
+
+```bash
+gcloud scheduler jobs create http reconciliation-reminder-check \
+  --location=<REGION> \
+  --schedule="0 20 * * *" \
+  --time-zone="Africa/Nairobi" \
+  --uri="https://<api-domain>/api/v1/jobs/reconciliation-reminders" \
+  --http-method=POST \
+  --headers="x-scheduler-secret=<value-of-scheduler-shared-secret>"
+```
+
+For every active station with no reconciliation totals recorded yet for the current Nairobi calendar day, this in-app-notifies that station's Station Supervisor(s) (`Permission.RECONCILIATION_MANAGE`, which Station Supervisors now hold for their own station only — enforced server-side via `assertStationAccessible`). No email/admin-configurable schedule here, unlike price reminders — 20:00 is a fixed default; change the cron schedule directly if a different end-of-shift hour is needed.
+
 ## CI/CD
 
 `.github/workflows/backend-deploy.yml` and `.github/workflows/frontend-deploy.yml` redeploy on every push to `main` that touches the relevant paths (or via manual `workflow_dispatch`). Both authenticate to GCP keylessly via Workload Identity Federation — no service account key lives in GitHub. One-time setup already done for `loyalty-points-413d5`:

@@ -1,17 +1,19 @@
 import type { Sale } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../data/client';
+import { useCustomersCache } from '../data/useCustomersCache';
 import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const PAGE_SIZE = 25;
 
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
-  { header: 'Date', value: (s) => new Date(s.saleDate).toLocaleString('en-KE') },
+  { header: 'Date', value: (s) => formatNairobiDateTime(s.saleDate) },
   { header: 'Station', value: (s) => s.stationNameAtSale },
   { header: 'Attendant', value: (s) => s.attendantNameAtSale },
   { header: 'Product', value: (s) => s.product },
@@ -32,6 +34,8 @@ export function SalesList() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sale | null>(null);
+  const { customers } = useCustomersCache();
+  const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.fullName])), [customers]);
 
   function reload() {
     setLoading(true);
@@ -46,6 +50,10 @@ export function SalesList() {
   useEffect(reload, [api, stationId, page]);
   useRealtimeRefresh(['sales'], reload);
   useEffect(() => setPage(1), [stationId]);
+
+  function customerName(s: Sale): string {
+    return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
+  }
 
   async function fetchAllForExport(): Promise<Sale[]> {
     const all: Sale[] = [];
@@ -90,6 +98,7 @@ export function SalesList() {
                 <tr>
                   <Th>Date</Th>
                   <Th>Station</Th>
+                  <Th>Customer</Th>
                   <Th>Attendant</Th>
                   <Th>Product</Th>
                   <Th align="right">Amount</Th>
@@ -100,8 +109,9 @@ export function SalesList() {
               <tbody>
                 {sales.map((s) => (
                   <Tr key={s.id} onClick={() => setSelected(s)}>
-                    <Td>{new Date(s.saleDate).toLocaleString('en-KE')}</Td>
+                    <Td>{formatNairobiDateTime(s.saleDate)}</Td>
                     <Td>{s.stationNameAtSale}</Td>
+                    <Td>{customerName(s)}</Td>
                     <Td>{s.attendantNameAtSale}</Td>
                     <Td>{s.product}</Td>
                     <Td align="right">KSh {s.amountPaid.toLocaleString('en-KE')}</Td>
@@ -131,6 +141,7 @@ export function SalesList() {
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Immutable — this is exactly what was recorded at sale time</div>
 
+            <DetailRow label="Customer" value={customerName(selected)} />
             <DetailRow label="Customer phone" value={selected.customerPhoneAtSale} />
             <DetailRow label="Station" value={selected.stationNameAtSale} />
             <DetailRow label="Attendant" value={selected.attendantNameAtSale} />

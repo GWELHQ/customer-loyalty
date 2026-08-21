@@ -90,6 +90,34 @@ export class AttendantsService {
     return (await this.findById(id))!;
   }
 
+  async update(id: string, input: Partial<{ fullName: string; employeeId: string }>): Promise<Attendant> {
+    const attendant = await this.findById(id);
+    if (!attendant) throw new NotFoundException('Attendant not found');
+    if (input.employeeId && input.employeeId !== attendant.employeeId) {
+      const existing = await this.findByEmployeeId(input.employeeId);
+      if (existing) throw new ConflictException('Employee ID already in use');
+    }
+    await this.col().doc(id).update({ ...input, updatedAt: nowIso() });
+    this.changeEvents.emit(COLLECTION);
+    return (await this.findById(id))!;
+  }
+
+  async delete(id: string): Promise<Attendant> {
+    const attendant = await this.findById(id);
+    if (!attendant) throw new NotFoundException('Attendant not found');
+
+    const salesSnap = await this.firestore.collection('sales').where('attendantId', '==', id).limit(1).get();
+    if (!salesSnap.empty) {
+      throw new ConflictException(
+        `Cannot delete "${attendant.fullName}" — they have recorded sales. Deactivate them instead.`,
+      );
+    }
+
+    await this.col().doc(id).delete();
+    this.changeEvents.emit(COLLECTION);
+    return attendant;
+  }
+
   /**
    * Verifies employeeId + PIN with lockout after PIN_MAX_FAILED_ATTEMPTS.
    * Never authenticates on PIN alone — employeeId narrows to one account

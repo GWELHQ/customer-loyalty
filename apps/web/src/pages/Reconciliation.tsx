@@ -1,5 +1,5 @@
 import type { ReconciliationDaily, Station } from '@loyalty/shared';
-import { Permission, ReconciliationStatus } from '@loyalty/shared';
+import { Permission, ReconciliationStatus, Role } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
@@ -10,6 +10,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { nairobiToday } from '../lib/time';
 
 function reconciliationColumns(stations: Station[]): ExportColumn<ReconciliationDaily>[] {
   return [
@@ -33,11 +34,12 @@ const STATUS_TONE: Record<ReconciliationStatus, 'neutral' | 'success' | 'warning
 
 export function Reconciliation() {
   const api = useApi();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canManage = hasPermission(Permission.RECONCILIATION_MANAGE);
+  const lockedStationId = user?.role === Role.STATION_SUPERVISOR ? user.assignedStationId : undefined;
   const { stations } = useStations();
   const [records, setRecords] = useState<ReconciliationDaily[]>([]);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(nairobiToday);
   const [showIngest, setShowIngest] = useState(false);
   const { paged, page, pageCount, setPage } = usePagedRows(records);
 
@@ -65,6 +67,7 @@ export function Reconciliation() {
           <IngestForm
             stations={stations}
             defaultDate={date}
+            lockedStationId={lockedStationId}
             onDone={() => {
               setShowIngest(false);
               reload();
@@ -111,9 +114,19 @@ export function Reconciliation() {
   );
 }
 
-function IngestForm({ stations, defaultDate, onDone }: { stations: Station[]; defaultDate: string; onDone: () => void }) {
+function IngestForm({
+  stations,
+  defaultDate,
+  lockedStationId,
+  onDone,
+}: {
+  stations: Station[];
+  defaultDate: string;
+  lockedStationId?: string;
+  onDone: () => void;
+}) {
   const api = useApi();
-  const [stationId, setStationId] = useState('');
+  const [stationId, setStationId] = useState(lockedStationId ?? '');
   const [product, setProduct] = useState<'PMS' | 'AGO'>('PMS');
   const [totalSales, setTotalSales] = useState('');
   const [busy, setBusy] = useState(false);
@@ -146,14 +159,20 @@ function IngestForm({ stations, defaultDate, onDone }: { stations: Station[]; de
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         <Field label="Station">
-          <select style={inputStyle} value={stationId} onChange={(e) => setStationId(e.target.value)}>
-            <option value="">Choose station</option>
-            {stations.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          {lockedStationId ? (
+            <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', color: 'var(--color-text-secondary)' }}>
+              {stations.find((s) => s.id === lockedStationId)?.name ?? 'Your station'}
+            </div>
+          ) : (
+            <select style={inputStyle} value={stationId} onChange={(e) => setStationId(e.target.value)}>
+              <option value="">Choose station</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Product">
           <select style={inputStyle} value={product} onChange={(e) => setProduct(e.target.value as 'PMS' | 'AGO')}>

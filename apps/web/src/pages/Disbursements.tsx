@@ -9,6 +9,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { nairobiThisMonth } from '../lib/time';
 
 const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
   { header: 'Month', value: (b) => b.month },
@@ -30,7 +31,7 @@ export function Disbursements() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.DISBURSEMENTS_MANAGE);
   const { items: batches, refresh: reload } = useDisbursementBatchesCache();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(nairobiThisMonth);
   const [selected, setSelected] = useState<DisbursementBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const { paged, page, pageCount, setPage } = usePagedRows(batches);

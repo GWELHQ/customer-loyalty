@@ -4,11 +4,12 @@ import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Button, Card, EmptyState, Table, Td, Th, Tr } from '../ui/primitives';
 
 const AUDIT_COLUMNS: ExportColumn<AuditEvent>[] = [
-  { header: 'When', value: (e) => new Date(e.createdAt).toLocaleString('en-KE') },
+  { header: 'When', value: (e) => formatNairobiDateTime(e.createdAt) },
   { header: 'Actor', value: (e) => e.actorName },
   { header: 'Action', value: (e) => e.action },
   { header: 'Entity type', value: (e) => e.entityType },
@@ -83,7 +84,7 @@ export function AuditLog() {
             <tbody>
               {events.map((e) => (
                 <Tr key={e.id}>
-                  <Td>{new Date(e.createdAt).toLocaleString('en-KE')}</Td>
+                  <Td>{formatNairobiDateTime(e.createdAt)}</Td>
                   <Td>{e.actorName}</Td>
                   <Td>{e.action}</Td>
                   <Td>{e.entityLabel ? `${e.entityType} · ${e.entityLabel}` : e.entityType}</Td>

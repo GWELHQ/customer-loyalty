@@ -2,18 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { Product, ReconciliationStatus, SpecialRateStatus, type Sale, type Station } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
+import { nairobiDateKey, nairobiDayBoundsUtc, nairobiMonthBoundsUtc, nairobiMonthKey, nairobiToday } from '../common/time/nairobi';
 
 @Injectable()
 export class ReportsService {
   constructor(private readonly firestore: FirestoreService) {}
 
   async dashboard(stationId?: string) {
-    const today = new Date().toISOString().slice(0, 10);
-    const monthStart = `${today.slice(0, 7)}-01`;
+    const today = nairobiToday();
+    const monthStart = nairobiMonthBoundsUtc(nairobiMonthKey()).startUtc;
 
     let salesQuery = this.firestore
       .collection('sales')
-      .where('saleDate', '>=', `${monthStart}T00:00:00.000Z`) as FirebaseFirestore.Query;
+      .where('saleDate', '>=', monthStart) as FirebaseFirestore.Query;
     if (stationId) salesQuery = salesQuery.where('stationId', '==', stationId);
     const salesSnap = await salesQuery.get();
     const sales = salesSnap.docs.map((d) => fromDoc<Sale>(d));
@@ -62,26 +63,26 @@ export class ReportsService {
     };
   }
 
-  /** Last 7 days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
+  /** Last 7 Nairobi calendar days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
   private async salesTrend(stationId?: string): Promise<Array<{ date: string; label: string; pms: number; ago: number }>> {
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
+    const today = nairobiToday();
+    const dayKeys: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(`${today}T00:00:00.000Z`);
+      d.setUTCDate(d.getUTCDate() - i);
+      dayKeys.push(d.toISOString().slice(0, 10));
+    }
+    const startUtc = nairobiDayBoundsUtc(dayKeys[0]!).startUtc;
 
-    let query = this.firestore.collection('sales').where('saleDate', '>=', start.toISOString()) as FirebaseFirestore.Query;
+    let query = this.firestore.collection('sales').where('saleDate', '>=', startUtc) as FirebaseFirestore.Query;
     if (stationId) query = query.where('stationId', '==', stationId);
     const snap = await query.get();
     const sales = snap.docs.map((d) => fromDoc<Sale>(d));
 
     const byDay = new Map<string, { pms: number; ago: number }>();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      byDay.set(d.toISOString().slice(0, 10), { pms: 0, ago: 0 });
-    }
+    for (const key of dayKeys) byDay.set(key, { pms: 0, ago: 0 });
     for (const sale of sales) {
-      const day = sale.saleDate.slice(0, 10);
-      const bucket = byDay.get(day);
+      const bucket = byDay.get(nairobiDateKey(sale.saleDate));
       if (!bucket) continue;
       if (sale.product === Product.PMS) bucket.pms += sale.amountPaid;
       else if (sale.product === Product.AGO) bucket.ago += sale.amountPaid;
@@ -95,7 +96,7 @@ export class ReportsService {
     }));
   }
 
-  /** Today's loyalty sales amount per station — only meaningful for an unscoped (all-stations) view. */
+  /** Today's (Nairobi calendar day) loyalty sales amount per station — only meaningful for an unscoped (all-stations) view. */
   private async todayStationTotals(
     monthToDateSales: Sale[],
     today: string,
@@ -105,7 +106,7 @@ export class ReportsService {
 
     const byStation = new Map<string, number>();
     for (const sale of monthToDateSales) {
-      if (!sale.saleDate.startsWith(today)) continue;
+      if (nairobiDateKey(sale.saleDate) !== today) continue;
       byStation.set(sale.stationId, (byStation.get(sale.stationId) ?? 0) + sale.amountPaid);
     }
 

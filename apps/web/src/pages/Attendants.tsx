@@ -8,6 +8,7 @@ import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
+import { Icon } from '../ui/Icon';
 import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 function attendantColumns(stations: Station[]): ExportColumn<Attendant>[] {
@@ -26,6 +27,10 @@ export function Attendants() {
   const { paged, page, pageCount, setPage } = usePagedRows(attendants);
   const [showForm, setShowForm] = useState(false);
   const [pinModalFor, setPinModalFor] = useState<Attendant | null>(null);
+  const [editing, setEditing] = useState<Attendant | null>(null);
+  const [deleting, setDeleting] = useState<Attendant | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -39,6 +44,21 @@ export function Attendants() {
       setError(err instanceof Error ? err.message : `Could not update ${a.fullName}'s status`);
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      await api.attendants.delete(deleting.id);
+      setDeleting(null);
+      reload();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this attendant');
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -89,11 +109,26 @@ export function Attendants() {
                   </Td>
                   <Td align="right">
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <Button variant="secondary" size="sm" onClick={() => setEditing(a)}>
+                        Edit
+                      </Button>
                       <Button variant="secondary" size="sm" onClick={() => setPinModalFor(a)}>
                         Reset PIN
                       </Button>
                       <Button variant="secondary" size="sm" disabled={busyId === a.id} onClick={() => toggleStatus(a)}>
                         {busyId === a.id ? 'Working…' : a.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleting(a);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                      >
+                        <Icon name="trash" size={13} />
+                        Delete
                       </Button>
                     </div>
                   </Td>
@@ -106,7 +141,109 @@ export function Attendants() {
       </div>
 
       {pinModalFor && <ResetPinModal attendant={pinModalFor} onClose={() => setPinModalFor(null)} />}
+
+      {editing && (
+        <Modal title={`Edit ${editing.fullName}`} onClose={() => setEditing(null)}>
+          <EditAttendantForm
+            attendant={editing}
+            stations={stations}
+            onDone={() => {
+              setEditing(null);
+              reload();
+            }}
+          />
+        </Modal>
+      )}
+
+      {deleting && (
+        <Modal title={`Delete ${deleting.fullName}?`} onClose={() => !deleteBusy && setDeleting(null)}>
+          <div style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+            This permanently deletes <strong>{deleting.fullName}</strong> ({deleting.employeeId}). Only allowed if they have no recorded sales — otherwise, deactivate them instead.
+          </div>
+          {deleteError && (
+            <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>
+              {deleteError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Button variant="danger" onClick={confirmDelete} disabled={deleteBusy}>
+              {deleteBusy ? 'Deleting…' : 'Delete permanently'}
+            </Button>
+            <Button variant="secondary" onClick={() => setDeleting(null)} disabled={deleteBusy}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      )}
     </AppShell>
+  );
+}
+
+function EditAttendantForm({
+  attendant,
+  stations,
+  onDone,
+}: {
+  attendant: Attendant;
+  stations: Station[];
+  onDone: () => void;
+}) {
+  const api = useApi();
+  const [fullName, setFullName] = useState(attendant.fullName);
+  const [employeeId, setEmployeeId] = useState(attendant.employeeId);
+  const [assignedStationId, setAssignedStationId] = useState(attendant.assignedStationId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.attendants.update(attendant.id, { fullName, employeeId });
+      if (assignedStationId !== attendant.assignedStationId) {
+        await api.attendants.assignStation(attendant.id, assignedStationId);
+      }
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save changes');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Field label="Full name">
+          <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </Field>
+        <Field label="Employee ID">
+          <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
+        </Field>
+        <Field label="Assigned station">
+          <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
+            {stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <Button variant="primary" onClick={submit} disabled={busy || !fullName || !employeeId}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" onClick={onDone} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
+import { formatNairobiDate, formatNairobiDateTime } from '../lib/time';
 import { Icon } from '../ui/Icon';
 import { Badge, Button, Card, Field, inputStyle } from '../ui/primitives';
 
@@ -80,7 +81,7 @@ export function Prices() {
                 </div>
                 {price && (
                   <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                    per litre · effective {new Date(price.effectiveFrom).toLocaleDateString('en-KE')}
+                    per litre · effective {formatNairobiDate(price.effectiveFrom)}
                   </div>
                 )}
                 {price && (
@@ -158,7 +159,7 @@ export function Prices() {
                     <strong>{reminders.timezone}</strong>
                   </Row>
                   <Row label="Next reminder">
-                    <strong>{new Date(reminders.nextReminderAt).toLocaleString('en-KE')}</strong>
+                    <strong>{formatNairobiDateTime(reminders.nextReminderAt)}</strong>
                   </Row>
                   <div>
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 6 }}>Recipients</div>

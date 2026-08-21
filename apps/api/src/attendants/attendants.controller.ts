@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
@@ -10,6 +10,7 @@ import { AttendantsService } from './attendants.service';
 import { AssignStationDto } from './dto/assign-station.dto';
 import { CreateAttendantDto } from './dto/create-attendant.dto';
 import { ResetPinDto } from './dto/reset-pin.dto';
+import { UpdateAttendantDto } from './dto/update-attendant.dto';
 import { UpdateAttendantStatusDto } from './dto/update-attendant-status.dto';
 
 /**
@@ -105,5 +106,32 @@ export class AttendantsController {
       metadata: { stationId: dto.stationId },
     });
     return attendant;
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: UpdateAttendantDto, @CurrentUser() actor: StaffPrincipal) {
+    const attendant = await this.attendants.update(id, dto);
+    await this.audit.record({
+      actor,
+      action: 'attendant.update',
+      entityType: 'attendant',
+      entityId: id,
+      entityLabel: attendant.fullName,
+      metadata: dto as unknown as Record<string, unknown>,
+    });
+    return attendant;
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
+    const attendant = await this.attendants.delete(id);
+    await this.audit.record({
+      actor,
+      action: 'attendant.delete',
+      entityType: 'attendant',
+      entityId: id,
+      entityLabel: attendant.fullName,
+    });
+    return { success: true };
   }
 }

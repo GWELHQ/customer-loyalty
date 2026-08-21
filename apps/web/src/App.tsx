@@ -31,7 +31,7 @@ export function App() {
       <Route
         path="/dashboard"
         element={
-          <RequireStaff permission={Permission.REPORTS_VIEW_ALL}>
+          <RequireStaff anyPermission={[Permission.REPORTS_VIEW_ALL, Permission.REPORTS_VIEW_OWN_STATION]}>
             <Dashboard />
           </RequireStaff>
         }

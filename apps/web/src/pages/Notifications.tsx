@@ -1,9 +1,11 @@
 import type { Notification } from '@loyalty/shared';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../data/client';
 import { useNotificationsCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Card, EmptyState, Pagination } from '../ui/primitives';
 
@@ -12,11 +14,12 @@ const NOTIFICATION_COLUMNS: ExportColumn<Notification>[] = [
   { header: 'Body', value: (n) => n.body },
   { header: 'Type', value: (n) => n.type },
   { header: 'Read', value: (n) => (n.read ? 'Yes' : 'No') },
-  { header: 'Created', value: (n) => new Date(n.createdAt).toLocaleString('en-KE') },
+  { header: 'Created', value: (n) => formatNairobiDateTime(n.createdAt) },
 ];
 
 export function Notifications() {
   const api = useApi();
+  const navigate = useNavigate();
   const { items, refresh: reload } = useNotificationsCache();
   const { paged, page, pageCount, setPage } = usePagedRows(items);
 
@@ -24,6 +27,13 @@ export function Notifications() {
     if (!n.read) {
       await api.notifications.markRead(n.id);
       reload();
+    }
+    if (n.linkPath) {
+      // linkPath may point at a per-item detail path (e.g. /cashback-ledgers/2026-08)
+      // that has no dedicated route — the item is decided from its list page instead,
+      // so navigate to that top-level list rather than 404ing.
+      const listPath = '/' + n.linkPath.split('/').filter(Boolean)[0];
+      navigate(listPath);
     }
   }
 
@@ -69,7 +79,7 @@ export function Notifications() {
                 {n.body}
               </span>
               <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                {new Date(n.createdAt).toLocaleString('en-KE')}
+                {formatNairobiDateTime(n.createdAt)}
               </span>
             </span>
           </button>

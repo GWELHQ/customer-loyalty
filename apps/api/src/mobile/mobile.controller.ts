@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificationType, Role } from '@loyalty/shared';
 import { AttendantOnly } from '../common/decorators/attendant-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { nairobiDayBoundsUtc, nairobiToday } from '../common/time/nairobi';
 import { CustomerRegistrationsService } from '../customer-registrations/customer-registrations.service';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -123,7 +124,7 @@ export class MobileController {
 
   @Get('daily-summary')
   async dailySummary(@CurrentUser() actor: AttendantPrincipal, @Query('date') date?: string) {
-    const targetDate = (date ?? new Date().toISOString()).slice(0, 10);
+    const targetDate = date ?? nairobiToday();
     const reconciliation = await this.reconciliation.listDaily({
       stationId: actor.assignedStationId,
       date: targetDate,
@@ -133,10 +134,14 @@ export class MobileController {
 
   @Get('sales/mine')
   mySales(@CurrentUser() actor: AttendantPrincipal, @Query('date') date?: string) {
-    const targetDate = (date ?? new Date().toISOString()).slice(0, 10);
+    const targetDate = date ?? nairobiToday();
+    const { startUtc, endUtc } = nairobiDayBoundsUtc(targetDate);
+    // `to` is inclusive in SalesService.list — back off 1ms so the next
+    // Nairobi day's opening instant isn't double-counted.
+    const inclusiveEnd = new Date(new Date(endUtc).getTime() - 1).toISOString();
     return this.sales.list(
       { page: 1, pageSize: 200 },
-      { attendantId: actor.attendantId, from: `${targetDate}T00:00:00.000Z`, to: `${targetDate}T23:59:59.999Z` },
+      { attendantId: actor.attendantId, from: startUtc, to: inclusiveEnd },
     );
   }
 }

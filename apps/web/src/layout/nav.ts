@@ -29,6 +29,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 // the underlying permission (view_own_station) differs from the "all" one
 // above, so it needs its own entries rather than reusing ALL_NAV_ITEMS.
 const STATION_SCOPED_NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard', path: '/dashboard', icon: 'dashboard', permission: Permission.REPORTS_VIEW_OWN_STATION },
   { label: 'Reconciliation', path: '/reconciliation', icon: 'reconciliation', permission: Permission.RECONCILIATION_VIEW_OWN_STATION },
   { label: 'Sales', path: '/sales', icon: 'sales', permission: Permission.SALES_VIEW_OWN_STATION },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_OWN_STATION },

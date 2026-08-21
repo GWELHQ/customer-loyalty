@@ -8,6 +8,7 @@ import { useSpecialRateRequestsCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDate } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, CardHeader, Field, Pagination, inputStyle } from '../ui/primitives';
 
@@ -16,7 +17,7 @@ function specialRateColumns(customers: Record<string, Customer>): ExportColumn<S
     { header: 'Customer', value: (r) => customers[r.customerId]?.fullName ?? 'Unknown customer' },
     { header: 'Phone', value: (r) => customers[r.customerId]?.phoneNumber ?? '' },
     { header: 'Proposed rate (KSh/L)', value: (r) => r.proposedKesPerLitre },
-    { header: 'Effective from', value: (r) => new Date(r.effectiveFrom).toLocaleDateString('en-KE') },
+    { header: 'Effective from', value: (r) => formatNairobiDate(r.effectiveFrom) },
     { header: 'Requested by', value: (r) => r.requestedByName },
     { header: 'Reason', value: (r) => r.reason },
     { header: 'Status', value: (r) => r.status },
@@ -124,7 +125,7 @@ function RequestRow({
         </div>
         <div>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Effective from</div>
-          <div style={{ fontWeight: 700 }}>{new Date(request.effectiveFrom).toLocaleDateString('en-KE')}</div>
+          <div style={{ fontWeight: 700 }}>{formatNairobiDate(request.effectiveFrom)}</div>
         </div>
         <div>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Requested by</div>
@@ -152,7 +153,7 @@ function RequestRow({
       {request.decidedByName && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-text-muted)' }}>
           Decided by {request.decidedByName}
-          {request.decidedAt && ` · ${new Date(request.decidedAt).toLocaleDateString('en-KE')}`}
+          {request.decidedAt && ` · ${formatNairobiDate(request.decidedAt)}`}
         </div>
       )}
     </div>

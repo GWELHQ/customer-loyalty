@@ -7,6 +7,7 @@ import {
 } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { nairobiMonthBoundsUtc } from '../common/time/nairobi';
 import type { StaffPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
 
@@ -42,12 +43,11 @@ export class CashbackLedgersService {
   }
 
   private async recompute(month: string): Promise<MonthlyCashbackLedger> {
-    const start = `${month}-01T00:00:00.000Z`;
-    const end = `${month}-31T23:59:59.999Z`;
+    const { startUtc, endUtc } = nairobiMonthBoundsUtc(month);
     const snap = await this.firestore
       .collection('sales')
-      .where('saleDate', '>=', start)
-      .where('saleDate', '<=', end)
+      .where('saleDate', '>=', startUtc)
+      .where('saleDate', '<', endUtc)
       .get();
     const sales = snap.docs.map((d) => fromDoc<Sale>(d));
 

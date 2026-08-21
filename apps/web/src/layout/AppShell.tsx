@@ -1,4 +1,4 @@
-import { Role } from '@loyalty/shared';
+import { CustomerRegistrationStatus, Permission, Role } from '@loyalty/shared';
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -23,6 +23,8 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
   const location = useLocation();
   const api = useApi();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingRegistrations, setPendingRegistrations] = useState(0);
+  const canViewRegistrations = !!user && hasPermission(Permission.CUSTOMER_REGISTRATIONS_VIEW);
 
   const reloadUnreadCount = useCallback(() => {
     if (!user) return;
@@ -32,8 +34,18 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
       .catch(() => {});
   }, [api, user]);
 
+  const reloadPendingRegistrations = useCallback(() => {
+    if (!canViewRegistrations) return;
+    api.customerRegistrations
+      .list(CustomerRegistrationStatus.PENDING)
+      .then((list) => setPendingRegistrations(list.length))
+      .catch(() => {});
+  }, [api, canViewRegistrations]);
+
   useEffect(reloadUnreadCount, [reloadUnreadCount, location.pathname]);
   useRealtimeRefresh(['notifications'], reloadUnreadCount);
+  useEffect(reloadPendingRegistrations, [reloadPendingRegistrations, location.pathname]);
+  useRealtimeRefresh(['customerRegistrationRequests'], reloadPendingRegistrations);
 
   if (!user) return null;
   const nav = navItemsForRole(user.role, hasPermission);
@@ -109,6 +121,25 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
                     }}
                   >
                     {unreadCount}
+                  </span>
+                )}
+                {n.path === '/customer-registrations' && pendingRegistrations > 0 && (
+                  <span
+                    style={{
+                      background: 'var(--gw-amber-500)',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      borderRadius: 999,
+                      minWidth: 18,
+                      height: 18,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 5px',
+                    }}
+                  >
+                    {pendingRegistrations}
                   </span>
                 )}
               </button>

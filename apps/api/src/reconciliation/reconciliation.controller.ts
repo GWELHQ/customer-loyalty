@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
-import { resolveStationScope } from '../common/access/station-scope';
+import { assertStationAccessible, resolveStationScope } from '../common/access/station-scope';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../common/decorators/any-permission.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -36,6 +36,7 @@ export class ReconciliationController {
   @Post('daily-totals')
   @RequirePermissions(Permission.RECONCILIATION_MANAGE)
   async ingest(@Body() dto: IngestDailyTotalsDto, @CurrentUser() actor: StaffPrincipal) {
+    assertStationAccessible(actor, dto.stationId);
     const record = await this.reconciliation.ingestDailyTotal(dto, actor);
     await this.audit.record({
       actor,
