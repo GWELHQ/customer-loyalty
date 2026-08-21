@@ -117,7 +117,7 @@ export class AttendantsController {
       entityType: 'attendant',
       entityId: id,
       entityLabel: attendant.fullName,
-      metadata: dto as unknown as Record<string, unknown>,
+      metadata: { fullName: dto.fullName, employeeId: dto.employeeId },
     });
     return attendant;
   }
