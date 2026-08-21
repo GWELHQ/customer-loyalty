@@ -217,6 +217,7 @@ export class LoyaltyApiClient {
     complete: (id: string, results: { customerId: string; status: 'paid' | 'failed'; reference?: string; failureReason?: string }[]) =>
       this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/complete`, { results }),
     hold: (id: string, reason: string) => this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/hold`, { reason }),
+    exportFile: (id: string) => this.http.getBlob(`/disbursement-batches/${id}/export.txt`),
   };
 
   reports = {

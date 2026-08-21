@@ -14,7 +14,7 @@ import { MockEmailProvider } from './mock-email.provider';
     {
       provide: EMAIL_PROVIDER,
       useFactory: (config: ConfigService<AppConfig, true>, mock: MockEmailProvider, graph: MicrosoftGraphEmailProvider) =>
-        config.get('email', { infer: true }).provider === 'microsoft-graph' ? graph : mock,
+        ['microsoft-graph', 'graph'].includes(config.get('email', { infer: true }).provider) ? graph : mock,
       inject: [ConfigService, MockEmailProvider, MicrosoftGraphEmailProvider],
     },
     EmailService,

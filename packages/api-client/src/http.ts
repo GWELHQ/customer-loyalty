@@ -107,6 +107,28 @@ export class HttpClient {
   delete<T>(path: string): Promise<T> {
     return this.request<T>('DELETE', path);
   }
+
+  /** For endpoints returning a file (e.g. a bank export) rather than JSON — same auth/401-retry handling as request(), but resolves to a Blob plus the server-suggested filename. */
+  async getBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+    let res = await this.rawFetch('GET', path, undefined, undefined, this.options.getAccessToken?.());
+
+    if (res.status === 401 && this.options.refreshAccessToken) {
+      const newToken = await this.getRefreshedToken();
+      if (newToken) {
+        res = await this.rawFetch('GET', path, undefined, undefined, newToken);
+      }
+    }
+    if (res.status === 401) {
+      this.options.onUnauthorized?.();
+    }
+    if (!res.ok) {
+      throw new ApiError(res.status, undefined, `Request failed with status ${res.status}`);
+    }
+
+    const disposition = res.headers.get('content-disposition') ?? '';
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    return { blob: await res.blob(), filename: match?.[1] ?? null };
+  }
 }
 
 export function toQueryString(params: Record<string, string | number | undefined | null>): string {

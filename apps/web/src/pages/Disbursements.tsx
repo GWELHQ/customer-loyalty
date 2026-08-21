@@ -7,9 +7,10 @@ import { useDisbursementBatchesCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { nairobiThisMonth } from '../lib/time';
+import { Icon } from '../ui/Icon';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
-import { nairobiThisMonth } from '../lib/time';
 
 const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
   { header: 'Month', value: (b) => b.month },
@@ -34,7 +35,25 @@ export function Disbursements() {
   const [month, setMonth] = useState(nairobiThisMonth);
   const [selected, setSelected] = useState<DisbursementBatch | null>(null);
   const [busy, setBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const { paged, page, pageCount, setPage } = usePagedRows(batches);
+
+  async function downloadBankFile(batch: DisbursementBatch) {
+    setDownloadError(null);
+    try {
+      const { blob, filename } = await api.disbursementBatches.exportFile(batch.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? `green-wells-${batch.month}-disbursement.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Could not download the bank file');
+    }
+  }
 
   async function createBatch() {
     setBusy(true);
@@ -134,8 +153,25 @@ export function Disbursements() {
                 {selected.entries.length} customers · KSh {selected.totalAmount.toLocaleString('en-KE')}
               </div>
 
+              {downloadError && (
+                <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 10 }}>
+                  {downloadError}
+                </div>
+              )}
+
               {canManage && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+                  {selected.status !== DisbursementBatchStatus.COMPLETED && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => downloadBankFile(selected)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}
+                    >
+                      <Icon name="download" size={13} />
+                      Download bank file (.txt)
+                    </Button>
+                  )}
                   {selected.status === DisbursementBatchStatus.DRAFT && !selected.confirmedAt && (
                     <Button variant="primary" size="sm" onClick={() => transition('confirm', selected)} disabled={busy}>
                       Confirm batch
