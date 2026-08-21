@@ -1,14 +1,21 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../config/configuration';
+import { AfricasTalkingSmsProvider } from './africastalking-sms.provider';
 import { MockSmsProvider } from './mock-sms.provider';
 import { SMS_PROVIDER } from './sms-provider.interface';
 import { SmsService } from './sms.service';
 
 @Module({
   providers: [
-    // SMS_PROVIDER is always the mock in this deliverable. Swap this
-    // factory for a real provider class (e.g. Africa's Talking) in prod —
-    // SmsService and every caller only depend on the SmsProvider interface.
-    { provide: SMS_PROVIDER, useClass: MockSmsProvider },
+    AfricasTalkingSmsProvider,
+    MockSmsProvider,
+    {
+      provide: SMS_PROVIDER,
+      useFactory: (config: ConfigService<AppConfig, true>, africastalking: AfricasTalkingSmsProvider, mock: MockSmsProvider) =>
+        config.get('sms', { infer: true }).provider === 'africastalking' ? africastalking : mock,
+      inject: [ConfigService, AfricasTalkingSmsProvider, MockSmsProvider],
+    },
     SmsService,
   ],
   exports: [SmsService],

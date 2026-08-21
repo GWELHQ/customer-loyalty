@@ -19,7 +19,12 @@ export interface AppConfig {
   };
   sms: {
     provider: string;
-    apiKey: string;
+    africastalking: {
+      username: string;
+      apiKey: string;
+      baseUrl: string;
+      senderId: string;
+    };
   };
   schedulerSharedSecret: string;
 }
@@ -45,7 +50,12 @@ export default (): AppConfig => ({
   },
   sms: {
     provider: process.env.SMS_PROVIDER ?? 'mock',
-    apiKey: process.env.SMS_PROVIDER_API_KEY ?? '',
+    africastalking: {
+      username: process.env.AFRICASTALKING_USERNAME ?? '',
+      apiKey: process.env.AFRICASTALKING_API_KEY ?? '',
+      baseUrl: process.env.AFRICASTALKING_BASE_URL ?? 'https://api.africastalking.com',
+      senderId: process.env.AFRICASTALKING_SENDER_ID ?? '',
+    },
   },
   schedulerSharedSecret: process.env.SCHEDULER_SHARED_SECRET ?? '',
 });
