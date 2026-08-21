@@ -177,6 +177,11 @@ export class CustomerRegistrationsService {
         stationId: request.stationId,
         saleDate: request.saleDate,
         idempotencyKey: request.idempotencyKey,
+        // Credit the sale to the attendant who originally submitted the registration, not to
+        // whichever supervisor/admin approves it — otherwise the sale never shows up under that
+        // attendant's own `/mobile/sales/mine` (it's scoped strictly to attendantId).
+        attendantIdOverride: request.attendantId,
+        attendantNameOverride: request.attendantNameAtRequest,
       },
       decidedBy,
     );

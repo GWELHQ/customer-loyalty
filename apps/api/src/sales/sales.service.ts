@@ -33,6 +33,13 @@ export interface CreateSaleParams {
   /** Only present on synced offline sales — used to detect a stale client cache, never trusted for the actual calculation. */
   claimedPricePerLitre?: number;
   claimedCashbackEarned?: number;
+  /**
+   * Attributes the sale to a specific attendant regardless of who the calling `actor` is —
+   * needed when a supervisor/admin approves a customer-registration request: the sale must
+   * still be credited to the attendant who originally submitted it, not to the approver.
+   */
+  attendantIdOverride?: string;
+  attendantNameOverride?: string;
 }
 
 export interface SyncedSaleOutcome {
@@ -142,8 +149,8 @@ export class SalesService {
       cashbackRatePerLitre,
     });
 
-    const attendantId = actor.kind === 'attendant' ? actor.attendantId : actor.userId;
-    const attendantName = actor.fullName;
+    const attendantId = params.attendantIdOverride ?? (actor.kind === 'attendant' ? actor.attendantId : actor.userId);
+    const attendantName = params.attendantNameOverride ?? actor.fullName;
     const saleId = params.idempotencyKey;
     const saleRef = this.col().doc(saleId);
 
