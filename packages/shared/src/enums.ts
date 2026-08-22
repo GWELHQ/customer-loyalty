@@ -43,6 +43,8 @@ export enum SpecialRateStatus {
   PENDING = 'pending',
   APPROVED = 'approved',
   REJECTED = 'rejected',
+  /** Was approved and active, then the Chairman removed it from the customer. */
+  REVOKED = 'revoked',
 }
 
 export enum CustomerRegistrationStatus {

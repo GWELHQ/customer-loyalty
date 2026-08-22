@@ -135,6 +135,9 @@ export interface SpecialRateRequest extends BaseDoc {
   decidedByUserId?: string;
   decidedByName?: string;
   decidedAt?: ISODateString;
+  revokedByUserId?: string;
+  revokedByName?: string;
+  revokedAt?: ISODateString;
 }
 
 /**

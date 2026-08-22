@@ -124,6 +124,37 @@ export class SpecialRateRequestsService {
     return this.findById(id);
   }
 
+  /**
+   * Chairman-only. Removes an approved rate from the customer, reverting
+   * them to the default cashback rate. Only actually clears the customer's
+   * fields if this request is still the active one — a request that's
+   * since been superseded by a newer approved rate is just marked revoked
+   * for history, without touching whatever rate is active now.
+   */
+  async revoke(id: string, revokedBy: StaffPrincipal): Promise<SpecialRateRequest> {
+    const request = await this.findById(id);
+    if (request.status !== SpecialRateStatus.APPROVED) {
+      throw new BadRequestException(`Only an approved request can be revoked (status: ${request.status})`);
+    }
+
+    const now = nowIso();
+    await this.col().doc(id).update({
+      status: SpecialRateStatus.REVOKED,
+      revokedByUserId: revokedBy.userId,
+      revokedByName: revokedBy.fullName,
+      revokedAt: now,
+      updatedAt: now,
+    });
+    this.changeEvents.emit(COLLECTION);
+
+    const customer = await this.customers.findById(request.customerId);
+    if (customer.specialRateId === id) {
+      await this.customers.clearSpecialRate(request.customerId);
+    }
+
+    return this.findById(id);
+  }
+
   assertCanApprove(user: StaffPrincipal): void {
     // Defense in depth: PermissionsGuard already enforces this at the
     // route level via Permission.SPECIAL_RATES_APPROVE (Chairman only).

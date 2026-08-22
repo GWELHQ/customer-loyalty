@@ -181,6 +181,7 @@ export class LoyaltyApiClient {
       this.http.post<SpecialRateRequest>(`/special-rate-requests/${id}/approve`, { decisionNote }),
     reject: (id: string, decisionNote?: string) =>
       this.http.post<SpecialRateRequest>(`/special-rate-requests/${id}/reject`, { decisionNote }),
+    revoke: (id: string) => this.http.post<SpecialRateRequest>(`/special-rate-requests/${id}/revoke`, {}),
   };
 
   customerRegistrations = {

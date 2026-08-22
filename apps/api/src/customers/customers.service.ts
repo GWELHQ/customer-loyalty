@@ -160,6 +160,18 @@ export class CustomersService {
     this.changeEvents.emit(COLLECTION);
   }
 
+  /** Removes an active special rate, reverting the customer to the default cashback rate. Only called from SpecialRateRequestsService.revoke(). */
+  async clearSpecialRate(id: string): Promise<void> {
+    await this.col().doc(id).update({
+      specialRateId: null,
+      specialRateKesPerLitre: null,
+      specialRateEffectiveFrom: null,
+      specialRateEffectiveTo: null,
+      updatedAt: nowIso(),
+    });
+    this.changeEvents.emit(COLLECTION);
+  }
+
   async delete(id: string): Promise<Customer> {
     const customer = await this.findById(id);
     await this.col().doc(id).delete();

@@ -114,4 +114,29 @@ export class SpecialRateRequestsController {
     });
     return request;
   }
+
+  @Post(':id/revoke')
+  @RequirePermissions(Permission.SPECIAL_RATES_APPROVE)
+  async revoke(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
+    const request = await this.requests.revoke(id, actor);
+    await this.audit.record({
+      actor,
+      action: 'special_rate_request.revoke',
+      entityType: 'specialRateRequest',
+      entityId: id,
+    });
+    // Skip the notification when the Chairman is revoking a rate they
+    // both requested and applied themselves (see create()'s
+    // Chairman-direct-apply path) — no one else to tell.
+    if (request.requestedByUserId !== actor.userId) {
+      await this.notifications.notify({
+        userId: request.requestedByUserId,
+        type: NotificationType.SPECIAL_RATE_DECISION,
+        title: 'Special rate removed',
+        body: `${actor.fullName} removed a special rate you requested.`,
+        linkPath: `/special-rates/${id}`,
+      });
+    }
+    return request;
+  }
 }

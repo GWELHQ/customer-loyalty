@@ -10,7 +10,8 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDate } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, CardHeader, Field, Pagination, inputStyle } from '../ui/primitives';
+import { Icon } from '../ui/Icon';
+import { Badge, Button, Card, CardHeader, Field, Modal, Pagination, inputStyle } from '../ui/primitives';
 
 function specialRateColumns(
   customers: Record<string, Customer>,
@@ -116,7 +117,7 @@ export function SpecialRates() {
                 key={r.id}
                 request={r}
                 customer={customers[r.customerId]}
-                canApprove={false}
+                canApprove={canApprove}
                 onDecided={reload}
               />
             ))}
@@ -146,6 +147,9 @@ function RequestRow({
 }) {
   const api = useApi();
   const [busy, setBusy] = useState(false);
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   async function decide(action: 'approve' | 'reject') {
     setBusy(true);
@@ -157,6 +161,22 @@ function RequestRow({
       setBusy(false);
     }
   }
+
+  async function confirmRevoke() {
+    setRevoking(true);
+    setRevokeError(null);
+    try {
+      await api.specialRateRequests.revoke(request.id);
+      setShowRevokeConfirm(false);
+      onDecided();
+    } catch (err) {
+      setRevokeError(err instanceof Error ? err.message : 'Could not remove the rate');
+    } finally {
+      setRevoking(false);
+    }
+  }
+
+  const isActiveRate = request.status === SpecialRateStatus.APPROVED && customer?.specialRateId === request.id;
 
   return (
     <div style={{ padding: 16, borderBottom: '1px solid var(--color-border)' }}>
@@ -180,7 +200,7 @@ function RequestRow({
           tone={
             request.status === SpecialRateStatus.APPROVED
               ? 'success'
-              : request.status === SpecialRateStatus.REJECTED
+              : request.status === SpecialRateStatus.REJECTED || request.status === SpecialRateStatus.REVOKED
                 ? 'danger'
                 : 'warning'
           }
@@ -239,11 +259,55 @@ function RequestRow({
           Waiting on the Chairman. No other role can approve it.
         </div>
       )}
+      {isActiveRate && (
+        <div style={{ marginTop: 13 }}>
+          <Button variant="danger" size="sm" onClick={() => setShowRevokeConfirm(true)}>
+            <Icon name="trash" size={13} /> Delete rate
+          </Button>
+        </div>
+      )}
       {request.decidedByName && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-text-muted)' }}>
           Decided by {request.decidedByName}
           {request.decidedAt && ` · ${formatNairobiDate(request.decidedAt)}`}
         </div>
+      )}
+      {request.revokedByName && (
+        <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+          Removed by {request.revokedByName}
+          {request.revokedAt && ` · ${formatNairobiDate(request.revokedAt)}`}
+        </div>
+      )}
+      {showRevokeConfirm && (
+        <Modal title="Delete this special rate?" onClose={() => !revoking && setShowRevokeConfirm(false)}>
+          <div style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            This removes the KSh {request.proposedKesPerLitre}/L rate from{' '}
+            <strong style={{ color: 'var(--color-text)' }}>{customer?.fullName ?? 'this customer'}</strong> —
+            they'll revert to the default cashback rate on their next sale.
+          </div>
+          {revokeError && (
+            <div
+              style={{
+                fontSize: 13,
+                color: 'var(--color-danger)',
+                background: 'var(--color-danger-tint)',
+                borderRadius: 8,
+                padding: 12,
+                marginTop: 12,
+              }}
+            >
+              {revokeError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <Button variant="danger" onClick={confirmRevoke} disabled={revoking}>
+              {revoking ? 'Removing…' : 'Delete rate'}
+            </Button>
+            <Button variant="secondary" onClick={() => setShowRevokeConfirm(false)} disabled={revoking}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
