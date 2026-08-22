@@ -202,7 +202,7 @@ function EditStationForm({ station, onDone }: { station: Station; onDone: () => 
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Field label="Name">
+        <Field label="Name" required>
           <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Location">
@@ -250,10 +250,10 @@ function StationForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        <Field label="Name">
+        <Field label="Name" required>
           <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="Kisumu 3" />
         </Field>
-        <Field label="Code">
+        <Field label="Code" required>
           <input style={inputStyle} value={code} onChange={(e) => setCode(e.target.value)} placeholder="KIS3" />
         </Field>
         <Field label="Location">

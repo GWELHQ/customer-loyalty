@@ -158,7 +158,7 @@ function IngestForm({
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        <Field label="Station">
+        <Field label="Station" required>
           {lockedStationId ? (
             <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', color: 'var(--color-text-secondary)' }}>
               {stations.find((s) => s.id === lockedStationId)?.name ?? 'Your station'}
@@ -174,13 +174,13 @@ function IngestForm({
             </select>
           )}
         </Field>
-        <Field label="Product">
+        <Field label="Product" required>
           <select style={inputStyle} value={product} onChange={(e) => setProduct(e.target.value as 'PMS' | 'AGO')}>
             <option value="PMS">PMS</option>
             <option value="AGO">AGO</option>
           </select>
         </Field>
-        <Field label="Total sales (KSh)">
+        <Field label="Total sales (KSh)" required>
           <input type="number" style={inputStyle} value={totalSales} onChange={(e) => setTotalSales(e.target.value)} />
         </Field>
       </div>

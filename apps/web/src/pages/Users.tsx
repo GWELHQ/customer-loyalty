@@ -245,11 +245,11 @@ function EditUserModal({
           {error}
         </div>
       )}
-      <Field label="Full name">
+      <Field label="Full name" required>
         <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
       <div style={{ marginTop: 12 }}>
-        <Field label="Role">
+        <Field label="Role" required>
           <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
             {ASSIGNABLE_ROLES.map((r) => (
               <option key={r} value={r}>
@@ -261,7 +261,7 @@ function EditUserModal({
       </div>
       {role === Role.STATION_SUPERVISOR && (
         <div style={{ marginTop: 12 }}>
-          <Field label="Assigned station (exactly one)">
+          <Field label="Assigned station (exactly one)" required>
             <select
               style={inputStyle}
               value={assignedStationId}
@@ -337,14 +337,14 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Full name">
+        <Field label="Full name" required>
           <input
             style={inputStyle}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
           />
         </Field>
-        <Field label="Work email">
+        <Field label="Work email" required>
           <input
             style={inputStyle}
             value={email}
@@ -352,7 +352,7 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
             placeholder="name@greenwellsenergies.co.ke"
           />
         </Field>
-        <Field label="Role">
+        <Field label="Role" required>
           <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
             {ASSIGNABLE_ROLES.map((r) => (
               <option key={r} value={r}>
@@ -362,7 +362,7 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
           </select>
         </Field>
         {role === Role.STATION_SUPERVISOR && (
-          <Field label="Assigned station (exactly one)">
+          <Field label="Assigned station (exactly one)" required>
             <select
               style={inputStyle}
               value={assignedStationId}

@@ -37,10 +37,10 @@ export function CustomerCreate() {
               {error}
             </div>
           )}
-          <Field label="Full name">
+          <Field label="Full name" required>
             <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Wanjiku" />
           </Field>
-          <Field label="Phone number">
+          <Field label="Phone number" required>
             <input style={inputStyle} value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="0712345678" />
           </Field>
           <Field label="Home station (optional, for reporting only)">

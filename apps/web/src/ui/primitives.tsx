@@ -212,10 +212,21 @@ export function EmptyState({ title, body }: { title: string; body?: string }) {
   );
 }
 
-export function Field({ label, children }: PropsWithChildren<{ label: string }>) {
+export function Field({
+  label,
+  required,
+  children,
+}: PropsWithChildren<{ label: string; required?: boolean }>) {
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>
+        {label}
+        {required && (
+          <span style={{ color: 'var(--color-danger)', marginLeft: 3 }} aria-hidden="true">
+            *
+          </span>
+        )}
+      </div>
       <div style={{ marginTop: 6 }}>{children}</div>
     </div>
   );

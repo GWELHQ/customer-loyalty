@@ -107,7 +107,7 @@ export function Prices() {
                 </div>
               )}
               <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Field label="Product">
+                <Field label="Product" required>
                   <select style={inputStyle} value={product} onChange={(e) => setProduct(e.target.value as Product)}>
                     {Object.values(Product).map((p) => (
                       <option key={p} value={p}>
@@ -116,11 +116,11 @@ export function Prices() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Effective from">
+                <Field label="Effective from" required>
                   <input type="date" style={inputStyle} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
                 </Field>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <Field label="Price per litre (KSh)">
+                  <Field label="Price per litre (KSh)" required>
                     <input type="number" step="0.01" style={inputStyle} value={pricePerLitre} onChange={(e) => setPricePerLitre(e.target.value)} placeholder="226.40" />
                   </Field>
                 </div>
@@ -248,7 +248,7 @@ function ReminderSettingsForm({
         Reminder enabled
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Day of month (1–28)">
+        <Field label="Day of month (1–28)" required>
           <input
             type="number"
             min={1}
@@ -258,7 +258,7 @@ function ReminderSettingsForm({
             onChange={(e) => setDayOfMonth(e.target.value)}
           />
         </Field>
-        <Field label="Hour (0–23, Africa/Nairobi)">
+        <Field label="Hour (0–23, Africa/Nairobi)" required>
           <input
             type="number"
             min={0}

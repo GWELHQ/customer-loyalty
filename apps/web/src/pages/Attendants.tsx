@@ -219,13 +219,13 @@ function EditAttendantForm({
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Field label="Full name">
+        <Field label="Full name" required>
           <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </Field>
-        <Field label="Employee ID">
+        <Field label="Employee ID" required>
           <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
         </Field>
-        <Field label="Assigned station">
+        <Field label="Assigned station" required>
           <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
             {stations.map((s) => (
               <option key={s.id} value={s.id}>
@@ -287,7 +287,7 @@ function ResetPinModal({ attendant, onClose }: { attendant: Attendant; onClose: 
               {error}
             </div>
           )}
-          <Field label="New 4–6 digit PIN">
+          <Field label="New 4–6 digit PIN" required>
             <input
               style={inputStyle}
               value={pin}
@@ -341,13 +341,13 @@ function AttendantForm({ stations, onDone }: { stations: Station[]; onDone: () =
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Full name">
+        <Field label="Full name" required>
           <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </Field>
-        <Field label="Employee ID">
+        <Field label="Employee ID" required>
           <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="KIS1-003" />
         </Field>
-        <Field label="Assigned station (exactly one)">
+        <Field label="Assigned station (exactly one)" required>
           <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
             <option value="">Choose station</option>
             {stations.map((s) => (
@@ -357,7 +357,7 @@ function AttendantForm({ stations, onDone }: { stations: Station[]; onDone: () =
             ))}
           </select>
         </Field>
-        <Field label="Initial PIN (4–6 digits)">
+        <Field label="Initial PIN (4–6 digits)" required>
           <input style={inputStyle} value={pin} onChange={(e) => setPin(e.target.value)} placeholder="1234" />
         </Field>
       </div>
