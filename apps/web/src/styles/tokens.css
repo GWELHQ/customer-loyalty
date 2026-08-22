@@ -44,6 +44,10 @@
   --gw-red-500: #d64545;
   --gw-red-600: #b13333;
   --gw-teal-500: #2b9d9c;
+  /* Warm, friendly red for PMS branding — deliberately its own token
+     rather than reusing --gw-red-500/600, which are tied to the danger
+     palette and shouldn't shift if that palette ever changes. */
+  --gw-coral-500: #e0685c;
 
   --color-primary: var(--gw-green-500);
   --color-primary-hover: var(--gw-green-600);
@@ -75,6 +79,10 @@
   --color-danger-tint: #faeaea;
   --color-info: var(--gw-blue-500);
   --color-info-tint: var(--gw-blue-50);
+
+  /* Fuel product colors — used wherever PMS/AGO are distinguished visually (e.g. the Dashboard trend chart). */
+  --color-fuel-pms: var(--gw-coral-500);
+  --color-fuel-ago: var(--color-primary);
 
   --shadow-sm: 0 1px 2px rgba(12, 16, 16, 0.06);
   --shadow-md: 0 4px 12px rgba(12, 16, 16, 0.08);

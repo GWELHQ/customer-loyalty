@@ -224,13 +224,13 @@ function TrendCard({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span
-              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-primary)' }}
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-pms)' }}
             />
             Petrol (PMS)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span
-              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--gw-blue-500)' }}
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-ago)' }}
             />
             Diesel (AGO)
           </span>
@@ -281,11 +281,11 @@ function TrendCard({
               >
                 <div style={{ fontWeight: 800, marginBottom: 3 }}>{d.label}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-primary)' }} />
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-pms)' }} />
                   Petrol: KSh {format(d.pms)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--gw-blue-500)' }} />
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-ago)' }} />
                   Diesel: KSh {format(d.ago)}
                 </div>
               </div>
@@ -304,7 +304,7 @@ function TrendCard({
                 style={{
                   width: '40%',
                   height: animate ? barHeight(d.pms) : '0%',
-                  background: 'var(--color-primary)',
+                  background: 'var(--color-fuel-pms)',
                   borderRadius: '3px 3px 0 0',
                   transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms`,
                   opacity: hovered && hovered !== d.date ? 0.45 : 1,
@@ -314,7 +314,7 @@ function TrendCard({
                 style={{
                   width: '40%',
                   height: animate ? barHeight(d.ago) : '0%',
-                  background: 'var(--gw-blue-500)',
+                  background: 'var(--color-fuel-ago)',
                   borderRadius: '3px 3px 0 0',
                   transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45 + 60}ms`,
                   opacity: hovered && hovered !== d.date ? 0.45 : 1,
