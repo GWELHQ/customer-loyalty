@@ -1,11 +1,13 @@
 import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Permission, Product } from '@loyalty/shared';
+import { Permission, Product, Role, UserStatus } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
+import { EmailService } from '../common/email/email.service';
 import type { StaffPrincipal } from '../common/types/principal';
+import { UsersService } from '../users/users.service';
 import { CreatePriceDto } from './dto/create-price.dto';
 import { UpdatePriceReminderDto } from './dto/update-price-reminder.dto';
 import { PriceRemindersService } from './price-reminders.service';
@@ -20,6 +22,8 @@ export class PricesController {
     private readonly prices: PricesService,
     private readonly reminders: PriceRemindersService,
     private readonly audit: AuditService,
+    private readonly users: UsersService,
+    private readonly email: EmailService,
   ) {}
 
   @Get('prices')
@@ -52,6 +56,22 @@ export class PricesController {
       entityLabel: `${price.product} @ KSh ${price.pricePerLitre}/L`,
       metadata: { product: price.product, pricePerLitre: price.pricePerLitre },
     });
+
+    // Station Supervisors need the new price to reconcile against, and
+    // Admins oversee pricing regardless of who published it.
+    const recipients = (await this.users.list())
+      .filter(
+        (u) =>
+          u.status === UserStatus.ACTIVE &&
+          (u.role === Role.STATION_SUPERVISOR || u.role === Role.ADMIN),
+      )
+      .map((u) => u.email);
+    await this.email.send(
+      recipients,
+      `Green Wells: new ${price.product} price — KSh ${price.pricePerLitre}/L`,
+      `${actor.fullName} published a new ${price.product} price of KSh ${price.pricePerLitre} per litre, effective ${price.effectiveFrom}.`,
+    );
+
     return price;
   }
 

@@ -127,6 +127,7 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.CUSTOMERS_IMPORT,
   Permission.STATIONS_VIEW,
   Permission.PRICES_VIEW,
+  Permission.PRICES_MANAGE,
   Permission.SALES_VIEW_ALL,
   Permission.SPECIAL_RATES_VIEW,
   Permission.SPECIAL_RATES_REQUEST,
