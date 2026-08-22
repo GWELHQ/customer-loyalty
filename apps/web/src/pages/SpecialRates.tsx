@@ -264,6 +264,7 @@ function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () =
               {matches.map((c) => (
                 <button
                   key={c.id}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setSelectedCustomer(c);
                     setShowMatches(false);
