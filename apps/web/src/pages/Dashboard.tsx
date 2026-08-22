@@ -1,51 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { useApi } from '../data/client';
-import { useRealtimeRefresh } from '../data/realtime';
+import { useDashboardSnapshot, type DashboardStationTotal, type DashboardTrendDay } from '../data/useDashboardCache';
 import { AppShell } from '../layout/AppShell';
 import { Card, KpiTile } from '../ui/primitives';
 
-interface TrendDay {
-  date: string;
-  label: string;
-  pms: number;
-  ago: number;
-}
-
-interface StationTotal {
-  stationId: string;
-  name: string;
-  value: number;
-}
-
-interface DashboardData {
-  month: string;
-  totalCashbackMonth: number;
-  totalSalesAmountMonth: number;
-  saleCount: number;
-  uniqueCustomers: number;
-  pendingSpecialRateRequests: number | null;
-  reconciliationRecordsNeedingAttention: number;
-  trend: TrendDay[];
-  stationTotals: StationTotal[] | null;
-}
+type TrendDay = DashboardTrendDay;
+type StationTotal = DashboardStationTotal;
 
 export function Dashboard() {
-  const api = useApi();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  function reload() {
-    api.reports
-      .dashboard()
-      .then((d) => setData(d as DashboardData))
-      .finally(() => setLoading(false));
-  }
-  useEffect(reload, [api]);
-  useRealtimeRefresh(['sales', 'customers', 'specialRateRequests', 'reconciliationDaily'], reload);
+  const { data } = useDashboardSnapshot();
 
   const kpis = data
     ? [
@@ -116,7 +82,7 @@ export function Dashboard() {
 
   return (
     <AppShell title="Dashboard" subtitle={`Welcome back, ${user?.fullName ?? ''}`}>
-      {loading && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
+      {!data && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
       {data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div

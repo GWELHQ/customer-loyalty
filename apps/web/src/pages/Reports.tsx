@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useApi } from '../data/client';
+import { createCachedResourceHook } from '../data/createCachedResource';
+import { useDashboardSnapshot } from '../data/useDashboardCache';
 import { AppShell } from '../layout/AppShell';
 import { Card, KpiTile } from '../ui/primitives';
 
-export function Reports() {
-  const api = useApi();
-  const [dashboard, setDashboard] = useState<Record<string, number | string> | null>(null);
-  const [sales, setSales] = useState<{ byProduct: Record<string, { count: number; amount: number; cashback: number }> } | null>(null);
+type SalesByProduct = { byProduct: Record<string, { count: number; amount: number; cashback: number }> };
 
-  useEffect(() => {
-    api.reports.dashboard().then((d) => setDashboard(d as Record<string, number | string>));
-    api.reports.sales({}).then((s) => setSales(s as never));
-  }, [api]);
+// Same cached-snapshot-plus-silent-refresh approach as the Dashboard page,
+// and literally the same dashboard cache — this is an unfiltered,
+// whole-org summary, so sharing it is safe and avoids fetching it twice.
+const { useCachedResource: useSalesByProduct } = createCachedResourceHook<SalesByProduct>(
+  (api) => api.reports.sales({}) as Promise<SalesByProduct>,
+  ['sales'],
+);
+
+export function Reports() {
+  const { data: dashboard } = useDashboardSnapshot();
+  const { data: sales } = useSalesByProduct();
 
   return (
     <AppShell title="Reports" subtitle="Operational summaries across every station">

@@ -51,6 +51,8 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
       uniqueCustomers: 87,
       pendingSpecialRateRequests: 1,
       reconciliationRecordsNeedingAttention: 2,
+      trend: [],
+      stationTotals: null,
     });
   }
   if (path === '/sales' && method === 'GET') return json({ items: [], page: 1, pageSize: 20, total: 0, nextCursor: null });
