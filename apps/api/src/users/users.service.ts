@@ -112,7 +112,10 @@ export class UsersService {
     await this.col()
       .doc(id)
       .update({ ...input, updatedAt: nowIso() });
-    this.changeEvents.emit(COLLECTION);
+    // entityId lets the affected user's own already-open session notice
+    // its role/station changed and silently refresh, instead of running
+    // on stale JWT claims until they happen to sign out and back in.
+    this.changeEvents.emit(COLLECTION, id);
     return (await this.findById(id))!;
   }
 
@@ -120,7 +123,7 @@ export class UsersService {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
     await this.col().doc(id).update({ status, updatedAt: nowIso() });
-    this.changeEvents.emit(COLLECTION);
+    this.changeEvents.emit(COLLECTION, id);
     return (await this.findById(id))!;
   }
 

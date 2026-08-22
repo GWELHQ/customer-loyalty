@@ -4,6 +4,8 @@ import { Observable, Subject } from 'rxjs';
 export interface ChangeEvent {
   /** Firestore collection name that changed, e.g. 'sales', 'stations'. */
   collection: string;
+  /** Id of the specific document that changed, when the caller knows it — lets a client filter for "my own record changed" instead of treating every event as "refetch the whole list". */
+  entityId?: string;
 }
 
 /**
@@ -17,8 +19,8 @@ export interface ChangeEvent {
 export class ChangeEventsService {
   private readonly subject = new Subject<ChangeEvent>();
 
-  emit(collection: string): void {
-    this.subject.next({ collection });
+  emit(collection: string, entityId?: string): void {
+    this.subject.next({ collection, entityId });
   }
 
   stream(): Observable<ChangeEvent> {

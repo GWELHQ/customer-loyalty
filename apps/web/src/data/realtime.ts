@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { env } from '../env';
 
-type Listener = () => void;
+type Listener = (entityId?: string) => void;
 
 /**
  * Live-update channel: one SSE connection to the API, fanned out to
@@ -17,8 +17,8 @@ let activeToken: string | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelayMs = 1000;
 
-function notify(collection: string): void {
-  listeners.get(collection)?.forEach((fn) => fn());
+function notify(collection: string, entityId?: string): void {
+  listeners.get(collection)?.forEach((fn) => fn(entityId));
 }
 
 async function readStream(token: string): Promise<void> {
@@ -44,8 +44,8 @@ async function readStream(token: string): Promise<void> {
         const dataLine = raw.split('\n').find((line) => line.startsWith('data:'));
         if (!dataLine) continue;
         try {
-          const payload = JSON.parse(dataLine.slice(5).trim()) as { collection?: string };
-          if (payload.collection && payload.collection !== '__ping__') notify(payload.collection);
+          const payload = JSON.parse(dataLine.slice(5).trim()) as { collection?: string; entityId?: string };
+          if (payload.collection && payload.collection !== '__ping__') notify(payload.collection, payload.entityId);
         } catch {
           // malformed chunk — skip it, the connection itself is still fine
         }
@@ -97,7 +97,7 @@ export function useRealtimeRefresh(collections: string[], onChange: Listener): v
   const key = collections.join(',');
 
   useEffect(() => {
-    return subscribeToChanges(collections, () => onChangeRef.current());
+    return subscribeToChanges(collections, (entityId) => onChangeRef.current(entityId));
     // `collections` is intentionally reduced to `key` — pass a stable array (or an inline literal) at the call site.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

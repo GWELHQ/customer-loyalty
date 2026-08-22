@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { LoyaltyApiClient } from '@loyalty/api-client';
 import { setRefreshHandler, setTokenGetter, setUnauthorizedHandler, useApi } from '../data/client';
-import { connectRealtime, disconnectRealtime } from '../data/realtime';
+import { connectRealtime, disconnectRealtime, useRealtimeRefresh } from '../data/realtime';
 import { env } from '../env';
 import { isTokenExpiringSoon } from '../lib/jwt';
 import { msalInstance, msalReady, msalScopes } from './msal';
@@ -131,6 +131,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return next.accessToken;
     });
   }, [api]);
+
+  // An Admin editing this user's own role/station/status (Users.tsx) emits
+  // a realtime 'users' event carrying that user's id. If it's us, our
+  // access token now has a stale role baked into it — silently mint a
+  // fresh one (refreshStaffSession always re-reads Firestore) instead of
+  // leaving the tab running on old permissions until it happens to expire
+  // or the user manually signs out and back in. A failed refresh means the
+  // account was deactivated out from under us, so sign out instead.
+  useRealtimeRefresh(['users'], (entityId) => {
+    if (!entityId || entityId !== session?.user.userId) return;
+    refreshStoredSession(api).then((next) => {
+      if (next) {
+        setSession(next);
+        saveSession(next);
+      } else {
+        setSession(null);
+        saveSession(null);
+      }
+    });
+  });
 
   // Validate the session on load. An already-expired access token is
   // refreshed proactively here rather than left to fail its first request
