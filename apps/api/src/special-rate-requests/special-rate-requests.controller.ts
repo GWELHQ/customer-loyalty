@@ -42,21 +42,27 @@ export class SpecialRateRequestsController {
     const request = await this.requests.create(dto, actor);
     await this.audit.record({
       actor,
-      action: 'special_rate_request.create',
+      action: request.status === SpecialRateStatus.APPROVED
+        ? 'special_rate_request.create_and_apply'
+        : 'special_rate_request.create',
       entityType: 'specialRateRequest',
       entityId: request.id,
     });
 
-    const chairs = (await this.users.list()).filter((u) => u.role === Role.CHAIRMAN);
-    await this.notifications.notifyMany(
-      chairs.map((c) => c.id),
-      {
-        type: NotificationType.SPECIAL_RATE_REQUEST,
-        title: 'New special rate request',
-        body: `${actor.fullName} requested a special rate for a customer.`,
-        linkPath: `/special-rates/${request.id}`,
-      },
-    );
+    // A Chairman-initiated request is already applied — nothing left for
+    // the Chairman to be notified about approving.
+    if (request.status === SpecialRateStatus.PENDING) {
+      const chairs = (await this.users.list()).filter((u) => u.role === Role.CHAIRMAN);
+      await this.notifications.notifyMany(
+        chairs.map((c) => c.id),
+        {
+          type: NotificationType.SPECIAL_RATE_REQUEST,
+          title: 'New special rate request',
+          body: `${actor.fullName} requested a special rate for a customer.`,
+          linkPath: `/special-rates/${request.id}`,
+        },
+      );
+    }
 
     return request;
   }

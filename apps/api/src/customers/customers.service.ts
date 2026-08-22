@@ -145,7 +145,7 @@ export class CustomersService {
     return this.findById(id);
   }
 
-  /** Applies a special rate to a customer once Chairman-approved. Never called directly by RTSM. */
+  /** Applies a special rate to a customer once Chairman-approved (or Chairman-initiated). Never called directly by RTSM. */
   async applySpecialRate(
     id: string,
     rate: { specialRateId: string; kesPerLitre: number; effectiveFrom: string; effectiveTo?: string },

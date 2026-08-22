@@ -45,6 +45,10 @@ export class SpecialRateRequestsService {
   ): Promise<SpecialRateRequest> {
     await this.customers.findById(input.customerId); // 404s if missing
 
+    // The Chairman is also the approver, so a Chairman-initiated request
+    // has no one left to wait on — it's created already approved and the
+    // rate is applied immediately, instead of sitting in the pending queue.
+    const isChairman = requestedBy.role === Role.CHAIRMAN;
     const now = nowIso();
     const doc: Omit<SpecialRateRequest, 'id'> = {
       customerId: input.customerId,
@@ -54,12 +58,29 @@ export class SpecialRateRequestsService {
       reason: input.reason,
       requestedByUserId: requestedBy.userId,
       requestedByName: requestedBy.fullName,
-      status: SpecialRateStatus.PENDING,
+      status: isChairman ? SpecialRateStatus.APPROVED : SpecialRateStatus.PENDING,
       createdAt: now,
       updatedAt: now,
+      ...(isChairman
+        ? {
+            decidedByUserId: requestedBy.userId,
+            decidedByName: requestedBy.fullName,
+            decidedAt: now,
+          }
+        : {}),
     };
     const ref = await this.col().add(doc);
     this.changeEvents.emit(COLLECTION);
+
+    if (isChairman) {
+      await this.customers.applySpecialRate(input.customerId, {
+        specialRateId: ref.id,
+        kesPerLitre: input.proposedKesPerLitre,
+        effectiveFrom: input.effectiveFrom,
+        effectiveTo: input.effectiveTo,
+      });
+    }
+
     return { ...doc, id: ref.id };
   }
 

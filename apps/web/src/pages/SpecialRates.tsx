@@ -54,7 +54,7 @@ export function SpecialRates() {
           <div style={{ flex: 1 }} />
           <ExportButtons filename="special-rate-requests" title="Special rate requests" columns={specialRateColumns(customers)} rows={requests} />
         </div>
-        {showForm && <RequestForm onDone={() => { setShowForm(false); reload(); }} />}
+        {showForm && <RequestForm isChairman={canApprove} onDone={() => { setShowForm(false); reload(); }} />}
 
         <Card padding={0}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
@@ -160,7 +160,7 @@ function RequestRow({
   );
 }
 
-function RequestForm({ onDone }: { onDone: () => void }) {
+function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () => void }) {
   const api = useApi();
   const { customers } = useCustomersCache();
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -206,7 +206,7 @@ function RequestForm({ onDone }: { onDone: () => void }) {
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div style={{ position: 'relative' }}>
-          <Field label="Customer">
+          <Field label="Customer" required>
             {selectedCustomer ? (
               <div
                 style={{
@@ -285,21 +285,26 @@ function RequestForm({ onDone }: { onDone: () => void }) {
             </div>
           )}
         </div>
-        <Field label="Proposed rate (KSh per litre)">
+        <Field label="Proposed rate (KSh per litre)" required>
           <input type="number" style={inputStyle} value={rate} onChange={(e) => setRate(e.target.value)} />
         </Field>
-        <Field label="Effective from">
+        <Field label="Effective from" required>
           <input type="date" style={inputStyle} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
         </Field>
         <div style={{ gridColumn: 'span 2' }}>
-          <Field label="Reason">
+          <Field label="Reason" required>
             <textarea style={{ ...inputStyle, minHeight: 70 }} value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
         </div>
       </div>
       <Button variant="primary" onClick={submit} disabled={busy || !selectedCustomer || !rate || !effectiveFrom || !reason} style={{ marginTop: 14 }}>
-        {busy ? 'Submitting…' : 'Submit request'}
+        {busy ? (isChairman ? 'Applying…' : 'Submitting…') : isChairman ? 'Apply special rate' : 'Submit request'}
       </Button>
+      {isChairman && (
+        <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+          As Chairman, this takes effect immediately — no approval step needed.
+        </div>
+      )}
     </Card>
   );
 }

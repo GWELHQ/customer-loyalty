@@ -73,6 +73,10 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.SALES_VIEW_ALL,
   Permission.SPECIAL_RATES_VIEW,
   Permission.SPECIAL_RATES_APPROVE,
+  // The Chairman can also set a special rate directly, with no RTSM
+  // request needed — see SpecialRateRequestsService.create(), which
+  // auto-approves and applies the rate immediately for a Chairman actor.
+  Permission.SPECIAL_RATES_REQUEST,
   Permission.RECONCILIATION_VIEW_ALL,
   Permission.LEDGERS_VIEW,
   Permission.DISBURSEMENTS_VIEW,
@@ -81,11 +85,11 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.AUDIT_VIEW,
 ];
 
-// Everything the Chairman can see, minus the one action the Chairman can
-// take (approving/rejecting a special rate request) — a read-only
-// executive overview role.
+// Everything the Chairman can see, minus the two actions the Chairman can
+// take on special rates (requesting/setting and approving/rejecting) — a
+// read-only executive overview role.
 const EXEC_VIEWER_PERMISSIONS: Permission[] = CHAIRMAN_PERMISSIONS.filter(
-  (p) => p !== Permission.SPECIAL_RATES_APPROVE,
+  (p) => p !== Permission.SPECIAL_RATES_APPROVE && p !== Permission.SPECIAL_RATES_REQUEST,
 );
 
 // Checks and approves the monthly ledger RTSM releases. Deliberately does
