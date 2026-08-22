@@ -12,7 +12,9 @@ import { formatNairobiDate } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Badge, Button, Card, CardHeader, Field, Pagination, inputStyle } from '../ui/primitives';
 
-function specialRateColumns(customers: Record<string, Customer>): ExportColumn<SpecialRateRequest>[] {
+function specialRateColumns(
+  customers: Record<string, Customer>,
+): ExportColumn<SpecialRateRequest>[] {
   return [
     { header: 'Customer', value: (r) => customers[r.customerId]?.fullName ?? 'Unknown customer' },
     { header: 'Phone', value: (r) => customers[r.customerId]?.phoneNumber ?? '' },
@@ -43,38 +45,87 @@ export function SpecialRates() {
   const { paged: pagedDecided, page, pageCount, setPage } = usePagedRows(decided, 10);
 
   return (
-    <AppShell title="Special cashback rates" subtitle="Only the Chairman can approve or reject a request">
+    <AppShell
+      title="Special cashback rates"
+      subtitle="Only the Chairman can approve or reject a request"
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
         <div style={{ display: 'flex', gap: 10 }}>
           {canRequest && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
-              {showForm ? 'Cancel' : 'Request a special rate'}
+              {showForm ? 'Cancel' : canApprove ? 'Apply special rate' : 'Request special rate'}
             </Button>
           )}
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="special-rate-requests" title="Special rate requests" columns={specialRateColumns(customers)} rows={requests} />
+          <ExportButtons
+            filename="special-rate-requests"
+            title="Special rate requests"
+            columns={specialRateColumns(customers)}
+            rows={requests}
+          />
         </div>
-        {showForm && <RequestForm isChairman={canApprove} onDone={() => { setShowForm(false); reload(); }} />}
+        {showForm && (
+          <RequestForm
+            isChairman={canApprove}
+            onDone={() => {
+              setShowForm(false);
+              reload();
+            }}
+          />
+        )}
 
         <Card padding={0}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
-            <CardHeader title="Pending requests" subtitle="Waiting on the Chairman" right={<Badge tone="warning">{pending.length}</Badge>} />
+            <CardHeader
+              title="Pending requests"
+              subtitle="Waiting on the Chairman"
+              right={<Badge tone="warning">{pending.length}</Badge>}
+            />
           </div>
-          {pending.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No pending requests.</div>}
+          {pending.length === 0 && (
+            <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              No pending requests.
+            </div>
+          )}
           {pending.map((r) => (
-            <RequestRow key={r.id} request={r} customer={customers[r.customerId]} canApprove={canApprove} onDecided={reload} />
+            <RequestRow
+              key={r.id}
+              request={r}
+              customer={customers[r.customerId]}
+              canApprove={canApprove}
+              onDecided={reload}
+            />
           ))}
         </Card>
 
         {decided.length > 0 && (
           <Card padding={0}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
+            <div
+              style={{
+                padding: '14px 16px',
+                borderBottom: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
+                fontSize: 16,
+              }}
+            >
               Decided requests
             </div>
             {pagedDecided.map((r) => (
-              <RequestRow key={r.id} request={r} customer={customers[r.customerId]} canApprove={false} onDecided={reload} />
+              <RequestRow
+                key={r.id}
+                request={r}
+                customer={customers[r.customerId]}
+                canApprove={false}
+                onDecided={reload}
+              />
             ))}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${decided.length} decided`} />
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              onChange={setPage}
+              totalLabel={`${decided.length} decided`}
+            />
           </Card>
         )}
       </div>
@@ -109,19 +160,50 @@ function RequestRow({
 
   return (
     <div style={{ padding: 16, borderBottom: '1px solid var(--color-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 16,
+          alignItems: 'flex-start',
+        }}
+      >
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{customer?.fullName ?? 'Unknown customer'}</div>
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{customer?.phoneNumber}</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>
+            {customer?.fullName ?? 'Unknown customer'}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            {customer?.phoneNumber}
+          </div>
         </div>
-        <Badge tone={request.status === SpecialRateStatus.APPROVED ? 'success' : request.status === SpecialRateStatus.REJECTED ? 'danger' : 'warning'}>
+        <Badge
+          tone={
+            request.status === SpecialRateStatus.APPROVED
+              ? 'success'
+              : request.status === SpecialRateStatus.REJECTED
+                ? 'danger'
+                : 'warning'
+          }
+        >
           {request.status}
         </Badge>
       </div>
-      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, background: 'var(--color-surface-sunken)', borderRadius: 8, padding: 12 }}>
+      <div
+        style={{
+          marginTop: 12,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12,
+          background: 'var(--color-surface-sunken)',
+          borderRadius: 8,
+          padding: 12,
+        }}
+      >
         <div>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Proposed rate</div>
-          <div style={{ fontWeight: 800, color: 'var(--gw-blue-500)' }}>KSh {request.proposedKesPerLitre} / L</div>
+          <div style={{ fontWeight: 800, color: 'var(--gw-blue-500)' }}>
+            KSh {request.proposedKesPerLitre} / L
+          </div>
         </div>
         <div>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Effective from</div>
@@ -132,7 +214,14 @@ function RequestRow({
           <div style={{ fontWeight: 700 }}>{request.requestedByName}</div>
         </div>
       </div>
-      <div style={{ marginTop: 11, fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+      <div
+        style={{
+          marginTop: 11,
+          fontSize: 13,
+          color: 'var(--color-text-secondary)',
+          lineHeight: 1.55,
+        }}
+      >
         <strong style={{ color: 'var(--color-text)' }}>Reason:</strong> {request.reason}
       </div>
       {request.status === SpecialRateStatus.PENDING && canApprove && (
@@ -175,7 +264,9 @@ function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () =
   const matches = useMemo(() => {
     const q = customerQuery.trim().toLowerCase();
     if (!q) return [];
-    return customers.filter((c) => c.fullName.toLowerCase().includes(q) || c.phoneNumber.includes(q)).slice(0, 8);
+    return customers
+      .filter((c) => c.fullName.toLowerCase().includes(q) || c.phoneNumber.includes(q))
+      .slice(0, 8);
   }, [customers, customerQuery]);
 
   async function submit() {
@@ -200,7 +291,16 @@ function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () =
   return (
     <Card>
       {error && (
-        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--color-danger)',
+            background: 'var(--color-danger-tint)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+          }}
+        >
           {error}
         </div>
       )}
@@ -218,14 +318,23 @@ function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () =
                 }}
               >
                 <span>
-                  {selectedCustomer.fullName} <span style={{ color: 'var(--color-text-muted)' }}>· {selectedCustomer.phoneNumber}</span>
+                  {selectedCustomer.fullName}{' '}
+                  <span style={{ color: 'var(--color-text-muted)' }}>
+                    · {selectedCustomer.phoneNumber}
+                  </span>
                 </span>
                 <button
                   onClick={() => {
                     setSelectedCustomer(null);
                     setCustomerQuery('');
                   }}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 16 }}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--color-text-muted)',
+                    fontSize: 16,
+                  }}
                 >
                   ×
                 </button>
@@ -280,26 +389,52 @@ function RequestForm({ isChairman, onDone }: { isChairman: boolean; onDone: () =
                     fontSize: 13.5,
                   }}
                 >
-                  {c.fullName} <span style={{ color: 'var(--color-text-muted)' }}>· {c.phoneNumber}</span>
+                  {c.fullName}{' '}
+                  <span style={{ color: 'var(--color-text-muted)' }}>· {c.phoneNumber}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
         <Field label="Proposed rate (KSh per litre)" required>
-          <input type="number" style={inputStyle} value={rate} onChange={(e) => setRate(e.target.value)} />
+          <input
+            type="number"
+            style={inputStyle}
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+          />
         </Field>
         <Field label="Effective from" required>
-          <input type="date" style={inputStyle} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+          <input
+            type="date"
+            style={inputStyle}
+            value={effectiveFrom}
+            onChange={(e) => setEffectiveFrom(e.target.value)}
+          />
         </Field>
         <div style={{ gridColumn: 'span 2' }}>
           <Field label="Reason" required>
-            <textarea style={{ ...inputStyle, minHeight: 70 }} value={reason} onChange={(e) => setReason(e.target.value)} />
+            <textarea
+              style={{ ...inputStyle, minHeight: 70 }}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
           </Field>
         </div>
       </div>
-      <Button variant="primary" onClick={submit} disabled={busy || !selectedCustomer || !rate || !effectiveFrom || !reason} style={{ marginTop: 14 }}>
-        {busy ? (isChairman ? 'Applying…' : 'Submitting…') : isChairman ? 'Apply special rate' : 'Submit request'}
+      <Button
+        variant="primary"
+        onClick={submit}
+        disabled={busy || !selectedCustomer || !rate || !effectiveFrom || !reason}
+        style={{ marginTop: 14 }}
+      >
+        {busy
+          ? isChairman
+            ? 'Applying…'
+            : 'Submitting…'
+          : isChairman
+            ? 'Apply special rate'
+            : 'Submit request'}
       </Button>
       {isChairman && (
         <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 8 }}>
