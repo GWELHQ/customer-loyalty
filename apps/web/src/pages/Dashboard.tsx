@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react';
+import type { Sale } from '@loyalty/shared';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useApi } from '../data/client';
+import { useCustomersCache } from '../data/useCustomersCache';
 import { useDashboardSnapshot, type DashboardStationTotal, type DashboardTrendDay } from '../data/useDashboardCache';
+import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
-import { Card, KpiTile } from '../ui/primitives';
+import { formatNairobiDateTime } from '../lib/time';
+import { Badge, Button, Card, KpiTile, Table, Td, Th, Tr } from '../ui/primitives';
+
+const RECENT_SALES_LIMIT = 8;
 
 type TrendDay = DashboardTrendDay;
 type StationTotal = DashboardStationTotal;
@@ -190,9 +197,83 @@ export function Dashboard() {
               ))}
             </Card>
           </div>
+
+          <RecentSalesCard />
         </div>
       )}
     </AppShell>
+  );
+}
+
+function RecentSalesCard() {
+  const api = useApi();
+  const navigate = useNavigate();
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { customers } = useCustomersCache();
+  const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.fullName])), [customers]);
+
+  function reload() {
+    api.sales
+      .list({ page: 1, pageSize: RECENT_SALES_LIMIT })
+      .then((res) => setSales(res.items))
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [api]);
+  useRealtimeRefresh(['sales'], reload);
+
+  return (
+    <Card padding={0}>
+      <div
+        style={{
+          padding: '14px 16px',
+          borderBottom: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Recent sales</div>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/sales')}>
+          View all
+        </Button>
+      </div>
+      {!loading && sales.length === 0 && (
+        <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No sales recorded yet.</div>
+      )}
+      {sales.length > 0 && (
+        <Table>
+          <thead>
+            <tr>
+              <Th>Time</Th>
+              <Th>Customer</Th>
+              <Th>Station</Th>
+              <Th>Product</Th>
+              <Th align="right">Amount (KSh)</Th>
+              <Th align="right">Cashback (KSh)</Th>
+              <Th>SMS</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {sales.map((s) => (
+              <Tr key={s.id} onClick={() => navigate('/sales')}>
+                <Td>{formatNairobiDateTime(s.saleDate)}</Td>
+                <Td>{customerNames.get(s.customerId) ?? s.customerPhoneAtSale}</Td>
+                <Td>{s.stationNameAtSale}</Td>
+                <Td>{s.product}</Td>
+                <Td align="right">{s.amountPaid.toLocaleString('en-KE')}</Td>
+                <Td align="right">{s.snapshot.cashbackEarned.toLocaleString('en-KE')}</Td>
+                <Td>
+                  <Badge tone={s.smsStatus === 'sent' ? 'success' : s.smsStatus === 'failed' ? 'danger' : 'neutral'}>
+                    {s.smsStatus}
+                  </Badge>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Card>
   );
 }
 
