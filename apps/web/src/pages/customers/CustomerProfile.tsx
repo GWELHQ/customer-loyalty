@@ -266,7 +266,7 @@ function CustomerDetailsForm({
           {error}
         </div>
       )}
-      <Field label="Full name">
+      <Field label="Full name" required>
         <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
       <Field label="Home station">

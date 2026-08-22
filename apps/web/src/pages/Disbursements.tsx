@@ -10,7 +10,7 @@ import type { ExportColumn } from '../lib/exportTable';
 import { nairobiThisMonth } from '../lib/time';
 import { Icon } from '../ui/Icon';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
   { header: 'Month', value: (b) => b.month },
@@ -105,8 +105,10 @@ export function Disbursements() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {canManage && (
             <>
-              <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
-              <Button variant="primary" onClick={createBatch} disabled={busy}>
+              <Field label="Month" required>
+                <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
+              </Field>
+              <Button variant="primary" onClick={createBatch} disabled={busy || !month} style={{ marginTop: 19 }}>
                 Create batch from approved ledger
               </Button>
             </>

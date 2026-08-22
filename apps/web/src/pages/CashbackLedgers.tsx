@@ -9,7 +9,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDate, formatNairobiDateTime, nairobiThisMonth } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { StepIndicator, type StepIndicatorStep, type StepState } from '../ui/StepIndicator';
 
 const LEDGER_ENTRY_COLUMNS: ExportColumn<MonthlyCashbackLedgerEntry>[] = [
@@ -124,7 +124,9 @@ export function CashbackLedgers() {
     <AppShell title="Monthly cashback ledger" subtitle="RTSM releases, Finance Approver checks and approves, Finance Disburser pays out">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1000 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
+          <Field label="Month" required>
+            <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
+          </Field>
           {ledger && <Badge tone={STATUS_TONE[ledger.status]}>{ledger.status.replace(/_/g, ' ')}</Badge>}
           <div style={{ flex: 1 }} />
           {ledger && canManage && (ledger.status === LedgerStatus.OPEN_ACCRUING || ledger.status === LedgerStatus.READY_FOR_REVIEW) && (

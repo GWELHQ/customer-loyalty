@@ -140,7 +140,12 @@ export function CustomerImportWizard() {
               </div>
 
               <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Branch</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                  Branch
+                  <span style={{ color: 'var(--color-danger)', marginLeft: 3 }} aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <select
                   style={inputStyle}
                   value={homeStationId}
@@ -226,7 +231,12 @@ export function CustomerImportWizard() {
                 >
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Customer field</div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>Customer name</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>
+                      Customer name
+                      <span style={{ color: 'var(--color-danger)', marginLeft: 3 }} aria-hidden="true">
+                        *
+                      </span>
+                    </div>
                   </div>
                   <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>←</div>
                   <select style={inputStyle} value={nameColumn} onChange={(e) => setNameColumn(e.target.value)}>
@@ -251,7 +261,12 @@ export function CustomerImportWizard() {
                 >
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Customer field</div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>Phone number</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-primary)' }}>
+                      Phone number
+                      <span style={{ color: 'var(--color-danger)', marginLeft: 3 }} aria-hidden="true">
+                        *
+                      </span>
+                    </div>
                   </div>
                   <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>←</div>
                   <select style={inputStyle} value={phoneColumn} onChange={(e) => setPhoneColumn(e.target.value)}>
