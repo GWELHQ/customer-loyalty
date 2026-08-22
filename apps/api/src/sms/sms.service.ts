@@ -1,11 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { SmsStatus, type SmsDelivery } from '@loyalty/shared';
+import { SmsStatus, type PaginatedResult, type SmsDelivery } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { ChangeEventsService } from '../events/change-events.service';
 import { SMS_PROVIDER, type SmsProvider } from './sms-provider.interface';
 
 const COLLECTION = 'smsDeliveries';
 const MAX_RETRIES = 3;
+const PAGE_SIZE = 50;
 
 /** Canonical sale-confirmation SMS text — shared by the backend send path and the Android app (which composes the same message for its own direct send). */
 export function buildSaleConfirmationMessage(input: { cashbackEarned: number; monthToDateCashback: number }): string {
@@ -19,6 +21,7 @@ export class SmsService {
   constructor(
     private readonly firestore: FirestoreService,
     @Inject(SMS_PROVIDER) private readonly provider: SmsProvider,
+    private readonly changeEvents: ChangeEventsService,
   ) {}
 
   private col() {
@@ -49,7 +52,32 @@ export class SmsService {
       updatedAt: now,
     };
     const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
     await this.attemptSend(ref.id, { ...doc, id: ref.id });
+  }
+
+  /** Every SMS ever sent (or attempted), newest first — powers the Logs page's SMS tab. */
+  async list(cursor?: string): Promise<PaginatedResult<SmsDelivery>> {
+    let query = this.col().orderBy('createdAt', 'desc') as FirebaseFirestore.Query;
+
+    const countSnap = await query.count().get();
+    const total = countSnap.data().count;
+
+    if (cursor) {
+      const cursorSnap = await this.col().doc(cursor).get();
+      if (cursorSnap.exists) query = query.startAfter(cursorSnap);
+    }
+
+    const snap = await query.limit(PAGE_SIZE).get();
+    const items = snap.docs.map((d) => fromDoc<SmsDelivery>(d));
+
+    return {
+      items,
+      page: 1,
+      pageSize: PAGE_SIZE,
+      total,
+      nextCursor: snap.docs.length === PAGE_SIZE ? snap.docs.at(-1)!.id : null,
+    };
   }
 
   async retry(saleId: string): Promise<SmsDelivery | null> {
@@ -105,6 +133,7 @@ export class SmsService {
     // sync — it's a denormalized read shortcut, the smsDeliveries doc above
     // is the source of truth.
     await this.firestore.collection('sales').doc(saleId).update({ smsStatus: status, updatedAt: now });
+    this.changeEvents.emit(COLLECTION);
   }
 
   /**
@@ -142,6 +171,7 @@ export class SmsService {
       .collection('sales')
       .doc(input.saleId)
       .update({ smsStatus: doc.status, updatedAt: now });
+    this.changeEvents.emit(COLLECTION);
     return { ...doc, id: ref.id };
   }
 }

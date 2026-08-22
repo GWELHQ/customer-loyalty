@@ -16,6 +16,7 @@ import type {
   ReconciliationDaily,
   Role,
   Sale,
+  SmsDelivery,
   SpecialRateRequest,
   Station,
   User,
@@ -242,5 +243,10 @@ export class LoyaltyApiClient {
   auditEvents = {
     list: (params: { entityType?: string; entityId?: string; cursor?: string } = {}) =>
       this.http.get<PaginatedResult<AuditEvent>>(`/audit-events${toQueryString(params)}`),
+  };
+
+  smsDeliveries = {
+    list: (params: { cursor?: string } = {}) =>
+      this.http.get<PaginatedResult<SmsDelivery>>(`/sms-deliveries${toQueryString(params)}`),
   };
 }

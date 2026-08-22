@@ -1,0 +1,310 @@
+import type { AuditEvent, SmsDelivery } from '@loyalty/shared';
+import { useEffect, useState } from 'react';
+import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
+import { AppShell } from '../layout/AppShell';
+import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr } from '../ui/primitives';
+
+type Tab = 'audit' | 'sms';
+
+export function Logs() {
+  const [tab, setTab] = useState<Tab>('audit');
+
+  return (
+    <AppShell title="Logs" subtitle="Every state-changing action and every SMS sent, across the whole system">
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <Button variant={tab === 'audit' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('audit')}>
+          Audit log
+        </Button>
+        <Button variant={tab === 'sms' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('sms')}>
+          SMS log
+        </Button>
+      </div>
+      {tab === 'audit' ? <AuditLogTab /> : <SmsLogTab />}
+    </AppShell>
+  );
+}
+
+const AUDIT_COLUMNS: ExportColumn<AuditEvent>[] = [
+  { header: 'When', value: (e) => formatNairobiDateTime(e.createdAt) },
+  { header: 'Actor', value: (e) => e.actorName },
+  { header: 'Action', value: (e) => e.action },
+  { header: 'Entity type', value: (e) => e.entityType },
+  { header: 'Entity', value: (e) => e.entityLabel ?? '' },
+  { header: 'Entity ID', value: (e) => e.entityId },
+  { header: 'Details', value: (e) => (e.metadata ? JSON.stringify(e.metadata) : '') },
+];
+
+function AuditLogTab() {
+  const api = useApi();
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // Cursor pagination is forward-only server-side; this stack lets "Previous" step back through pages already visited this session.
+  const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  function reload() {
+    setLoading(true);
+    api.auditEvents
+      .list({ cursor: cursorStack[pageIndex] })
+      .then((res) => {
+        setEvents(res.items);
+        setTotal(res.total);
+        setNextCursor(res.nextCursor);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [api, pageIndex]);
+  useRealtimeRefresh(['auditEvents'], () => {
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  });
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursorStack((stack) => [...stack.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+  }
+  function goPrev() {
+    setPageIndex((i) => Math.max(0, i - 1));
+  }
+
+  async function fetchAllForExport(): Promise<AuditEvent[]> {
+    const all: AuditEvent[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const res = await api.auditEvents.list({ cursor });
+      all.push(...res.items);
+      if (!res.nextCursor || all.length >= res.total) break;
+      cursor = res.nextCursor;
+    }
+    return all;
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        <ExportButtons filename="audit-log" title="Audit log" columns={AUDIT_COLUMNS} rows={fetchAllForExport} />
+      </div>
+      <Card padding={0}>
+        {!loading && events.length === 0 && <EmptyState title="No audit events yet" />}
+        {events.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>When</Th>
+                <Th>Actor</Th>
+                <Th>Action</Th>
+                <Th>Entity</Th>
+                <Th>Entity ID</Th>
+                <Th>Details</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e) => (
+                <Tr key={e.id}>
+                  <Td>{formatNairobiDateTime(e.createdAt)}</Td>
+                  <Td>{e.actorName}</Td>
+                  <Td>{e.action}</Td>
+                  <Td>{e.entityLabel ? `${e.entityType} · ${e.entityLabel}` : e.entityType}</Td>
+                  <Td>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                      {e.entityId}
+                    </span>
+                  </Td>
+                  <Td>
+                    {e.metadata ? (
+                      <span
+                        title={JSON.stringify(e.metadata)}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11.5,
+                          color: 'var(--color-text-secondary)',
+                          display: 'inline-block',
+                          maxWidth: 260,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          verticalAlign: 'bottom',
+                        }}
+                      >
+                        {JSON.stringify(e.metadata)}
+                      </span>
+                    ) : (
+                      ''
+                    )}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 12,
+            padding: '12px 14px',
+            borderTop: '1px solid var(--color-border)',
+          }}
+        >
+          <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+            Page {pageIndex + 1} · {total} event(s) total
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Button variant="secondary" size="sm" onClick={goPrev} disabled={pageIndex === 0 || loading}>
+              Previous
+            </Button>
+            <Button variant="secondary" size="sm" onClick={goNext} disabled={!nextCursor || loading}>
+              Next
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+const SMS_COLUMNS: ExportColumn<SmsDelivery>[] = [
+  { header: 'When', value: (d) => formatNairobiDateTime(d.createdAt) },
+  { header: 'Phone', value: (d) => d.customerPhone },
+  { header: 'Message', value: (d) => d.message },
+  { header: 'Status', value: (d) => d.status },
+  { header: 'Provider', value: (d) => d.providerName },
+  { header: 'Sale ID', value: (d) => d.saleId },
+  { header: 'Retry count', value: (d) => d.retryCount },
+  { header: 'Sent at', value: (d) => (d.sentAt ? formatNairobiDateTime(d.sentAt) : '') },
+  { header: 'Error reason', value: (d) => d.errorReason ?? '' },
+];
+
+function SmsLogTab() {
+  const api = useApi();
+  const [deliveries, setDeliveries] = useState<SmsDelivery[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  function reload() {
+    setLoading(true);
+    api.smsDeliveries
+      .list({ cursor: cursorStack[pageIndex] })
+      .then((res) => {
+        setDeliveries(res.items);
+        setTotal(res.total);
+        setNextCursor(res.nextCursor);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [api, pageIndex]);
+  useRealtimeRefresh(['smsDeliveries'], () => {
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  });
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursorStack((stack) => [...stack.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+  }
+  function goPrev() {
+    setPageIndex((i) => Math.max(0, i - 1));
+  }
+
+  async function fetchAllForExport(): Promise<SmsDelivery[]> {
+    const all: SmsDelivery[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const res = await api.smsDeliveries.list({ cursor });
+      all.push(...res.items);
+      if (!res.nextCursor || all.length >= res.total) break;
+      cursor = res.nextCursor;
+    }
+    return all;
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        <ExportButtons filename="sms-log" title="SMS log" columns={SMS_COLUMNS} rows={fetchAllForExport} />
+      </div>
+      <Card padding={0}>
+        {!loading && deliveries.length === 0 && <EmptyState title="No SMS sent yet" />}
+        {deliveries.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>When</Th>
+                <Th>Phone</Th>
+                <Th>Message</Th>
+                <Th>Status</Th>
+                <Th>Provider</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.map((d) => (
+                <Tr key={d.id}>
+                  <Td>{formatNairobiDateTime(d.createdAt)}</Td>
+                  <Td>{d.customerPhone}</Td>
+                  <Td>
+                    <span
+                      title={d.message}
+                      style={{
+                        display: 'inline-block',
+                        maxWidth: 340,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'bottom',
+                      }}
+                    >
+                      {d.message}
+                    </span>
+                  </Td>
+                  <Td>
+                    <Badge tone={d.status === 'sent' ? 'success' : d.status === 'failed' ? 'danger' : 'neutral'}>
+                      {d.status}
+                    </Badge>
+                    {d.status === 'failed' && d.errorReason && (
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 3 }}>{d.errorReason}</div>
+                    )}
+                  </Td>
+                  <Td>{d.providerName}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 12,
+            padding: '12px 14px',
+            borderTop: '1px solid var(--color-border)',
+          }}
+        >
+          <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+            Page {pageIndex + 1} · {total} message(s) total
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Button variant="secondary" size="sm" onClick={goPrev} disabled={pageIndex === 0 || loading}>
+              Previous
+            </Button>
+            <Button variant="secondary" size="sm" onClick={goNext} disabled={!nextCursor || loading}>
+              Next
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </>
+  );
+}
