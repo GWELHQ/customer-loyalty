@@ -51,21 +51,13 @@ export class AuthService {
       microsoftOid: claims.oid,
     });
 
-    // Microsoft successfully authenticating the person is not enough — the
-    // backend is the source of truth for whether they're allowed in at all.
-    if (user.status !== UserStatus.ACTIVE) {
-      await this.audit.record({
-        actor: 'system',
-        action: 'auth.microsoft_login_rejected_inactive',
-        entityType: 'user',
-        entityId: user.id,
-        entityLabel: user.fullName,
-      });
-      throw new UnauthorizedException(
-        'Your account is not yet active. Ask an Admin to activate it and assign your role.',
-      );
-    }
-
+    // Microsoft successfully authenticating the person doesn't grant any
+    // real access — a not-yet-activated (or deactivated) account still
+    // gets a session, but PermissionsGuard rejects it on every
+    // permission-gated route, so the web app just shows a "waiting for an
+    // Admin" screen instead of a real dashboard. This lets an Admin's later
+    // activation reach the already-open tab via the same realtime-refresh
+    // path as any other role/status change, with no re-login needed.
     const principal: StaffPrincipal = {
       kind: 'staff',
       userId: user.id,
@@ -73,6 +65,7 @@ export class AuthService {
       fullName: user.fullName,
       role: user.role,
       assignedStationId: user.assignedStationId,
+      status: user.status,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -83,7 +76,7 @@ export class AuthService {
     await this.users.touchLastLogin(user.id);
     await this.audit.record({
       actor: principal,
-      action: 'auth.microsoft_login',
+      action: user.status === UserStatus.ACTIVE ? 'auth.microsoft_login' : 'auth.microsoft_login_pending_activation',
       entityType: 'user',
       entityId: user.id,
       entityLabel: user.fullName,
@@ -95,7 +88,7 @@ export class AuthService {
   async refreshStaffSession(refreshToken: string): Promise<StaffSession> {
     const userId = await this.tokens.verifyStaffRefreshToken(refreshToken);
     const user = await this.users.findById(userId);
-    if (!user || user.status !== UserStatus.ACTIVE) {
+    if (!user) {
       throw new UnauthorizedException('Session no longer valid');
     }
 
@@ -106,6 +99,7 @@ export class AuthService {
       fullName: user.fullName,
       role: user.role,
       assignedStationId: user.assignedStationId,
+      status: user.status,
     };
 
     const [accessToken, newRefreshToken] = await Promise.all([

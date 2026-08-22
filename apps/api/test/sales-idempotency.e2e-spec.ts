@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { Product } from '@loyalty/shared';
+import { Product, UserStatus } from '@loyalty/shared';
 import { CustomersService } from '../src/customers/customers.service';
 import { PricesService } from '../src/prices/prices.service';
 import { StationsService } from '../src/stations/stations.service';
@@ -43,6 +43,7 @@ describe('Sales idempotency (e2e)', () => {
         email: 'seed@greenwellsenergies.co.ke',
         fullName: 'Seed',
         role: 'admin' as never,
+        status: UserStatus.ACTIVE,
       },
     );
 

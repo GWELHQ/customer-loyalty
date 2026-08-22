@@ -12,6 +12,7 @@ import { CustomerRegistrations } from './pages/CustomerRegistrations';
 import { Dashboard } from './pages/Dashboard';
 import { Disbursements } from './pages/Disbursements';
 import { Notifications } from './pages/Notifications';
+import { PendingActivation } from './pages/PendingActivation';
 import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
@@ -27,6 +28,8 @@ export function App() {
       <Route path="/" element={<SignIn />} />
       {/* MSAL popup redirect target — the library closes the popup itself once it detects the response; this route just needs to exist so it doesn't 404 mid-flow. */}
       <Route path="/auth/microsoft/callback" element={<div />} />
+
+      <Route path="/pending-activation" element={<RequireStaff><PendingActivation /></RequireStaff>} />
 
       <Route
         path="/dashboard"

@@ -107,6 +107,7 @@ async function seed() {
       email: admin.email,
       fullName: admin.fullName,
       role: Role.ADMIN,
+      status: UserStatus.ACTIVE,
     },
   );
   await pricesSvc.create(
@@ -121,6 +122,7 @@ async function seed() {
       email: admin.email,
       fullName: admin.fullName,
       role: Role.ADMIN,
+      status: UserStatus.ACTIVE,
     },
   );
 

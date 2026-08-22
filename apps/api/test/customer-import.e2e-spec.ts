@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import * as XLSX from 'xlsx';
-import { ImportRowResult } from '@loyalty/shared';
+import { ImportRowResult, UserStatus } from '@loyalty/shared';
 import { CustomerImportsService } from '../src/customers/customer-imports.service';
 import { CustomersService } from '../src/customers/customers.service';
 import type { StaffPrincipal } from '../src/common/types/principal';
@@ -12,6 +12,7 @@ const admin: StaffPrincipal = {
   email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: 'admin' as never,
+  status: UserStatus.ACTIVE,
 };
 
 function buildWorkbookBuffer(rows: Record<string, string>[]): Buffer {

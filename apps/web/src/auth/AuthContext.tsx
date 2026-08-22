@@ -1,4 +1,4 @@
-import { getPermissionsForRole, Permission, Role } from '@loyalty/shared';
+import { getPermissionsForRole, Permission, Role, UserStatus } from '@loyalty/shared';
 import {
   createContext,
   useCallback,
@@ -22,6 +22,7 @@ export interface StaffUser {
   fullName: string;
   role: Role;
   assignedStationId?: string;
+  status: UserStatus;
 }
 
 const STORAGE_KEY = 'gw_session_v1';
@@ -224,11 +225,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       user: session?.user ?? null,
       loading,
+      // A not-yet-(or no-longer-)activated account holds a real session
+      // (see AuthService.loginWithMicrosoft) but no permission at all,
+      // regardless of what its role would otherwise grant — the backend
+      // enforces the same rule, this just keeps the nav/UI from dangling
+      // links to routes every request would 403 on.
       hasPermission: (permission) =>
-        session ? getPermissionsForRole(session.user.role).includes(permission) : false,
+        session && session.user.status === UserStatus.ACTIVE
+          ? getPermissionsForRole(session.user.role).includes(permission)
+          : false,
       signInWithMicrosoft,
       signOut,
-      landingPath: session ? landingPathForRole(session.user.role) : '/',
+      landingPath: !session
+        ? '/'
+        : session.user.status !== UserStatus.ACTIVE
+          ? '/pending-activation'
+          : landingPathForRole(session.user.role),
     }),
     [session, loading, signInWithMicrosoft, signOut],
   );
@@ -252,6 +264,7 @@ function demoSession(): StoredSession {
       email: 'a.wanjiru@greenwellsenergies.co.ke',
       fullName: 'Amina Wanjiru',
       role: Role.ADMIN,
+      status: UserStatus.ACTIVE,
     },
   };
 }

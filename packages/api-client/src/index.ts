@@ -19,6 +19,7 @@ import type {
   SpecialRateRequest,
   Station,
   User,
+  UserStatus,
 } from '@loyalty/shared';
 import { ApiError, HttpClient, toQueryString, type ApiClientOptions } from './http.js';
 
@@ -35,6 +36,7 @@ export interface StaffSessionResponse {
     fullName: string;
     role: Role;
     assignedStationId?: string;
+    status: UserStatus;
   };
 }
 

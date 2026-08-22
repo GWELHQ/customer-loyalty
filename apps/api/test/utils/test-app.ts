@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Role } from '@loyalty/shared';
+import { Role, UserStatus } from '@loyalty/shared';
 import { AppModule } from '../../src/app.module';
 import { TokenService } from '../../src/common/token/token.service';
 import type { AttendantPrincipal, StaffPrincipal } from '../../src/common/types/principal';
@@ -26,6 +26,7 @@ export async function mintStaffToken(
     fullName: overrides.fullName ?? 'Test User',
     role: overrides.role ?? Role.ADMIN,
     assignedStationId: overrides.assignedStationId,
+    status: overrides.status ?? UserStatus.ACTIVE,
   };
   return tokens.signStaffAccessToken(principal);
 }

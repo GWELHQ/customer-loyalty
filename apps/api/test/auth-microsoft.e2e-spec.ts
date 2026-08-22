@@ -9,8 +9,9 @@ import { UsersService } from '../src/users/users.service';
 /**
  * Mocks only the Microsoft JWKS verification boundary (the one thing that
  * genuinely requires network access to login.microsoftonline.com) and runs
- * everything downstream — Firestore matching/provisioning, active-status
- * rejection, our own session issuance — for real against the emulator.
+ * everything downstream — Firestore matching/provisioning, session issuance
+ * for a not-yet-activated account, PermissionsGuard's status check — for
+ * real against the emulator.
  */
 describe('Microsoft login (e2e, mocked id_token verification)', () => {
   let app: INestApplication;
@@ -31,7 +32,7 @@ describe('Microsoft login (e2e, mocked id_token verification)', () => {
     await app.close();
   });
 
-  it('rejects a first-time Microsoft sign-in because the provisioned account starts inactive', async () => {
+  it('issues a restricted session for a first-time Microsoft sign-in whose provisioned account starts inactive', async () => {
     mockVerify.mockResolvedValueOnce({
       oid: 'ms-oid-new-user',
       email: 'new.person@greenwellsenergies.co.ke',
@@ -42,7 +43,24 @@ describe('Microsoft login (e2e, mocked id_token verification)', () => {
       .post('/api/v1/auth/microsoft/callback')
       .send({ idToken: 'irrelevant-because-mocked' });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(201);
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.user.status).toBe(UserStatus.INACTIVE);
+
+    // The session is real but powerless: every permission-gated route is
+    // rejected regardless of the account's (default) role.
+    const usersRes = await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${res.body.accessToken}`);
+    expect(usersRes.status).toBe(403);
+
+    // /auth/me has no permission requirement, so the pending session can
+    // still use it to know who it is and render a "waiting" screen.
+    const meRes = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${res.body.accessToken}`);
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.status).toBe(UserStatus.INACTIVE);
   });
 
   it('issues an app session once the Admin has activated the provisioned account', async () => {

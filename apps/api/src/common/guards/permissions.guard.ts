@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { roleHasPermission, type Permission } from '@loyalty/shared';
+import { roleHasPermission, UserStatus, type Permission } from '@loyalty/shared';
 import { ANY_PERMISSION_KEY } from '../decorators/any-permission.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import type { AuthPrincipal } from '../types/principal';
@@ -34,6 +34,15 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
     if (!user) throw new ForbiddenException('No authenticated principal');
+
+    // A not-yet-(or no-longer-)activated staff account still gets a
+    // session (see AuthService.loginWithMicrosoft) so the web app can show
+    // it a "waiting for an Admin" screen, but it may not hold ANY
+    // permission-gated route regardless of what its role would otherwise
+    // allow — role alone is not enough once an account is inactive.
+    if (user.kind === 'staff' && user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Your account is not yet active. Ask an Admin to activate it.');
+    }
 
     if (requiredAll && requiredAll.length > 0) {
       const missing = requiredAll.filter((p) => !roleHasPermission(user.role, p));

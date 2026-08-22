@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { LedgerStatus, Product, Role, SpecialRateStatus } from '@loyalty/shared';
+import { LedgerStatus, Product, Role, SpecialRateStatus, UserStatus } from '@loyalty/shared';
 import { CashbackLedgersService } from '../src/cashback-ledgers/cashback-ledgers.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { DisbursementBatchesService } from '../src/disbursement-batches/disbursement-batches.service';
@@ -17,6 +17,7 @@ const rtsm: StaffPrincipal = {
   email: 'rtsm@greenwellsenergies.co.ke',
   fullName: 'RTSM Person',
   role: Role.RTSM,
+  status: UserStatus.ACTIVE,
 };
 const chairman: StaffPrincipal = {
   kind: 'staff',
@@ -24,6 +25,7 @@ const chairman: StaffPrincipal = {
   email: 'chairman@greenwellsenergies.co.ke',
   fullName: 'Chairman Person',
   role: Role.CHAIRMAN,
+  status: UserStatus.ACTIVE,
 };
 const finance: StaffPrincipal = {
   kind: 'staff',
@@ -31,6 +33,7 @@ const finance: StaffPrincipal = {
   email: 'finance@greenwellsenergies.co.ke',
   fullName: 'Finance Person',
   role: Role.FINANCE_APPROVER,
+  status: UserStatus.ACTIVE,
 };
 const admin: StaffPrincipal = {
   kind: 'staff',
@@ -38,6 +41,7 @@ const admin: StaffPrincipal = {
   email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: Role.ADMIN,
+  status: UserStatus.ACTIVE,
 };
 
 describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => {
