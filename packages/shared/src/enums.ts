@@ -111,6 +111,32 @@ export enum SyncRecordResult {
   NEEDS_REVIEW = 'needs_review',
 }
 
+export enum FraudFlagType {
+  VOLUME_SPIKE_VS_BASELINE = 'volume_spike_vs_baseline',
+  MULTI_LOCATION_SAME_DAY = 'multi_location_same_day',
+  ATTENDANT_CUSTOMER_CONCENTRATION = 'attendant_customer_concentration',
+  CUSTOMER_MULTI_ATTENDANT_BURST = 'customer_multi_attendant_burst',
+  REPEATED_EXACT_LITRES = 'repeated_exact_litres',
+  HIGH_FREQUENCY_REFUEL = 'high_frequency_refuel',
+  NEW_CUSTOMER_HIGH_VOLUME = 'new_customer_high_volume',
+  ATTENDANT_VOLUME_OUTLIER = 'attendant_volume_outlier',
+  ADMIN_MANUAL_BURST = 'admin_manual_burst',
+  OFF_HOURS_SALE = 'off_hours_sale',
+}
+
+export enum FraudFlagStatus {
+  OPEN = 'open',
+  UNDER_REVIEW = 'under_review',
+  RESOLVED = 'resolved',
+  DISMISSED = 'dismissed',
+}
+
+export enum FraudFlagSeverity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
 export enum NotificationType {
   PRICE_REMINDER = 'price_reminder',
   SPECIAL_RATE_REQUEST = 'special_rate_request',

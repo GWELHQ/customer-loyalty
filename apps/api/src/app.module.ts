@@ -20,6 +20,7 @@ import { TokenModule } from './common/token/token.module';
 import { CustomersModule } from './customers/customers.module';
 import { DisbursementBatchesModule } from './disbursement-batches/disbursement-batches.module';
 import { EventsModule } from './events/events.module';
+import { FraudModule } from './fraud/fraud.module';
 import { JobsModule } from './jobs/jobs.module';
 import { MobileModule } from './mobile/mobile.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     NotificationsModule,
     AuditEventsModule,
     SmsModule,
+    FraudModule,
     JobsModule,
   ],
   providers: [

@@ -1,0 +1,318 @@
+import { FraudFlagStatus, FraudFlagType, Permission, type FraudFlag } from '@loyalty/shared';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { useApi } from '../data/client';
+import { useRealtimeRefresh } from '../data/realtime';
+import { useStations } from '../data/useStations';
+import { AppShell } from '../layout/AppShell';
+import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
+import { ExportButtons } from '../ui/ExportButtons';
+import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+
+const TYPE_LABELS: Record<FraudFlagType, string> = {
+  [FraudFlagType.VOLUME_SPIKE_VS_BASELINE]: 'Volume spike vs. baseline',
+  [FraudFlagType.MULTI_LOCATION_SAME_DAY]: 'Multiple locations, same day',
+  [FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION]: 'Attendant-customer concentration',
+  [FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST]: 'Many attendants, one customer',
+  [FraudFlagType.REPEATED_EXACT_LITRES]: 'Repeated exact litres',
+  [FraudFlagType.HIGH_FREQUENCY_REFUEL]: 'High-frequency refuel',
+  [FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME]: 'New customer, high volume',
+  [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: 'Attendant volume outlier',
+  [FraudFlagType.ADMIN_MANUAL_BURST]: 'Manual-entry burst',
+  [FraudFlagType.OFF_HOURS_SALE]: 'Off-hours sale',
+};
+
+const STATUS_TONE: Record<FraudFlagStatus, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
+  [FraudFlagStatus.OPEN]: 'danger',
+  [FraudFlagStatus.UNDER_REVIEW]: 'warning',
+  [FraudFlagStatus.RESOLVED]: 'success',
+  [FraudFlagStatus.DISMISSED]: 'neutral',
+};
+
+const FLAG_COLUMNS: ExportColumn<FraudFlag>[] = [
+  { header: 'Detected', value: (f) => formatNairobiDateTime(f.createdAt) },
+  { header: 'Type', value: (f) => TYPE_LABELS[f.type] },
+  { header: 'Severity', value: (f) => f.severity },
+  { header: 'Status', value: (f) => f.status },
+  { header: 'Customer', value: (f) => f.customerNameAtFlag ?? '' },
+  { header: 'Station', value: (f) => f.stationNameAtFlag ?? '' },
+  { header: 'Attendant', value: (f) => f.attendantNameAtFlag ?? '' },
+  { header: 'Detection mode', value: (f) => f.detectionMode },
+];
+
+export function FraudGovernance() {
+  const api = useApi();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(Permission.FRAUD_MANAGE);
+  const { stations } = useStations();
+
+  const [flags, setFlags] = useState<FraudFlag[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<FraudFlag | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const [type, setType] = useState('');
+  const [status, setStatus] = useState('');
+  const [stationId, setStationId] = useState('');
+
+  function resetToFirstPage() {
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  }
+
+  function reload() {
+    setLoading(true);
+    api.fraudFlags
+      .list({
+        type: (type || undefined) as FraudFlagType | undefined,
+        status: (status || undefined) as FraudFlagStatus | undefined,
+        stationId: stationId || undefined,
+        cursor: cursorStack[pageIndex],
+      })
+      .then((res) => {
+        setFlags(res.items);
+        setTotal(res.total);
+        setNextCursor(res.nextCursor);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [api, type, status, stationId, pageIndex]);
+  useEffect(resetToFirstPage, [type, status, stationId]);
+  useRealtimeRefresh(['fraudFlags'], resetToFirstPage);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursorStack((stack) => [...stack.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+  }
+  function goPrev() {
+    setPageIndex((i) => Math.max(0, i - 1));
+  }
+
+  async function fetchAllForExport(): Promise<FraudFlag[]> {
+    const all: FraudFlag[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const res = await api.fraudFlags.list({
+        type: (type || undefined) as FraudFlagType | undefined,
+        status: (status || undefined) as FraudFlagStatus | undefined,
+        stationId: stationId || undefined,
+        cursor,
+      });
+      all.push(...res.items);
+      if (!res.nextCursor || all.length >= res.total) break;
+      cursor = res.nextCursor;
+    }
+    return all;
+  }
+
+  async function startReview(flag: FraudFlag) {
+    setBusy(true);
+    try {
+      const updated = await api.fraudFlags.startReview(flag.id);
+      setSelected(updated);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resolve(flag: FraudFlag) {
+    const note = window.prompt('Resolution note (what was found)?') ?? undefined;
+    setBusy(true);
+    try {
+      const updated = await api.fraudFlags.resolve(flag.id, note);
+      setSelected(updated);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismiss(flag: FraudFlag) {
+    const note = window.prompt('Reason for dismissing this flag?') ?? undefined;
+    setBusy(true);
+    try {
+      const updated = await api.fraudFlags.dismiss(flag.id, note);
+      setSelected(updated);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AppShell title="Fraud & Governance" subtitle="Irregular fueling activity flagged automatically for review">
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select style={{ ...inputStyle, maxWidth: 220 }} value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">All types</option>
+          {Object.values(FraudFlagType).map((t) => (
+            <option key={t} value={t}>
+              {TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+        <select style={{ ...inputStyle, maxWidth: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {Object.values(FraudFlagStatus).map((s) => (
+            <option key={s} value={s}>
+              {s.replace('_', ' ')}
+            </option>
+          ))}
+        </select>
+        {stations.length > 0 && (
+          <select style={{ ...inputStyle, maxWidth: 200 }} value={stationId} onChange={(e) => setStationId(e.target.value)}>
+            <option value="">All stations</option>
+            {stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <div style={{ flex: 1 }} />
+        <ExportButtons filename="fraud-flags" title="Fraud & Governance" columns={FLAG_COLUMNS} rows={fetchAllForExport} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
+        <Card padding={0}>
+          {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
+          {!loading && flags.length === 0 && <EmptyState title="No irregularities flagged" body="Nothing to review right now." />}
+          {!loading && flags.length > 0 && (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Detected</Th>
+                  <Th>Type</Th>
+                  <Th>Severity</Th>
+                  <Th>Status</Th>
+                  <Th>Subject</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {flags.map((f) => (
+                  <Tr key={f.id} onClick={() => setSelected(f)}>
+                    <Td>{formatNairobiDateTime(f.createdAt)}</Td>
+                    <Td>{TYPE_LABELS[f.type]}</Td>
+                    <Td>
+                      <Badge tone={f.severity === 'high' ? 'danger' : f.severity === 'medium' ? 'warning' : 'neutral'}>
+                        {f.severity}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <Badge tone={STATUS_TONE[f.status]}>{f.status.replace('_', ' ')}</Badge>
+                    </Td>
+                    <Td>{f.customerNameAtFlag ?? f.attendantNameAtFlag ?? '—'}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 12,
+              padding: '12px 14px',
+              borderTop: '1px solid var(--color-border)',
+            }}
+          >
+            <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+              Page {pageIndex + 1} · {total} flag(s) total
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button variant="secondary" size="sm" onClick={goPrev} disabled={pageIndex === 0 || loading}>
+                Previous
+              </Button>
+              <Button variant="secondary" size="sm" onClick={goNext} disabled={!nextCursor || loading}>
+                Next
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {selected && (
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>{TYPE_LABELS[selected.type]}</div>
+              <button
+                onClick={() => setSelected(null)}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--color-text-muted)' }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <Badge tone={selected.severity === 'high' ? 'danger' : selected.severity === 'medium' ? 'warning' : 'neutral'}>
+                {selected.severity}
+              </Badge>
+              <Badge tone={STATUS_TONE[selected.status]}>{selected.status.replace('_', ' ')}</Badge>
+            </div>
+
+            <DetailRow label="Detected" value={formatNairobiDateTime(selected.createdAt)} />
+            {selected.customerNameAtFlag && <DetailRow label="Customer" value={selected.customerNameAtFlag} />}
+            {selected.stationNameAtFlag && <DetailRow label="Station" value={selected.stationNameAtFlag} />}
+            {selected.attendantNameAtFlag && <DetailRow label="Attendant" value={selected.attendantNameAtFlag} />}
+            <DetailRow label="Detection mode" value={selected.detectionMode} />
+            <DetailRow label="Related sales" value={`${selected.relatedSaleIds.length}`} />
+
+            <div style={{ marginTop: 12, fontSize: 13, fontWeight: 700 }}>Evidence</div>
+            <div
+              style={{
+                marginTop: 6,
+                padding: 10,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface-muted, rgba(127,127,127,0.08))',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+              }}
+            >
+              {Object.entries(selected.evidence).map(([key, value]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{key}</span>
+                  <span>{String(value)}</span>
+                </div>
+              ))}
+            </div>
+
+            {selected.reviewedByName && (
+              <>
+                <DetailRow label="Reviewed by" value={selected.reviewedByName} />
+                {selected.reviewedAt && <DetailRow label="Reviewed at" value={formatNairobiDateTime(selected.reviewedAt)} />}
+                {selected.resolutionNote && <DetailRow label="Note" value={selected.resolutionNote} />}
+              </>
+            )}
+
+            {canManage && selected.status === FraudFlagStatus.OPEN && (
+              <Button variant="secondary" size="sm" onClick={() => startReview(selected)} disabled={busy} style={{ marginTop: 12, marginRight: 8 }}>
+                Start review
+              </Button>
+            )}
+            {canManage && (selected.status === FraudFlagStatus.OPEN || selected.status === FraudFlagStatus.UNDER_REVIEW) && (
+              <>
+                <Button variant="primary" size="sm" onClick={() => resolve(selected)} disabled={busy} style={{ marginTop: 12, marginRight: 8 }}>
+                  Resolve
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => dismiss(selected)} disabled={busy} style={{ marginTop: 12 }}>
+                  Dismiss
+                </Button>
+              </>
+            )}
+          </Card>
+        )}
+      </div>
+    </AppShell>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--color-border)', fontSize: 13 }}>
+      <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
+      <span style={{ fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}

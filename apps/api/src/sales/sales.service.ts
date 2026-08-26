@@ -14,6 +14,7 @@ import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { nairobiDateKey, nairobiMonthBoundsUtc, nairobiMonthKey } from '../common/time/nairobi';
 import type { AttendantPrincipal, AuthPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
+import { FraudDetectionService } from '../fraud/fraud-detection.service';
 import { PricesService } from '../prices/prices.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import { SmsService } from '../sms/sms.service';
@@ -71,6 +72,7 @@ export class SalesService {
     private readonly reconciliation: ReconciliationService,
     private readonly sms: SmsService,
     private readonly changeEvents: ChangeEventsService,
+    private readonly fraudDetection: FraudDetectionService,
   ) {}
 
   private col() {
@@ -215,6 +217,9 @@ export class SalesService {
     this.changeEvents.emit('sales');
     this.changeEvents.emit('customers');
     this.changeEvents.emit('reconciliationDaily');
+
+    // Never fails the sale — see FraudDetectionService.runRealtimeChecks.
+    await this.fraudDetection.runRealtimeChecks(sale);
 
     // Attendant-recorded sales send their SMS from the Android app itself
     // (direct Africa's Talking call — see MobileController), so the phone

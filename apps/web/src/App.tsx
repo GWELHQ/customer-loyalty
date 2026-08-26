@@ -10,6 +10,7 @@ import { CustomersList } from './pages/customers/CustomersList';
 import { CustomerRegistrations } from './pages/CustomerRegistrations';
 import { Dashboard } from './pages/Dashboard';
 import { Disbursements } from './pages/Disbursements';
+import { FraudGovernance } from './pages/FraudGovernance';
 import { Logs } from './pages/Logs';
 import { Notifications } from './pages/Notifications';
 import { PendingActivation } from './pages/PendingActivation';
@@ -70,6 +71,7 @@ export function App() {
       <Route path="/logs" element={<RequireStaff permission={Permission.AUDIT_VIEW}><Logs /></RequireStaff>} />
       {/* Old path, kept as a redirect in case it's bookmarked/linked anywhere. */}
       <Route path="/audit-log" element={<Navigate to="/logs" replace />} />
+      <Route path="/fraud" element={<RequireStaff permission={Permission.FRAUD_VIEW}><FraudGovernance /></RequireStaff>} />
       <Route path="/users" element={<RequireStaff permission={Permission.USERS_MANAGE}><Users /></RequireStaff>} />
       <Route path="/attendants" element={<RequireStaff permission={Permission.ATTENDANTS_MANAGE}><Attendants /></RequireStaff>} />
       <Route path="/stations" element={<RequireStaff permission={Permission.STATIONS_VIEW}><Stations /></RequireStaff>} />

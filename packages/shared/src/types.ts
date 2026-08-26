@@ -2,6 +2,9 @@ import type {
   CustomerRegistrationStatus,
   DisbursementBatchStatus,
   DisbursementEntryStatus,
+  FraudFlagSeverity,
+  FraudFlagStatus,
+  FraudFlagType,
   ImportRowResult,
   ImportStatus,
   LedgerStatus,
@@ -273,6 +276,30 @@ export interface AuditEvent extends BaseDoc {
   /** Human-readable name for the affected record (e.g. a customer's or station's name) — the UI shows this instead of the raw Firestore document ID. */
   entityLabel?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface FraudFlag extends BaseDoc {
+  type: FraudFlagType;
+  severity: FraudFlagSeverity;
+  status: FraudFlagStatus;
+  customerId?: string;
+  customerNameAtFlag?: string;
+  stationId?: string;
+  stationNameAtFlag?: string;
+  attendantId?: string;
+  attendantNameAtFlag?: string;
+  /** Sale ids that triggered/support this flag. */
+  relatedSaleIds: string[];
+  /** Calendar window the check covered (the scanned day, or the rolling window). */
+  periodStart?: ISODateString;
+  periodEnd?: ISODateString;
+  detectionMode: 'realtime' | 'batch';
+  /** Per-check payload, e.g. { baselineAvgLitres, actualLitres, multiplier, sampleSize }. */
+  evidence: Record<string, unknown>;
+  reviewedByUserId?: string;
+  reviewedByName?: string;
+  reviewedAt?: ISODateString;
+  resolutionNote?: string;
 }
 
 export interface SyncOperation extends BaseDoc {

@@ -38,6 +38,8 @@ export enum Permission {
   IMPORTS_VIEW = 'imports:view',
   NOTIFICATIONS_VIEW_OWN = 'notifications:view_own',
   AUDIT_VIEW = 'audit:view',
+  FRAUD_VIEW = 'fraud:view',
+  FRAUD_MANAGE = 'fraud:manage',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -63,6 +65,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.AUDIT_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
+  Permission.FRAUD_VIEW,
+  Permission.FRAUD_MANAGE,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 
@@ -83,6 +87,7 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.REPORTS_VIEW_ALL,
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.AUDIT_VIEW,
+  Permission.FRAUD_VIEW,
 ];
 
 // Everything the Chairman can see, minus the two actions the Chairman can
@@ -109,6 +114,8 @@ const FINANCE_APPROVER_PERMISSIONS: Permission[] = [
   Permission.REPORTS_VIEW_ALL,
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.AUDIT_VIEW,
+  Permission.FRAUD_VIEW,
+  Permission.FRAUD_MANAGE,
 ];
 
 // Executes payout on an already-approved ledger — cannot approve one
@@ -139,6 +146,8 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
+  Permission.FRAUD_VIEW,
+  Permission.FRAUD_MANAGE,
 ];
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [

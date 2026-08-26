@@ -5,6 +5,9 @@ import type {
   Customer,
   CustomerRegistrationRequest,
   DisbursementBatch,
+  FraudFlag,
+  FraudFlagStatus,
+  FraudFlagType,
   ImportJob,
   ImportRow,
   MonthlyCashbackLedger,
@@ -248,5 +251,15 @@ export class LoyaltyApiClient {
   smsDeliveries = {
     list: (params: { cursor?: string } = {}) =>
       this.http.get<PaginatedResult<SmsDelivery>>(`/sms-deliveries${toQueryString(params)}`),
+  };
+
+  fraudFlags = {
+    list: (
+      params: { type?: FraudFlagType; status?: FraudFlagStatus; stationId?: string; customerId?: string; cursor?: string } = {},
+    ) => this.http.get<PaginatedResult<FraudFlag>>(`/fraud-flags${toQueryString(params)}`),
+    get: (id: string) => this.http.get<FraudFlag>(`/fraud-flags/${id}`),
+    startReview: (id: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/start-review`, {}),
+    resolve: (id: string, note?: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/resolve`, { note }),
+    dismiss: (id: string, note?: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/dismiss`, { note }),
   };
 }

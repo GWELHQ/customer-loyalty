@@ -5,6 +5,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { EmailService } from '../common/email/email.service';
 import { SchedulerSecretGuard } from '../common/guards/scheduler-secret.guard';
 import { nairobiToday } from '../common/time/nairobi';
+import { FraudDetectionService } from '../fraud/fraud-detection.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PriceRemindersService } from '../prices/price-reminders.service';
 import { PricesService } from '../prices/prices.service';
@@ -30,6 +31,7 @@ export class JobsController {
     private readonly stations: StationsService,
     private readonly users: UsersService,
     private readonly notifications: NotificationsService,
+    private readonly fraudDetection: FraudDetectionService,
   ) {}
 
   @Post('price-reminders')
@@ -95,5 +97,12 @@ export class JobsController {
     }
 
     return { remindersSent };
+  }
+
+  /** Run once nightly (see infra/google-cloud/DEPLOYMENT.md) — scans the prior day/week's sales for irregular activity. */
+  @Post('fraud-scan')
+  @HttpCode(HttpStatus.OK)
+  async runFraudScan() {
+    return this.fraudDetection.runScan();
   }
 }

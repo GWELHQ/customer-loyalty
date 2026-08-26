@@ -23,6 +23,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Attendants', path: '/attendants', icon: 'customers', permission: Permission.ATTENDANTS_MANAGE },
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },
   { label: 'Logs', path: '/logs', icon: 'audit', permission: Permission.AUDIT_VIEW },
+  { label: 'Fraud & Governance', path: '/fraud', icon: 'shield', permission: Permission.FRAUD_VIEW },
 ];
 
 // Station Supervisor gets its own station-scoped variants of a few items —
