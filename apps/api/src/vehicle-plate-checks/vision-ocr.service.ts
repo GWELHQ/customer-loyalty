@@ -15,10 +15,16 @@ import type { AppConfig } from '../config/configuration';
 const PLATE_TOKEN = /\b([A-Z]{3})[\s-]*([0-9]{3})[\s-]*([A-Z])\b/;
 
 /**
- * Wraps Cloud Vision's generic OCR (`textDetection`) to pull a best-guess
- * license plate out of a photo. This is a heuristic, not a purpose-built
- * ANPR model — good enough for a first version given a mismatch only ever
- * raises a fraud flag for human review, it never blocks a sale.
+ * Wraps Cloud Vision's OCR to pull a best-guess license plate out of a
+ * photo. This is a heuristic, not a purpose-built ANPR model — good enough
+ * for a first version given a mismatch only ever raises a fraud flag for
+ * human review, it never blocks a sale.
+ *
+ * Uses `documentTextDetection` (dense/structured text) rather than
+ * `textDetection` (sparse, arbitrary text-in-scene) — plates are small,
+ * high-contrast, structured text blocks, and the document mode's layout
+ * analysis handles the stacked two-line square-plate style noticeably
+ * better than the general-purpose mode did.
  */
 @Injectable()
 export class VisionOcrService {
@@ -32,8 +38,8 @@ export class VisionOcrService {
   /** Returns the best-guess normalized plate text, or null if nothing plausible was found (including on API failure — never throws). */
   async detectLicensePlate(imageBuffer: Buffer): Promise<string | null> {
     try {
-      const [result] = await this.client.textDetection(imageBuffer);
-      const fullText = result.textAnnotations?.[0]?.description ?? '';
+      const [result] = await this.client.documentTextDetection(imageBuffer);
+      const fullText = result.fullTextAnnotation?.text ?? '';
       const normalized = fullText.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
       const match = normalized.match(PLATE_TOKEN);
       return match ? `${match[1]}${match[2]}${match[3]}` : null;
