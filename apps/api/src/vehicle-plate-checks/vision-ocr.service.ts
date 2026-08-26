@@ -3,22 +3,43 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/configuration';
 
-/** A slot-by-slot shape: 'L' = letter, 'D' = digit. */
-type PlateShape = ('L' | 'D')[];
+/** A slot-by-slot shape: 'L' = any letter (coercible), 'D' = any digit (coercible), or an exact required character. */
+type Slot = 'L' | 'D' | { exact: string };
+type PlateShape = Slot[];
 
 /**
- * Kenyan plate shapes this app expects to see at a fuel station: the
- * standard 3-letter/3-digit/1-letter format used since 1989 (also covers
- * current-era plates and electric cars, e.g. "KAA 123B" / "EVA 001A"), and
- * the 4-letter electric-motorcycle format introduced 2024 ("EMAA 001A").
- * Deliberately excludes diplomatic/government/personalized formats — too
- * varied to pattern-match, and not a realistic customer segment for a
- * cashback loyalty program. Per Wikipedia's
- * "Vehicle registration plates of Kenya" (checked 2026-08-26).
+ * Plate shapes this app expects to see at a station near the Kenya/Uganda/
+ * Tanzania border. Deliberately excludes diplomatic, government, and
+ * personalized formats — those are too irregular to pattern-match (e.g.
+ * Kenyan diplomatic plates are sequential per-country assignments like
+ * "1CD1AK", with no fixed shape at all) and not a realistic customer
+ * segment for a cashback loyalty program.
+ *
+ * - Kenya standard, 1989-present (also covers current-era and electric
+ *   cars, e.g. "KAA 123B" / "EVA 001A"), and Uganda's old pre-2023 format
+ *   ("UAA 001A") — both are the same 3-letter/3-digit/1-letter shape.
+ * - Kenya electric motorcycles, 2024- ("EMAA 001A") — 4 letters.
+ * - Uganda's current digital plates (introduced Nov 2023): private
+ *   ("UA 001AA", 2 letters/3 digits/2 letters) and motorcycle/trailer
+ *   ("UMA 001AA" / "TUA 001AA", 3 letters/3 digits/2 letters).
+ * - Tanzania mainland ("T 123ABC") and Zanzibar ("Z 123ABC") — a fixed
+ *   country letter, then 3 digits, then 3 letters. The leading letter is
+ *   required to match exactly (not coercible) since it's a single-char
+ *   country code, not a multi-letter series code — treating it as a
+ *   generic letter slot would make this shape match almost any random
+ *   7-character run and swamp the more specific Kenya/Uganda shapes.
+ *
+ * Sources: Wikipedia's "Vehicle registration plates of Kenya"/"of Uganda"/
+ * "of Tanzania", and a web search for Uganda's current digital format
+ * (checked 2026-08-26).
  */
 const PLATE_SHAPES: PlateShape[] = [
   ['L', 'L', 'L', 'D', 'D', 'D', 'L'],
   ['L', 'L', 'L', 'L', 'D', 'D', 'D', 'L'],
+  ['L', 'L', 'D', 'D', 'D', 'L', 'L'],
+  ['L', 'L', 'L', 'D', 'D', 'D', 'L', 'L'],
+  [{ exact: 'T' }, 'D', 'D', 'D', 'L', 'L', 'L'],
+  [{ exact: 'Z' }, 'D', 'D', 'D', 'L', 'L', 'L'],
 ];
 
 /**
@@ -44,12 +65,17 @@ function coerceToShape(candidate: string, shape: PlateShape): string | null {
   if (candidate.length !== shape.length) return null;
   const chars = candidate.split('');
   for (let i = 0; i < shape.length; i++) {
+    const slot = shape[i]!;
+    if (typeof slot === 'object') {
+      if (chars[i] !== slot.exact) return null;
+      continue;
+    }
     const isLetter = /[A-Z]/.test(chars[i]!);
-    if (shape[i] === 'L' && !isLetter) {
+    if (slot === 'L' && !isLetter) {
       const fixed = LETTER_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
-    } else if (shape[i] === 'D' && isLetter) {
+    } else if (slot === 'D' && isLetter) {
       const fixed = DIGIT_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
