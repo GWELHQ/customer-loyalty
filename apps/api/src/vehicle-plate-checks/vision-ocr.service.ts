@@ -40,11 +40,24 @@ export class VisionOcrService {
     try {
       const [result] = await this.client.documentTextDetection(imageBuffer);
       const fullText = result.fullTextAnnotation?.text ?? '';
+      if (!fullText) {
+        this.logger.warn(
+          `Vision returned zero text for a ${imageBuffer.length}-byte image (no API error) — ` +
+            `possible causes: image genuinely has no legible text, or an upstream truncation/corruption ` +
+            `before this call.`,
+        );
+        return null;
+      }
       const normalized = fullText.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
       const match = normalized.match(PLATE_TOKEN);
+      if (!match) {
+        this.logger.warn(`Vision detected text but no plate-shaped token matched. Raw text: ${JSON.stringify(fullText)}`);
+      }
       return match ? `${match[1]}${match[2]}${match[3]}` : null;
     } catch (err) {
-      this.logger.warn(`Vision OCR failed: ${err instanceof Error ? err.message : err}`);
+      this.logger.error(
+        `Vision OCR call threw for a ${imageBuffer.length}-byte image: ${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+      );
       return null;
     }
   }
