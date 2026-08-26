@@ -3,8 +3,23 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/configuration';
 
-/** A candidate 7-character run shaped like a Kenyan plate: letter, digit, or ambiguous in each slot. */
-const PLATE_SHAPE = /^[A-Z0-9]{7}$/;
+/** A slot-by-slot shape: 'L' = letter, 'D' = digit. */
+type PlateShape = ('L' | 'D')[];
+
+/**
+ * Kenyan plate shapes this app expects to see at a fuel station: the
+ * standard 3-letter/3-digit/1-letter format used since 1989 (also covers
+ * current-era plates and electric cars, e.g. "KAA 123B" / "EVA 001A"), and
+ * the 4-letter electric-motorcycle format introduced 2024 ("EMAA 001A").
+ * Deliberately excludes diplomatic/government/personalized formats — too
+ * varied to pattern-match, and not a realistic customer segment for a
+ * cashback loyalty program. Per Wikipedia's
+ * "Vehicle registration plates of Kenya" (checked 2026-08-26).
+ */
+const PLATE_SHAPES: PlateShape[] = [
+  ['L', 'L', 'L', 'D', 'D', 'D', 'L'],
+  ['L', 'L', 'L', 'L', 'D', 'D', 'D', 'L'],
+];
 
 /**
  * Well-established OCR-confused pairs, keyed by which reading is "wrong"
@@ -17,28 +32,24 @@ const DIGIT_LOOKALIKE: Record<string, string> = { O: '0', I: '1', L: '1', S: '5'
 const LETTER_LOOKALIKE: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z' };
 
 /**
- * Coerces a 7-character candidate into the fixed Kenyan plate shape (3
- * letters, 3 digits, 1 letter) by correcting characters that landed in the
- * "wrong" slot but are well-known OCR lookalikes (0/O, 1/I, 5/S, 8/B, 2/Z,
- * 6/G) — e.g. Vision reading a plate's embossed zero as a letter "O" or
- * "G". Since the format at each position is fixed for a real plate, a
- * mismatched character there is virtually always a misread, not a
- * genuinely different value. Returns null if a character can't be
- * reconciled with its expected slot at all.
+ * Coerces a candidate into the given plate shape by correcting characters
+ * that landed in the "wrong" slot but are well-known OCR lookalikes (0/O,
+ * 1/I, 5/S, 8/B, 2/Z) — e.g. Vision reading a plate's embossed zero as a
+ * letter "O". Since the format at each position is fixed for a real
+ * plate, a mismatched character there is virtually always a misread, not
+ * a genuinely different value. Returns null if the length doesn't match
+ * or a character can't be reconciled with its expected slot at all.
  */
-function coerceToPlateShape(candidate: string): string | null {
-  const letterSlots = [0, 1, 2, 6];
-  const digitSlots = [3, 4, 5];
+function coerceToShape(candidate: string, shape: PlateShape): string | null {
+  if (candidate.length !== shape.length) return null;
   const chars = candidate.split('');
-  for (const i of letterSlots) {
-    if (!/[A-Z]/.test(chars[i]!)) {
+  for (let i = 0; i < shape.length; i++) {
+    const isLetter = /[A-Z]/.test(chars[i]!);
+    if (shape[i] === 'L' && !isLetter) {
       const fixed = LETTER_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
-    }
-  }
-  for (const i of digitSlots) {
-    if (!/[0-9]/.test(chars[i]!)) {
+    } else if (shape[i] === 'D' && isLetter) {
       const fixed = DIGIT_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
@@ -49,21 +60,24 @@ function coerceToPlateShape(candidate: string): string | null {
 
 /**
  * Pulls a plate out of a whitespace-split word list by trying every run of
- * up to 3 consecutive words concatenated together. Kenyan plates are laid
- * out as 1-3 separate OCR "words" depending on spacing/line breaks (e.g.
- * "KBW" + "878S", or "KBW" + "878" + "S", or a single "KBW878S") — trying
- * short consecutive runs handles all of those without assuming a fixed
- * separator, while still requiring the two groups to be adjacent words (so
- * unrelated text elsewhere in the photo, e.g. a serial number printed
- * along the plate's edge, can't get spliced into the middle of a match).
+ * up to 3 consecutive words concatenated together, against every known
+ * plate shape. Kenyan plates are laid out as 1-3 separate OCR "words"
+ * depending on spacing/line breaks (e.g. "KBW" + "878S", or "KBW" + "878"
+ * + "S", or a single "KBW878S") — trying short consecutive runs handles
+ * all of those without assuming a fixed separator, while still requiring
+ * the groups to be adjacent words (so unrelated text elsewhere in the
+ * photo, e.g. a serial number printed along the plate's edge, can't get
+ * spliced into the middle of a match).
  */
 function findPlateInWords(words: string[]): string | null {
   for (let i = 0; i < words.length; i++) {
     for (let span = 1; span <= 3 && i + span <= words.length; span++) {
       const combined = words.slice(i, i + span).join('');
-      if (!PLATE_SHAPE.test(combined)) continue;
-      const plate = coerceToPlateShape(combined);
-      if (plate) return plate;
+      if (!/^[A-Z0-9]+$/.test(combined)) continue;
+      for (const shape of PLATE_SHAPES) {
+        const plate = coerceToShape(combined, shape);
+        if (plate) return plate;
+      }
     }
   }
   return null;
