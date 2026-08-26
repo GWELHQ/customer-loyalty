@@ -14,6 +14,7 @@ import { formatNairobiDate } from '../../lib/time';
 import { ExportButtons } from '../../ui/ExportButtons';
 import { Icon } from '../../ui/Icon';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, Modal, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
+import { QrCode } from '../../ui/QrCode';
 
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Date', value: (s) => formatNairobiDate(s.saleDate) },
@@ -132,6 +133,8 @@ export function CustomerProfile() {
                   <div style={{ marginTop: 4 }}>
                     Home station: {stations.find((s) => s.id === customer.homeStationId)?.name ?? 'None set'}
                   </div>
+                  <div style={{ marginTop: 4 }}>License plate: {customer.licensePlateNumber ?? 'None set'}</div>
+                  <div style={{ marginTop: 4 }}>NFC tag: {customer.nfcTagId ?? 'None assigned'}</div>
                 </div>
               ) : (
                 <CustomerDetailsForm
@@ -146,6 +149,14 @@ export function CustomerProfile() {
               )}
             </Card>
           )}
+
+          <Card>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Customer QR code</div>
+            <QrCode value={customer.id} size={140} />
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>
+              Scan at point of sale to select this customer
+            </div>
+          </Card>
 
           <Card>
             <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Total cashback earned</div>
@@ -243,6 +254,8 @@ function CustomerDetailsForm({
   const api = useApi();
   const [fullName, setFullName] = useState(customer.fullName);
   const [homeStationId, setHomeStationId] = useState(customer.homeStationId ?? '');
+  const [licensePlateNumber, setLicensePlateNumber] = useState(customer.licensePlateNumber ?? '');
+  const [nfcTagId, setNfcTagId] = useState(customer.nfcTagId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -250,7 +263,12 @@ function CustomerDetailsForm({
     setError(null);
     setBusy(true);
     try {
-      await api.customers.update(customer.id, { fullName, homeStationId: homeStationId || undefined });
+      await api.customers.update(customer.id, {
+        fullName,
+        homeStationId: homeStationId || undefined,
+        licensePlateNumber: licensePlateNumber || undefined,
+        nfcTagId: nfcTagId || undefined,
+      });
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save changes');
@@ -278,6 +296,22 @@ function CustomerDetailsForm({
             </option>
           ))}
         </select>
+      </Field>
+      <Field label="License plate number">
+        <input
+          style={inputStyle}
+          value={licensePlateNumber}
+          onChange={(e) => setLicensePlateNumber(e.target.value)}
+          placeholder="e.g. KAA 123B"
+        />
+      </Field>
+      <Field label="NFC tag ID">
+        <input
+          style={inputStyle}
+          value={nfcTagId}
+          onChange={(e) => setNfcTagId(e.target.value)}
+          placeholder="Scanned tag UID"
+        />
       </Field>
       <div style={{ display: 'flex', gap: 8 }}>
         <Button variant="primary" size="sm" onClick={save} disabled={busy || !fullName}>

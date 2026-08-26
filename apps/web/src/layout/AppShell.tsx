@@ -76,6 +76,18 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [notificationsOpen, reloadNotifications]);
 
+  async function markAllRead() {
+    await api.notifications.markAllRead();
+    reloadUnreadCount();
+    reloadNotifications();
+  }
+
+  async function clearAllNotifications() {
+    await api.notifications.clearAll();
+    reloadUnreadCount();
+    reloadNotifications();
+  }
+
   async function openNotification(n: Notification) {
     if (!n.read) {
       await api.notifications.markRead(n.id);
@@ -279,11 +291,47 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
                   style={{
                     padding: '10px 14px',
                     borderBottom: '1px solid var(--color-border)',
-                    fontSize: 12.5,
-                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
                   }}
                 >
-                  Notifications
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>Notifications</span>
+                  {notifications.length > 0 && (
+                    <span style={{ display: 'flex', gap: 10 }}>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllRead}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: 'var(--color-primary)',
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                      <button
+                        onClick={clearAllNotifications}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: 'var(--color-text-secondary)',
+                        }}
+                      >
+                        Clear all
+                      </button>
+                    </span>
+                  )}
                 </div>
                 {notifications.length === 0 && <EmptyState title="You're all caught up" />}
                 {notifications.map((n) => (

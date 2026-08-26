@@ -23,6 +23,7 @@ const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Cashback earned (KSh)', value: (s) => s.snapshot.cashbackEarned },
   { header: 'SMS status', value: (s) => s.smsStatus },
   { header: 'Source', value: (s) => s.source },
+  { header: 'Approval', value: (s) => approvalLabel(s.approvalStatus) },
 ];
 
 export function SalesList() {
@@ -104,6 +105,7 @@ export function SalesList() {
                   <Th align="right">Amount</Th>
                   <Th align="right">Cashback</Th>
                   <Th>SMS</Th>
+                  <Th>Approval</Th>
                 </tr>
               </thead>
               <tbody>
@@ -120,8 +122,11 @@ export function SalesList() {
                     </Td>
                     <Td>
                       <Badge tone={s.smsStatus === 'sent' ? 'success' : s.smsStatus === 'failed' ? 'danger' : 'neutral'}>
-                        {s.smsStatus}
+                        {smsStatusLabel(s.smsStatus)}
                       </Badge>
+                    </Td>
+                    <Td>
+                      <Badge tone={approvalTone(s.approvalStatus)}>{approvalLabel(s.approvalStatus)}</Badge>
                     </Td>
                   </Tr>
                 ))}
@@ -153,7 +158,26 @@ export function SalesList() {
             <DetailRow label="Cashback rate" value={`KSh ${selected.snapshot.cashbackRatePerLitre} / litre`} />
             <DetailRow label="Cashback earned" value={`KSh ${selected.snapshot.cashbackEarned}`} strong />
             <DetailRow label="Source" value={selected.source} />
-            <DetailRow label="SMS status" value={selected.smsStatus} />
+            <DetailRow label="SMS status" value={smsStatusLabel(selected.smsStatus)} />
+            <DetailRow label="Approval" value={approvalLabel(selected.approvalStatus)} />
+            {selected.approvalDecidedByName && (
+              <DetailRow
+                label={selected.approvalStatus === 'rejected' ? 'Rejected by' : 'Approved by'}
+                value={`${selected.approvalDecidedByName}${selected.approvalDecidedAt ? ` · ${formatNairobiDateTime(selected.approvalDecidedAt)}` : ''}`}
+              />
+            )}
+            {selected.rejectionReason && <DetailRow label="Rejection reason" value={selected.rejectionReason} />}
+            {selected.licensePlateCheck && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--color-border)', fontSize: 13 }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>License plate</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {selected.licensePlateCheck.detectedPlateNumber ?? 'Not detected'}
+                  <Badge tone={selected.licensePlateCheck.matched ? 'success' : 'danger'}>
+                    {selected.licensePlateCheck.matched ? 'Matched' : 'Mismatch'}
+                  </Badge>
+                </span>
+              </div>
+            )}
 
             {selected.smsStatus === 'failed' && (
               <Button variant="secondary" size="sm" onClick={() => retrySms(selected)} style={{ marginTop: 12 }}>
@@ -165,6 +189,23 @@ export function SalesList() {
       </div>
     </AppShell>
   );
+}
+
+function smsStatusLabel(status: Sale['smsStatus']): string {
+  return status === 'not_applicable' ? 'No cashback' : status;
+}
+
+// Undefined = a legacy sale recorded before the approval gate existed — already credited the old way.
+function approvalLabel(status: Sale['approvalStatus']): string {
+  if (!status || status === 'approved') return 'Approved';
+  if (status === 'pending_approval') return 'Pending approval';
+  return 'Rejected';
+}
+
+function approvalTone(status: Sale['approvalStatus']): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  if (!status || status === 'approved') return 'success';
+  if (status === 'pending_approval') return 'warning';
+  return 'danger';
 }
 
 function DetailRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

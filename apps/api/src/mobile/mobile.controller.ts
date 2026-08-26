@@ -68,6 +68,20 @@ export class MobileController {
     return this.customers.searchByPhone(phone);
   }
 
+  /** Resolves a scanned NFC tag UID to its customer — declared ahead of `customers/:id` so it isn't shadowed by it. */
+  @Get('customers/nfc/:tagId')
+  async getCustomerByNfc(@Param('tagId') tagId: string) {
+    const customer = await this.customers.findByNfcTagId(tagId);
+    if (!customer) throw new NotFoundException('No customer registered for this NFC tag');
+    return customer;
+  }
+
+  /** Resolves a scanned QR code to its customer — the QR simply encodes the customer's own id. */
+  @Get('customers/:id')
+  getCustomer(@Param('id') id: string) {
+    return this.customers.findById(id);
+  }
+
   @Get('prices/current')
   currentPrices() {
     return this.prices.getCurrent();

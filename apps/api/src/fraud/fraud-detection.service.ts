@@ -14,8 +14,6 @@ const OUTLIER_WINDOW_DAYS = 7;
 const HIGH_FREQUENCY_WINDOW_HOURS = 24;
 const HIGH_FREQUENCY_MIN_GAP_MINUTES = 45;
 const NEW_CUSTOMER_WINDOW_DAYS = 14;
-const OFF_HOURS_START = 5; // 05:00 Nairobi
-const OFF_HOURS_END = 23; // 23:00 Nairobi
 
 /**
  * Flags irregular fueling activity. Real-time checks run inline (cheap,
@@ -44,7 +42,11 @@ export class FraudDetectionService {
   // ---------------------------------------------------------------------
   async runRealtimeChecks(sale: Sale): Promise<void> {
     try {
-      await Promise.all([this.checkRepeatedExactLitres(sale), this.checkOffHours(sale)]);
+      await Promise.all([
+        this.checkRepeatedExactLitres(sale),
+        this.checkLicensePlateMismatch(sale),
+        this.checkHighFrequencyRefuel(sale),
+      ]);
     } catch (err) {
       this.logger.error(`Real-time fraud check failed for sale ${sale.id}`, err instanceof Error ? err.stack : err);
     }
@@ -77,15 +79,19 @@ export class FraudDetectionService {
     });
   }
 
-  private async checkOffHours(sale: Sale): Promise<void> {
-    const nairobiHour = ((new Date(sale.saleDate).getUTCHours() + 3) % 24);
-    if (nairobiHour >= OFF_HOURS_START && nairobiHour < OFF_HOURS_END) return;
+  private async checkLicensePlateMismatch(sale: Sale): Promise<void> {
+    const check = sale.licensePlateCheck;
+    if (!check || check.matched) return;
+
+    if (await this.flags.hasOpenFlag(FraudFlagType.LICENSE_PLATE_MISMATCH, { customerId: sale.customerId })) return;
+
+    const customer = await this.customers.findById(sale.customerId).catch(() => null);
 
     await this.createFlag({
-      type: FraudFlagType.OFF_HOURS_SALE,
-      severity: FraudFlagSeverity.LOW,
+      type: FraudFlagType.LICENSE_PLATE_MISMATCH,
+      severity: FraudFlagSeverity.MEDIUM,
       customerId: sale.customerId,
-      customerNameAtFlag: await this.customerName(sale.customerId),
+      customerNameAtFlag: customer?.fullName,
       stationId: sale.stationId,
       stationNameAtFlag: sale.stationNameAtSale,
       attendantId: sale.attendantId,
@@ -93,9 +99,48 @@ export class FraudDetectionService {
       relatedSaleIds: [sale.id],
       detectionMode: 'realtime',
       evidence: {
-        saleDate: sale.saleDate,
-        nairobiHour,
-        note: 'Fixed 05:00-23:00 Nairobi-time heuristic — no per-station operating hours exist yet.',
+        plateCheckId: check.plateCheckId,
+        detectedPlateNumber: check.detectedPlateNumber,
+        customerLicensePlateNumber: customer?.licensePlateNumber ?? null,
+      },
+    });
+  }
+
+  private async checkHighFrequencyRefuel(sale: Sale): Promise<void> {
+    const since = new Date(Date.now() - HIGH_FREQUENCY_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+    const snap = await this.salesCol()
+      .where('customerId', '==', sale.customerId)
+      .where('saleDate', '>=', since)
+      .get();
+    const sales = snap.docs.map((d) => fromDoc<Sale>(d));
+    if (sales.length < 2) return;
+
+    const sorted = sales.sort((a, b) => a.saleDate.localeCompare(b.saleDate));
+    const closePairs: Sale[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1]!;
+      const curr = sorted[i]!;
+      const gapMinutes = (new Date(curr.saleDate).getTime() - new Date(prev.saleDate).getTime()) / 60_000;
+      if (gapMinutes < HIGH_FREQUENCY_MIN_GAP_MINUTES) {
+        if (!closePairs.includes(prev)) closePairs.push(prev);
+        closePairs.push(curr);
+      }
+    }
+    if (closePairs.length < 2) return;
+
+    if (await this.flags.hasOpenFlag(FraudFlagType.HIGH_FREQUENCY_REFUEL, { customerId: sale.customerId })) return;
+
+    await this.createFlag({
+      type: FraudFlagType.HIGH_FREQUENCY_REFUEL,
+      severity: closePairs.length >= 4 ? FraudFlagSeverity.HIGH : FraudFlagSeverity.MEDIUM,
+      customerId: sale.customerId,
+      customerNameAtFlag: await this.customerName(sale.customerId),
+      relatedSaleIds: closePairs.map((s) => s.id),
+      detectionMode: 'realtime',
+      evidence: {
+        windowHours: HIGH_FREQUENCY_WINDOW_HOURS,
+        minGapMinutes: HIGH_FREQUENCY_MIN_GAP_MINUTES,
+        flaggedSaleCount: closePairs.length,
       },
     });
   }
@@ -110,14 +155,12 @@ export class FraudDetectionService {
 
     const yesterdayKey = nairobiDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
     const sevenDaysAgo = new Date(Date.now() - BURST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const twentyFourHoursAgo = new Date(Date.now() - HIGH_FREQUENCY_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
 
     let flagsCreated = 0;
     flagsCreated += await this.scanVolumeSpikes(sales, yesterdayKey);
     flagsCreated += await this.scanMultiLocation(sales, yesterdayKey);
     flagsCreated += await this.scanAttendantCustomerConcentration(sales);
     flagsCreated += await this.scanCustomerMultiAttendantBurst(sales, sevenDaysAgo);
-    flagsCreated += await this.scanHighFrequencyRefuel(sales, twentyFourHoursAgo);
     flagsCreated += await this.scanAttendantVolumeOutliers(sales, sevenDaysAgo);
     flagsCreated += await this.scanAdminManualBurst(sales, sevenDaysAgo);
     flagsCreated += await this.scanNewCustomerHighVolume(sales);
@@ -129,7 +172,6 @@ export class FraudDetectionService {
         FraudFlagType.MULTI_LOCATION_SAME_DAY,
         FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION,
         FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST,
-        FraudFlagType.HIGH_FREQUENCY_REFUEL,
         FraudFlagType.ATTENDANT_VOLUME_OUTLIER,
         FraudFlagType.ADMIN_MANUAL_BURST,
         FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME,
@@ -263,44 +305,6 @@ export class FraudDetectionService {
           windowDays: BURST_WINDOW_DAYS,
           distinctAttendants: attendantIds.size,
           saleCount: customerSales.length,
-        },
-      }) ? 1 : 0;
-    }
-    return created;
-  }
-
-  private async scanHighFrequencyRefuel(sales: Sale[], twentyFourHoursAgo: string): Promise<number> {
-    const recent = sales.filter((s) => s.saleDate >= twentyFourHoursAgo);
-    const byCustomer = groupBy(recent, (s) => s.customerId);
-    let created = 0;
-
-    for (const [customerId, customerSales] of byCustomer) {
-      if (customerSales.length < 2) continue;
-      const sorted = [...customerSales].sort((a, b) => a.saleDate.localeCompare(b.saleDate));
-      const closePairs: Sale[] = [];
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1]!;
-        const curr = sorted[i]!;
-        const gapMinutes = (new Date(curr.saleDate).getTime() - new Date(prev.saleDate).getTime()) / 60_000;
-        if (gapMinutes < HIGH_FREQUENCY_MIN_GAP_MINUTES) {
-          if (!closePairs.includes(prev)) closePairs.push(prev);
-          closePairs.push(curr);
-        }
-      }
-      if (closePairs.length < 2) continue;
-      if (await this.flags.hasOpenFlag(FraudFlagType.HIGH_FREQUENCY_REFUEL, { customerId })) continue;
-
-      created += await this.createFlag({
-        type: FraudFlagType.HIGH_FREQUENCY_REFUEL,
-        severity: closePairs.length >= 4 ? FraudFlagSeverity.HIGH : FraudFlagSeverity.MEDIUM,
-        customerId,
-        customerNameAtFlag: await this.customerName(customerId),
-        relatedSaleIds: closePairs.map((s) => s.id),
-        detectionMode: 'batch',
-        evidence: {
-          windowHours: HIGH_FREQUENCY_WINDOW_HOURS,
-          minGapMinutes: HIGH_FREQUENCY_MIN_GAP_MINUTES,
-          flaggedSaleCount: closePairs.length,
         },
       }) ? 1 : 0;
     }

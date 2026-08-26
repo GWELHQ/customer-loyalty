@@ -29,6 +29,11 @@ export class CustomersService {
     return snap.empty ? null : fromDoc<Customer>(snap.docs[0]!);
   }
 
+  async findByNfcTagId(tagId: string): Promise<Customer | null> {
+    const snap = await this.col().where('nfcTagId', '==', normalizeNfcTagId(tagId)).limit(1).get();
+    return snap.empty ? null : fromDoc<Customer>(snap.docs[0]!);
+  }
+
   /**
    * Batched lookup for bulk-import classification — Firestore's `in`
    * clause takes up to 30 values, so this fans a large phone list out into
@@ -111,12 +116,15 @@ export class CustomersService {
     phoneNumber: string;
     homeStationId?: string;
     source?: Customer['source'];
+    licensePlateNumber?: string;
+    nfcTagId?: string;
   }): Promise<Customer> {
     const normalized = normalizePhoneNumber(input.phoneNumber);
     const existing = await this.findByPhone(normalized);
     if (existing) {
       throw new ConflictException(`A customer with phone ${normalized} already exists`);
     }
+    if (input.nfcTagId) await this.assertNfcTagAvailable(input.nfcTagId);
 
     const now = nowIso();
     const doc: Omit<Customer, 'id'> = {
@@ -125,6 +133,8 @@ export class CustomersService {
       homeStationId: input.homeStationId,
       totalCashbackEarned: 0,
       source: input.source ?? 'manual',
+      licensePlateNumber: input.licensePlateNumber ? normalizeLicensePlate(input.licensePlateNumber) : undefined,
+      nfcTagId: input.nfcTagId ? normalizeNfcTagId(input.nfcTagId) : undefined,
       createdAt: now,
       updatedAt: now,
     };
@@ -135,14 +145,28 @@ export class CustomersService {
 
   async update(
     id: string,
-    input: Partial<Pick<Customer, 'fullName' | 'homeStationId'>>,
+    input: Partial<Pick<Customer, 'fullName' | 'homeStationId' | 'licensePlateNumber' | 'nfcTagId'>>,
   ): Promise<Customer> {
     await this.findById(id);
-    await this.col()
-      .doc(id)
-      .update({ ...input, updatedAt: nowIso() });
+    const patch: Record<string, unknown> = { ...input, updatedAt: nowIso() };
+    if (input.licensePlateNumber !== undefined) {
+      patch.licensePlateNumber = input.licensePlateNumber ? normalizeLicensePlate(input.licensePlateNumber) : null;
+    }
+    if (input.nfcTagId !== undefined) {
+      if (input.nfcTagId) await this.assertNfcTagAvailable(input.nfcTagId, id);
+      patch.nfcTagId = input.nfcTagId ? normalizeNfcTagId(input.nfcTagId) : null;
+    }
+    await this.col().doc(id).update(patch);
     this.changeEvents.emit(COLLECTION);
     return this.findById(id);
+  }
+
+  /** Throws if the given NFC tag is already assigned to a different customer. */
+  private async assertNfcTagAvailable(tagId: string, excludingCustomerId?: string): Promise<void> {
+    const existing = await this.findByNfcTagId(tagId);
+    if (existing && existing.id !== excludingCustomerId) {
+      throw new ConflictException(`NFC tag ${normalizeNfcTagId(tagId)} is already assigned to another customer`);
+    }
   }
 
   /** Applies a special rate to a customer once Chairman-approved (or Chairman-initiated). Never called directly by RTSM. */
@@ -234,4 +258,14 @@ export class CustomersService {
     await this.col().doc(id).update({ inactivityNoticeSentAt: nowIso(), updatedAt: nowIso() });
     this.changeEvents.emit(COLLECTION);
   }
+}
+
+/** Uppercase, strip everything but letters/digits — so "kaa 123b" / "KAA-123-B" / "KAA123B" all compare equal. */
+export function normalizeLicensePlate(plate: string): string {
+  return plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Uppercase, trimmed — NFC tag UIDs are typically hex strings read verbatim off the tag. */
+export function normalizeNfcTagId(tagId: string): string {
+  return tagId.trim().toUpperCase();
 }

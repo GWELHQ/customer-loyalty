@@ -33,4 +33,12 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   clientLocalId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Id of a POST /mobile/vehicle-plate-checks result performed for this customer just before the sale — copied onto the sale for audit if it matches the resolved customer and is recent; silently ignored otherwise. Never blocks the sale.',
+  })
+  @IsOptional()
+  @IsString()
+  plateCheckId?: string;
 }

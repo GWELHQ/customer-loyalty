@@ -41,7 +41,21 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
   if (path.startsWith('/customer-registrations') && method === 'GET') return json([]);
   if (path.startsWith('/cashback-ledgers/')) return json(demoLedger);
   if (path === '/cashback-ledgers') return json([demoLedger]);
-  if (path === '/notifications') return json(demoNotifications);
+  if (path === '/notifications' && method === 'GET') return json(demoNotifications);
+  if (path === '/notifications/read-all' && method === 'PATCH') {
+    for (const n of demoNotifications) n.read = true;
+    return json({ success: true });
+  }
+  if (path === '/notifications' && method === 'DELETE') {
+    demoNotifications.length = 0;
+    return json({ success: true });
+  }
+  const readMatch = /^\/notifications\/([^/]+)\/read$/.exec(path);
+  if (readMatch && method === 'PATCH') {
+    const notification = demoNotifications.find((n) => n.id === readMatch[1]);
+    if (notification) notification.read = true;
+    return json(notification ?? {});
+  }
   if (path === '/reports/dashboard') {
     return json({
       month: '2026-08',

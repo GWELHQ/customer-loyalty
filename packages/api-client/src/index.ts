@@ -21,6 +21,7 @@ import type {
   ReconciliationDaily,
   Role,
   Sale,
+  SaleApprovalDelegation,
   SmsDelivery,
   SpecialRateRequest,
   Station,
@@ -116,10 +117,17 @@ export class LoyaltyApiClient {
       this.http.get<PaginatedResult<Customer>>(`/customers${toQueryString(params)}`),
     search: (phone: string) => this.http.get<Customer[]>(`/customers/search${toQueryString({ phone })}`),
     get: (id: string) => this.http.get<Customer>(`/customers/${id}`),
-    create: (input: { fullName: string; phoneNumber: string; homeStationId?: string }) =>
-      this.http.post<Customer>('/customers', input),
-    update: (id: string, input: Partial<{ fullName: string; homeStationId: string }>) =>
-      this.http.patch<Customer>(`/customers/${id}`, input),
+    create: (input: {
+      fullName: string;
+      phoneNumber: string;
+      homeStationId?: string;
+      licensePlateNumber?: string;
+      nfcTagId?: string;
+    }) => this.http.post<Customer>('/customers', input),
+    update: (
+      id: string,
+      input: Partial<{ fullName: string; homeStationId: string; licensePlateNumber: string; nfcTagId: string }>,
+    ) => this.http.patch<Customer>(`/customers/${id}`, input),
     delete: (id: string) => this.http.delete<{ success: boolean }>(`/customers/${id}`),
     uploadImport: (file: File, homeStationId: string) => {
       const form = new FormData();
@@ -171,6 +179,22 @@ export class LoyaltyApiClient {
       this.http.get<{ month: string; totalCashback: number; saleCount: number }>(
         `/sales/monthly-summary${toQueryString({ customerId, month })}`,
       ),
+    listPendingApproval: (params: { stationId?: string; page?: number; pageSize?: number; cursor?: string } = {}) =>
+      this.http.get<PaginatedResult<Sale>>(`/sales/pending-approval${toQueryString(params)}`),
+    approveBatch: (saleIds: string[]) =>
+      this.http.post<{ approved: string[]; skipped: { saleId: string; reason: string }[] }>('/sales/approve-batch', {
+        saleIds,
+      }),
+    reject: (id: string, reason: string) => this.http.post<Sale>(`/sales/${id}/reject`, { reason }),
+  };
+
+  salesDelegations = {
+    listForStation: (stationId: string) =>
+      this.http.get<SaleApprovalDelegation[]>(`/sales-delegations${toQueryString({ stationId })}`),
+    listEligibleStaff: () => this.http.get<{ id: string; fullName: string; role: Role }[]>('/sales-delegations/eligible-staff'),
+    create: (input: { stationId: string; delegateUserId: string; startDate: string; endDate: string }) =>
+      this.http.post<SaleApprovalDelegation>('/sales-delegations', input),
+    revoke: (id: string) => this.http.post<SaleApprovalDelegation>(`/sales-delegations/${id}/revoke`, {}),
   };
 
   specialRateRequests = {
@@ -243,6 +267,8 @@ export class LoyaltyApiClient {
   notifications = {
     list: () => this.http.get<Notification[]>('/notifications'),
     markRead: (id: string) => this.http.patch<Notification>(`/notifications/${id}/read`),
+    markAllRead: () => this.http.patch<{ success: boolean }>('/notifications/read-all'),
+    clearAll: () => this.http.delete<{ success: boolean }>('/notifications'),
   };
 
   auditEvents = {

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   LedgerStatus,
+  SaleApprovalStatus,
   type MonthlyCashbackLedger,
   type MonthlyCashbackLedgerEntry,
   type Sale,
@@ -71,7 +72,12 @@ export class CashbackLedgersService {
       .where('saleDate', '>=', startUtc)
       .where('saleDate', '<', endUtc)
       .get();
-    const sales = snap.docs.map((d) => fromDoc<Sale>(d));
+    // Pending/rejected sales haven't (and may never) actually credit any
+    // cashback — a sale with no approvalStatus at all is a legacy sale
+    // from before this gate existed, already credited the old way.
+    const sales = snap.docs
+      .map((d) => fromDoc<Sale>(d))
+      .filter((s) => s.approvalStatus == null || s.approvalStatus === SaleApprovalStatus.APPROVED);
 
     const byCustomer = new Map<string, MonthlyCashbackLedgerEntry>();
     for (const sale of sales) {

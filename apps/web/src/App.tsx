@@ -16,6 +16,7 @@ import { PendingActivation } from './pages/PendingActivation';
 import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
+import { SalesApprovals } from './pages/SalesApprovals';
 import { SalesList } from './pages/SalesList';
 import { SignIn } from './pages/SignIn';
 import { SpecialRates } from './pages/SpecialRates';
@@ -46,6 +47,14 @@ export function App() {
       <Route path="/customers/:id" element={<RequireStaff permission={Permission.CUSTOMERS_VIEW}><CustomerProfile /></RequireStaff>} />
 
       <Route path="/sales" element={<RequireStaff><SalesList /></RequireStaff>} />
+      {/*
+        No permission prop, deliberately — a delegate granted approval
+        access for a station may hold no permission at all normally
+        (delegation can name any staff member). The nav item is still
+        permission-gated for discoverability; this route itself defers to
+        the page/API to decide what the actor can actually do.
+      */}
+      <Route path="/sales-approvals" element={<RequireStaff><SalesApprovals /></RequireStaff>} />
 
       <Route path="/prices" element={<RequireStaff permission={Permission.PRICES_VIEW}><Prices /></RequireStaff>} />
 

@@ -9,9 +9,17 @@ const COLLECTION = 'smsDeliveries';
 const MAX_RETRIES = 3;
 const PAGE_SIZE = 50;
 
-/** Canonical sale-confirmation SMS text — shared by the backend send path and the Android app (which composes the same message for its own direct send). */
+/**
+ * Canonical sale-confirmation SMS text — shared by the backend send path
+ * and the Android app (which composes the same message for its own direct
+ * send; the Android team must mirror this text and the "skip when
+ * cashbackEarned is 0" rule below, since that path bypasses SmsService
+ * entirely). Amounts are rounded to whole KES — cashback is always a
+ * whole-litre multiple of a KES-denominated rate, so it never carries
+ * cents worth showing.
+ */
 export function buildSaleConfirmationMessage(input: { cashbackEarned: number; monthToDateCashback: number }): string {
-  return `Green Wells: You earned KSh ${input.cashbackEarned} cashback. Your total this month is KSh ${input.monthToDateCashback}.`;
+  return `Green Wells: You earned KES ${Math.round(input.cashbackEarned)} cashback. Your total this month is KES ${Math.round(input.monthToDateCashback)}.`;
 }
 
 @Injectable()
@@ -32,6 +40,8 @@ export class SmsService {
    * Creates the delivery record and attempts the send. Sale success is
    * always independent of SMS outcome — this never throws back to the
    * caller; failures just leave the delivery in FAILED for later retry.
+   * No SMS (and no delivery record at all) when the sale earned zero
+   * cashback — nothing worth texting the customer about.
    */
   async sendSaleConfirmation(input: {
     saleId: string;
@@ -39,6 +49,13 @@ export class SmsService {
     cashbackEarned: number;
     monthToDateCashback: number;
   }): Promise<void> {
+    if (input.cashbackEarned === 0) {
+      await this.firestore
+        .collection('sales')
+        .doc(input.saleId)
+        .update({ smsStatus: SmsStatus.NOT_APPLICABLE, updatedAt: nowIso() });
+      return;
+    }
     const message = buildSaleConfirmationMessage(input);
     const now = nowIso();
     const doc: Omit<SmsDelivery, 'id'> = {

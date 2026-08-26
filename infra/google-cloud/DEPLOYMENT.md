@@ -7,7 +7,8 @@
 | Cloud Run | Hosts the NestJS API (`apps/api`). Also hosts the web app if you pick the Cloud Run static-hosting option. |
 | Firebase Hosting **or** Cloud Storage + Cloud CDN **or** Cloud Run | Hosts the built React admin app (`apps/web`) — pick one, see below. |
 | Cloud Firestore (Native mode) | Primary database. |
-| Cloud Storage | Customer Excel import files and generated error reports. |
+| Cloud Storage | Customer Excel import files, generated error reports, and captured vehicle-plate photos. |
+| Cloud Vision API | OCRs vehicle-plate photos captured by the Android app (`POST /mobile/vehicle-plate-checks`) — billed per image, uses the Cloud Run service account's Application Default Credentials, no separate key. |
 | Secret Manager | JWT signing secrets, Microsoft Entra client secret, SMS provider key, scheduler shared secret. |
 | Cloud Scheduler | Triggers `POST /jobs/price-reminders` on a monthly cadence. |
 | Cloud Logging / Error Reporting | Automatic for anything running on Cloud Run — no extra wiring needed beyond normal `console.log`/thrown errors. |
@@ -22,6 +23,7 @@ gcloud services enable \
   run.googleapis.com \
   firestore.googleapis.com \
   storage.googleapis.com \
+  vision.googleapis.com \
   secretmanager.googleapis.com \
   cloudscheduler.googleapis.com \
   artifactregistry.googleapis.com

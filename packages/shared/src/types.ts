@@ -12,6 +12,7 @@ import type {
   Product,
   ReconciliationStatus,
   Role,
+  SaleApprovalStatus,
   SmsStatus,
   SpecialRateStatus,
   SyncRecordResult,
@@ -68,6 +69,10 @@ export interface Customer extends BaseDoc {
   source: 'manual' | 'import' | 'android';
   lastActivityAt?: ISODateString;
   inactivityNoticeSentAt?: ISODateString;
+  /** Normalized uppercase, spaces/dashes stripped. Compared against OCR results from vehicle-plate-check photos. */
+  licensePlateNumber?: string;
+  /** Normalized uppercase. Physical NFC tag UID, staff-assigned via the admin app, unique across customers. */
+  nfcTagId?: string;
 }
 
 export interface ProductPrice extends BaseDoc {
@@ -126,6 +131,37 @@ export interface Sale extends BaseDoc {
   clientLocalId?: string;
   source: 'android' | 'admin_manual';
   smsStatus: SmsStatus;
+  /** Result of the vehicle-plate photo check performed just before this sale was recorded, if any. Never blocks the sale either way. */
+  licensePlateCheck?: {
+    plateCheckId: string;
+    detectedPlateNumber: string | null;
+    matched: boolean;
+  };
+  /**
+   * Undefined = a legacy sale recorded before the approval gate existed —
+   * treated as already-approved everywhere (its cashback was credited
+   * immediately, the old way). New sales always start at PENDING_APPROVAL;
+   * cashback is only credited to the customer once this becomes APPROVED.
+   */
+  approvalStatus?: SaleApprovalStatus;
+  approvalDecidedByUserId?: string;
+  approvalDecidedByName?: string;
+  approvalDecidedAt?: ISODateString;
+  /** Only set when approvalStatus is REJECTED. */
+  rejectionReason?: string;
+}
+
+export interface SaleApprovalDelegation extends BaseDoc {
+  stationId: string;
+  stationNameAtDelegation: string;
+  delegatorUserId: string;
+  delegatorName: string;
+  delegateUserId: string;
+  delegateName: string;
+  startDate: ISODateString;
+  endDate: ISODateString;
+  revokedAt?: ISODateString;
+  revokedByUserId?: string;
 }
 
 export interface SmsDelivery extends BaseDoc {
@@ -297,6 +333,19 @@ export interface AuditEvent extends BaseDoc {
   /** Human-readable name for the affected record (e.g. a customer's or station's name) — the UI shows this instead of the raw Firestore document ID. */
   entityLabel?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface VehiclePlateCheck extends BaseDoc {
+  customerId: string;
+  customerNameAtCheck: string;
+  attendantId: string;
+  stationId: string;
+  /** gs:// path of the captured photo. */
+  imageUrl: string;
+  /** Best-guess plate text extracted by OCR, normalized (uppercase, no spaces/dashes) — null if nothing plausible was found. */
+  detectedPlateNumber: string | null;
+  /** False whenever the customer has no licensePlateNumber on file, OCR found nothing, or the two disagree. */
+  matched: boolean;
 }
 
 export interface FraudFlag extends BaseDoc {

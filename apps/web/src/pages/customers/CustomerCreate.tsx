@@ -12,6 +12,8 @@ export function CustomerCreate() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [homeStationId, setHomeStationId] = useState('');
+  const [licensePlateNumber, setLicensePlateNumber] = useState('');
+  const [nfcTagId, setNfcTagId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +21,13 @@ export function CustomerCreate() {
     setError(null);
     setBusy(true);
     try {
-      const customer = await api.customers.create({ fullName, phoneNumber, homeStationId: homeStationId || undefined });
+      const customer = await api.customers.create({
+        fullName,
+        phoneNumber,
+        homeStationId: homeStationId || undefined,
+        licensePlateNumber: licensePlateNumber || undefined,
+        nfcTagId: nfcTagId || undefined,
+      });
       navigate(`/customers/${customer.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create customer');
@@ -52,6 +60,17 @@ export function CustomerCreate() {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="License plate number (optional)">
+            <input
+              style={inputStyle}
+              value={licensePlateNumber}
+              onChange={(e) => setLicensePlateNumber(e.target.value)}
+              placeholder="e.g. KAA 123B"
+            />
+          </Field>
+          <Field label="NFC tag ID (optional)">
+            <input style={inputStyle} value={nfcTagId} onChange={(e) => setNfcTagId(e.target.value)} placeholder="Scanned tag UID" />
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Button variant="primary" onClick={submit} disabled={busy || !fullName || !phoneNumber}>

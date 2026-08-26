@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
@@ -20,5 +20,19 @@ export class NotificationsController {
   @Patch(':id/read')
   markRead(@Param('id') id: string, @CurrentUser() user: StaffPrincipal) {
     return this.notifications.markRead(id, user.userId);
+  }
+
+  @Patch('read-all')
+  @HttpCode(HttpStatus.OK)
+  async markAllRead(@CurrentUser() user: StaffPrincipal) {
+    await this.notifications.markAllRead(user.userId);
+    return { success: true };
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  async clearAll(@CurrentUser() user: StaffPrincipal) {
+    await this.notifications.deleteAll(user.userId);
+    return { success: true };
   }
 }

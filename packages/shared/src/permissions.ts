@@ -42,6 +42,8 @@ export enum Permission {
   FRAUD_MANAGE = 'fraud:manage',
   DISBURSEMENT_SETTINGS_MANAGE = 'disbursement_settings:manage',
   CUSTOMER_INACTIVITY_SETTINGS_MANAGE = 'customer_inactivity_settings:manage',
+  SALES_APPROVE_ALL = 'sales:approve_all',
+  SALES_APPROVE_OWN_STATION = 'sales:approve_own_station',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -71,6 +73,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.FRAUD_MANAGE,
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
+  Permission.SALES_APPROVE_ALL,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 
@@ -154,6 +157,7 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.FRAUD_MANAGE,
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
+  Permission.SALES_APPROVE_ALL,
 ];
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
@@ -166,6 +170,7 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
+  Permission.SALES_APPROVE_OWN_STATION,
 ];
 
 const ATTENDANT_PERMISSIONS: Permission[] = [

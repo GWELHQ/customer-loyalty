@@ -37,6 +37,8 @@ export enum SmsStatus {
   PENDING = 'pending',
   SENT = 'sent',
   FAILED = 'failed',
+  /** No confirmation SMS was ever sent because the sale earned zero cashback — nothing worth texting the customer about. */
+  NOT_APPLICABLE = 'not_applicable',
 }
 
 export enum SpecialRateStatus {
@@ -121,7 +123,7 @@ export enum FraudFlagType {
   NEW_CUSTOMER_HIGH_VOLUME = 'new_customer_high_volume',
   ATTENDANT_VOLUME_OUTLIER = 'attendant_volume_outlier',
   ADMIN_MANUAL_BURST = 'admin_manual_burst',
-  OFF_HOURS_SALE = 'off_hours_sale',
+  LICENSE_PLATE_MISMATCH = 'license_plate_mismatch',
 }
 
 export enum FraudFlagStatus {
@@ -148,4 +150,11 @@ export enum NotificationType {
   LEDGER_STATE_CHANGE = 'ledger_state_change',
   DISBURSEMENT_STATE_CHANGE = 'disbursement_state_change',
   SMS_FAILURE = 'sms_failure',
+  SALE_REJECTED = 'sale_rejected',
+}
+
+export enum SaleApprovalStatus {
+  PENDING_APPROVAL = 'pending_approval',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }

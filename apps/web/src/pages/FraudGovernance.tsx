@@ -8,7 +8,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { Badge, Button, Card, EmptyState, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const TYPE_LABELS: Record<FraudFlagType, string> = {
   [FraudFlagType.VOLUME_SPIKE_VS_BASELINE]: 'Volume spike vs. baseline',
@@ -20,7 +20,65 @@ const TYPE_LABELS: Record<FraudFlagType, string> = {
   [FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME]: 'New customer, high volume',
   [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: 'Attendant volume outlier',
   [FraudFlagType.ADMIN_MANUAL_BURST]: 'Manual-entry burst',
-  [FraudFlagType.OFF_HOURS_SALE]: 'Off-hours sale',
+  [FraudFlagType.LICENSE_PLATE_MISMATCH]: 'License plate mismatch',
+};
+
+interface RuleInfo {
+  mode: 'Real-time' | 'Nightly batch';
+  description: string;
+}
+
+const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
+  [FraudFlagType.REPEATED_EXACT_LITRES]: {
+    mode: 'Real-time',
+    description:
+      'The same customer buys the exact same whole-litre amount 4+ times within the trailing 90 days. Flat, repeated amounts can indicate fabricated sales used to farm cashback.',
+  },
+  [FraudFlagType.LICENSE_PLATE_MISMATCH]: {
+    mode: 'Real-time',
+    description:
+      "The attendant photographed the vehicle's plate before the sale, and the plate detected by OCR doesn't match the plate on file for that customer (or the customer has none on file). Never blocks the sale — only raises this flag.",
+  },
+  [FraudFlagType.VOLUME_SPIKE_VS_BASELINE]: {
+    mode: 'Nightly batch',
+    description:
+      "A customer's litres for the day exceed 3× their own trailing average (or average + 2 standard deviations), compared against at least 5 days of history. Catches a sudden jump from a normal fueling pattern.",
+  },
+  [FraudFlagType.MULTI_LOCATION_SAME_DAY]: {
+    mode: 'Nightly batch',
+    description:
+      'The same customer fuels at 2 or more different stations on the same calendar day — not physically plausible for most customers, and can indicate loyalty-card sharing.',
+  },
+  [FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION]: {
+    mode: 'Nightly batch',
+    description:
+      "One attendant processes more than 80% of a specific customer's sales over a 30-day window (minimum 5 sales) — a possible sign of attendant/customer collusion.",
+  },
+  [FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST]: {
+    mode: 'Nightly batch',
+    description:
+      'One customer is served by 4 or more distinct attendants within 7 days (minimum 4 sales) — the inverse pattern, which can indicate a shared or passed-around loyalty account.',
+  },
+  [FraudFlagType.HIGH_FREQUENCY_REFUEL]: {
+    mode: 'Real-time',
+    description:
+      "A customer has two or more sales less than 45 minutes apart within a 24-hour window — faster than one vehicle can plausibly refuel twice.",
+  },
+  [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: {
+    mode: 'Nightly batch',
+    description:
+      "An attendant's 7-day total litres sold is a statistical outlier (more than 2.5 standard deviations above the mean) compared to peers at the same station (station needs 3+ attendants to compare against).",
+  },
+  [FraudFlagType.ADMIN_MANUAL_BURST]: {
+    mode: 'Nightly batch',
+    description:
+      "A staff user's 7-day count of manually-entered sales (recorded from the admin web app rather than the field app) exceeds 3× their own 30-day baseline (minimum 5 in the week) — a burst of manual entries bypassing the normal attendant flow.",
+  },
+  [FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME]: {
+    mode: 'Nightly batch',
+    description:
+      "A customer registered within the last 14 days has a first-sale volume more than 2× the average first-sale volume of other recently registered customers — unusual for a brand-new account.",
+  },
 };
 
 const STATUS_TONE: Record<FraudFlagStatus, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
@@ -55,6 +113,7 @@ export function FraudGovernance() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<FraudFlag | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
@@ -174,7 +233,40 @@ export function FraudGovernance() {
         )}
         <div style={{ flex: 1 }} />
         <ExportButtons filename="fraud-flags" title="Fraud & Governance" columns={FLAG_COLUMNS} rows={fetchAllForExport} />
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Explain the fraud detection rules"
+          title="Explain the fraud detection rules"
+          onClick={() => setShowRules(true)}
+          style={{ width: 34, height: 34, padding: 0, borderRadius: '50%' }}
+        >
+          ?
+        </Button>
       </div>
+
+      {showRules && (
+        <Modal title="Fraud detection rules" onClose={() => setShowRules(false)}>
+          <div style={{ maxHeight: '65vh', overflowY: 'auto', paddingRight: 4 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 0 }}>
+              Sales are checked automatically for irregular patterns. Real-time checks run right after a sale is
+              recorded; the rest run once nightly over the recent sales history. A flag never blocks a sale — it
+              only queues the activity for review.
+            </p>
+            {Object.entries(RULE_INFO).map(([type, info]) => (
+              <div key={type} style={{ padding: '10px 0', borderBottom: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>{TYPE_LABELS[type as FraudFlagType]}</span>
+                  <Badge tone={info.mode === 'Real-time' ? 'info' : 'neutral'}>{info.mode}</Badge>
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
+                  {info.description}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
         <Card padding={0}>

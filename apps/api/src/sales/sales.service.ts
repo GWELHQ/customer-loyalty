@@ -1,8 +1,13 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { FieldValue } from 'firebase-admin/firestore';
 import {
   calculateCashback,
   DEFAULT_CASHBACK_RATE_KES,
+  NotificationType,
+  Permission,
+  roleHasPermission,
+  Role,
+  SaleApprovalStatus,
   SmsStatus,
   SyncRecordResult,
   type Product,
@@ -12,16 +17,27 @@ import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { nairobiDateKey, nairobiMonthBoundsUtc, nairobiMonthKey } from '../common/time/nairobi';
-import type { AttendantPrincipal, AuthPrincipal } from '../common/types/principal';
+import type { AttendantPrincipal, AuthPrincipal, StaffPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
 import { FraudDetectionService } from '../fraud/fraud-detection.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PricesService } from '../prices/prices.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
+import { SalesDelegationsService } from '../sales-delegations/sales-delegations.service';
 import { SmsService } from '../sms/sms.service';
 import { StationsService } from '../stations/stations.service';
+import { UsersService } from '../users/users.service';
+import { VehiclePlateChecksService } from '../vehicle-plate-checks/vehicle-plate-checks.service';
 import type { PaginatedResult, PaginationQueryDto } from '../common/dto/pagination.dto';
 
+const PLATE_CHECK_MAX_AGE_MS = 60 * 60 * 1000;
+
 const COLLECTION = 'sales';
+
+/** A sale with no approvalStatus field is a legacy sale recorded before the approval gate existed — treated as already-approved everywhere. */
+function isApprovedOrLegacy(sale: Sale): boolean {
+  return sale.approvalStatus == null || sale.approvalStatus === SaleApprovalStatus.APPROVED;
+}
 
 export interface CreateSaleParams {
   customerPhone: string;
@@ -41,6 +57,8 @@ export interface CreateSaleParams {
    */
   attendantIdOverride?: string;
   attendantNameOverride?: string;
+  /** Id of a POST /mobile/vehicle-plate-checks result for this same customer, performed just before this sale. Never trusted blindly — re-validated server-side, see resolvePlateCheck(). */
+  plateCheckId?: string;
 }
 
 export interface SyncedSaleOutcome {
@@ -73,6 +91,10 @@ export class SalesService {
     private readonly sms: SmsService,
     private readonly changeEvents: ChangeEventsService,
     private readonly fraudDetection: FraudDetectionService,
+    private readonly plateChecks: VehiclePlateChecksService,
+    private readonly salesDelegations: SalesDelegationsService,
+    private readonly notifications: NotificationsService,
+    private readonly users: UsersService,
   ) {}
 
   private col() {
@@ -112,6 +134,7 @@ export class SalesService {
     };
   }
 
+  /** Approved (or legacy) sales only — a pending or rejected sale's cashback isn't real money yet and must not inflate this. */
   async monthlySummary(customerId: string, month: string): Promise<{ month: string; totalCashback: number; saleCount: number }> {
     const { startUtc, endUtc } = nairobiMonthBoundsUtc(month);
     const snap = await this.col()
@@ -119,7 +142,7 @@ export class SalesService {
       .where('saleDate', '>=', startUtc)
       .where('saleDate', '<', endUtc)
       .get();
-    const sales = snap.docs.map((d) => fromDoc<Sale>(d));
+    const sales = snap.docs.map((d) => fromDoc<Sale>(d)).filter(isApprovedOrLegacy);
     return {
       month,
       totalCashback: round2(sales.reduce((sum, s) => sum + s.snapshot.cashbackEarned, 0)),
@@ -166,6 +189,7 @@ export class SalesService {
     const attendantName = params.attendantNameOverride ?? actor.fullName;
     const saleId = params.idempotencyKey;
     const saleRef = this.col().doc(saleId);
+    const licensePlateCheck = await this.resolvePlateCheck(params.plateCheckId, customer.id);
 
     const sale = await this.firestore.instance.runTransaction(async (tx) => {
       const existing = await tx.get(saleRef);
@@ -182,12 +206,6 @@ export class SalesService {
         date: nairobiDateKey(saleDate),
         amountPaid: params.amountPaid,
         saleId,
-      });
-
-      const customerRef = this.customers.col().doc(customer.id);
-      tx.update(customerRef, {
-        totalCashbackEarned: FieldValue.increment(snapshot.cashbackEarned),
-        updatedAt: nowIso(),
       });
 
       const now = nowIso();
@@ -207,6 +225,11 @@ export class SalesService {
         clientLocalId: params.clientLocalId,
         source: actor.kind === 'attendant' ? 'android' : 'admin_manual',
         smsStatus: SmsStatus.PENDING,
+        licensePlateCheck,
+        // Cashback isn't credited to the customer yet — that only happens
+        // once a station supervisor (or their delegate, or RTSM/Admin)
+        // approves this sale. See approveBatch()/reject() below.
+        approvalStatus: SaleApprovalStatus.PENDING_APPROVAL,
         createdAt: now,
         updatedAt: now,
       };
@@ -215,28 +238,186 @@ export class SalesService {
     });
 
     this.changeEvents.emit('sales');
-    this.changeEvents.emit('customers');
     this.changeEvents.emit('reconciliationDaily');
 
     // Never fails the sale — see FraudDetectionService.runRealtimeChecks.
     await this.fraudDetection.runRealtimeChecks(sale);
 
-    // Attendant-recorded sales send their SMS from the Android app itself
-    // (direct Africa's Talking call — see MobileController), so the phone
-    // isn't dependent on a data connection back to this API. This backend
-    // only sends for web/admin-entered sales (source: 'admin_manual').
-    if (actor.kind !== 'attendant') {
-      const monthKey = nairobiMonthKey(saleDate);
-      const summary = await this.monthlySummary(customer.id, monthKey);
+    return sale;
+  }
+
+  /**
+   * Sales awaiting a station-supervisor (or delegate, or RTSM/Admin)
+   * decision. `stationId` scopes to exactly one station — RTSM/Admin may
+   * omit it (all stations); every other actor is always forced to their
+   * own accessible station server-side, regardless of what's requested.
+   */
+  async listPendingApproval(
+    requestedStationId: string | undefined,
+    pagination: PaginationQueryDto,
+    actor: StaffPrincipal,
+  ): Promise<PaginatedResult<Sale>> {
+    const stationId = await this.resolveApproverStationId(actor, requestedStationId);
+    let query = this.col()
+      .where('approvalStatus', '==', SaleApprovalStatus.PENDING_APPROVAL)
+      .orderBy('createdAt', 'desc') as FirebaseFirestore.Query;
+    if (stationId) query = query.where('stationId', '==', stationId);
+    else if (stationId === null) {
+      // Actor has no accessible station at all (not RTSM/Admin, not a
+      // supervisor, no active delegation) — an empty page, not an error.
+      return { items: [], page: pagination.page, pageSize: pagination.pageSize, total: 0, nextCursor: null };
+    }
+
+    const countSnap = await query.count().get();
+    const total = countSnap.data().count;
+
+    if (pagination.cursor) {
+      const cursorSnap = await this.col().doc(pagination.cursor).get();
+      if (cursorSnap.exists) query = query.startAfter(cursorSnap);
+    } else if (pagination.page > 1) {
+      query = query.offset((pagination.page - 1) * pagination.pageSize);
+    }
+
+    const snap = await query.limit(pagination.pageSize).get();
+    const items = snap.docs.map((d) => fromDoc<Sale>(d));
+
+    return {
+      items,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      total,
+      nextCursor: snap.docs.length === pagination.pageSize ? snap.docs.at(-1)!.id : null,
+    };
+  }
+
+  /**
+   * Approves each sale in turn — never throws for one bad id, every id
+   * gets a definite outcome. Crediting cashback and marking approved
+   * happens per-sale in its own transaction (each sale's customer update
+   * is independent, so there's no reason to bundle them into one giant
+   * transaction and no risk of one failure rolling back the rest).
+   */
+  async approveBatch(
+    saleIds: string[],
+    actor: StaffPrincipal,
+  ): Promise<{ approved: string[]; skipped: { saleId: string; reason: string }[] }> {
+    const approved: string[] = [];
+    const skipped: { saleId: string; reason: string }[] = [];
+
+    for (const saleId of saleIds) {
+      try {
+        const sale = await this.approveOne(saleId, actor);
+        approved.push(sale.id);
+      } catch (err) {
+        skipped.push({ saleId, reason: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    if (approved.length > 0) {
+      this.changeEvents.emit('sales');
+      this.changeEvents.emit('customers');
+    }
+    return { approved, skipped };
+  }
+
+  private async approveOne(saleId: string, actor: StaffPrincipal): Promise<Sale> {
+    const sale = await this.findById(saleId);
+    if (sale.approvalStatus !== SaleApprovalStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(`Sale is already ${sale.approvalStatus ?? 'approved'}, not pending`);
+    }
+    await this.assertCanApproveStation(actor, sale.stationId);
+
+    const now = nowIso();
+    const approvedSale = await this.firestore.instance.runTransaction(async (tx) => {
+      const saleRef = this.col().doc(saleId);
+      const customerRef = this.customers.col().doc(sale.customerId);
+      tx.update(customerRef, { totalCashbackEarned: FieldValue.increment(sale.snapshot.cashbackEarned), updatedAt: now });
+      tx.update(saleRef, {
+        approvalStatus: SaleApprovalStatus.APPROVED,
+        approvalDecidedByUserId: actor.userId,
+        approvalDecidedByName: actor.fullName,
+        approvalDecidedAt: now,
+        updatedAt: now,
+      });
+      return { ...sale, approvalStatus: SaleApprovalStatus.APPROVED, approvalDecidedByUserId: actor.userId, approvalDecidedByName: actor.fullName, approvalDecidedAt: now };
+    });
+
+    // The one SMS path this backend controls — deferred from sale-creation
+    // time to now, since only now is the cashback actually real. Android
+    // sales already sent their own SMS immediately at creation time (out
+    // of this repo's control — see handover.md).
+    if (approvedSale.source === 'admin_manual') {
+      const monthKey = nairobiMonthKey(approvedSale.saleDate);
+      const summary = await this.monthlySummary(approvedSale.customerId, monthKey);
       await this.sms.sendSaleConfirmation({
-        saleId: sale.id,
-        customerPhone: customer.phoneNumber,
-        cashbackEarned: sale.snapshot.cashbackEarned,
+        saleId: approvedSale.id,
+        customerPhone: approvedSale.customerPhoneAtSale,
+        cashbackEarned: approvedSale.snapshot.cashbackEarned,
         monthToDateCashback: summary.totalCashback,
       });
     }
 
-    return sale;
+    return approvedSale;
+  }
+
+  async reject(saleId: string, reason: string, actor: StaffPrincipal): Promise<Sale> {
+    const sale = await this.findById(saleId);
+    if (sale.approvalStatus !== SaleApprovalStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(`Sale is already ${sale.approvalStatus ?? 'approved'}, not pending`);
+    }
+    await this.assertCanApproveStation(actor, sale.stationId);
+
+    const now = nowIso();
+    await this.col().doc(saleId).update({
+      approvalStatus: SaleApprovalStatus.REJECTED,
+      rejectionReason: reason,
+      approvalDecidedByUserId: actor.userId,
+      approvalDecidedByName: actor.fullName,
+      approvalDecidedAt: now,
+      updatedAt: now,
+    });
+    this.changeEvents.emit('sales');
+
+    // Attendants have no web/notification access (same reasoning as every
+    // other "staff-only visibility" flow in this app) — notify RTSM/Admin
+    // instead, for follow-up.
+    const staff = await this.users.list();
+    const overseers = staff.filter((u) => u.role === Role.RTSM || u.role === Role.ADMIN);
+    await this.notifications.notifyMany(
+      overseers.map((u) => u.id),
+      {
+        type: NotificationType.SALE_REJECTED,
+        title: 'A sale was rejected',
+        body: `${actor.fullName} rejected a sale at ${sale.stationNameAtSale}: ${reason}`,
+        linkPath: '/sales',
+      },
+    );
+
+    return this.findById(saleId);
+  }
+
+  /** RTSM/Admin, the station's own supervisor, or a currently-active delegate for that station. */
+  private async assertCanApproveStation(actor: StaffPrincipal, stationId: string): Promise<void> {
+    if (roleHasPermission(actor.role, Permission.SALES_APPROVE_ALL)) return;
+    if (actor.role === Role.STATION_SUPERVISOR && actor.assignedStationId === stationId) return;
+    if (await this.salesDelegations.isActiveDelegate(actor.userId, stationId)) return;
+    throw new ForbiddenException('You do not have approval access to this station');
+  }
+
+  /**
+   * The single station a non-RTSM/Admin actor is scoped to for the
+   * pending-approval list — `undefined` means "no scoping needed" (RTSM/
+   * Admin, optionally further narrowed by `requestedStationId`), `null`
+   * means "this actor has no accessible station at all right now."
+   */
+  private async resolveApproverStationId(
+    actor: StaffPrincipal,
+    requestedStationId: string | undefined,
+  ): Promise<string | undefined | null> {
+    if (roleHasPermission(actor.role, Permission.SALES_APPROVE_ALL)) return requestedStationId;
+    if (actor.role === Role.STATION_SUPERVISOR && actor.assignedStationId) return actor.assignedStationId;
+    const delegatedStationId = await this.salesDelegations.findActiveDelegationStationForUser(actor.userId);
+    return delegatedStationId ?? null;
   }
 
   /**
@@ -309,6 +490,24 @@ export class SalesService {
       if (Math.abs(params.claimedCashbackEarned - sale.snapshot.cashbackEarned) > 0.005) return true;
     }
     return false;
+  }
+
+  /**
+   * Looks up an attendant-supplied plateCheckId and re-validates it
+   * server-side rather than trusting a client-supplied match result —
+   * a wrong/stale/other-customer's id is silently ignored (never blocks
+   * the sale), since this data is informational/anti-fraud, not financial.
+   */
+  private async resolvePlateCheck(plateCheckId: string | undefined, customerId: string): Promise<Sale['licensePlateCheck']> {
+    if (!plateCheckId) return undefined;
+    try {
+      const check = await this.plateChecks.findById(plateCheckId);
+      if (check.customerId !== customerId) return undefined;
+      if (Date.now() - new Date(check.createdAt).getTime() > PLATE_CHECK_MAX_AGE_MS) return undefined;
+      return { plateCheckId: check.id, detectedPlateNumber: check.detectedPlateNumber, matched: check.matched };
+    } catch {
+      return undefined;
+    }
   }
 
   private assertActorCanSellAtStation(actor: AuthPrincipal, stationId: string): void {
