@@ -11,7 +11,6 @@ import { CustomerRegistrations } from './pages/CustomerRegistrations';
 import { Dashboard } from './pages/Dashboard';
 import { Disbursements } from './pages/Disbursements';
 import { Logs } from './pages/Logs';
-import { Notifications } from './pages/Notifications';
 import { PendingActivation } from './pages/PendingActivation';
 import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
@@ -66,7 +65,6 @@ export function App() {
       <Route path="/disbursements" element={<RequireStaff permission={Permission.DISBURSEMENTS_VIEW}><Disbursements /></RequireStaff>} />
 
       <Route path="/reports" element={<RequireStaff><Reports /></RequireStaff>} />
-      <Route path="/notifications" element={<RequireStaff><Notifications /></RequireStaff>} />
       <Route path="/logs" element={<RequireStaff permission={Permission.AUDIT_VIEW}><Logs /></RequireStaff>} />
       {/* Old path, kept as a redirect in case it's bookmarked/linked anywhere. */}
       <Route path="/audit-log" element={<Navigate to="/logs" replace />} />

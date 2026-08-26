@@ -27,6 +27,7 @@ import { PricesModule } from './prices/prices.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
 import { ReportsModule } from './reports/reports.module';
 import { SalesModule } from './sales/sales.module';
+import { SettingsModule } from './settings/settings.module';
 import { SmsModule } from './sms/sms.module';
 import { SpecialRateRequestsModule } from './special-rate-requests/special-rate-requests.module';
 import { StationsModule } from './stations/stations.module';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     NotificationsModule,
     AuditEventsModule,
     SmsModule,
+    SettingsModule,
     JobsModule,
   ],
   providers: [

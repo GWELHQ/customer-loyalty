@@ -3,8 +3,10 @@ import type {
   AttendantLoginInput,
   AuditEvent,
   Customer,
+  CustomerInactivitySettings,
   CustomerRegistrationRequest,
   DisbursementBatch,
+  DisbursementSettings,
   ImportJob,
   ImportRow,
   MonthlyCashbackLedger,
@@ -248,5 +250,17 @@ export class LoyaltyApiClient {
   smsDeliveries = {
     list: (params: { cursor?: string } = {}) =>
       this.http.get<PaginatedResult<SmsDelivery>>(`/sms-deliveries${toQueryString(params)}`),
+  };
+
+  disbursementSettings = {
+    get: () => this.http.get<DisbursementSettings>('/disbursement-settings'),
+    update: (input: Partial<{ minDisbursementAmount: number }>) =>
+      this.http.patch<DisbursementSettings>('/disbursement-settings', input),
+  };
+
+  customerInactivitySettings = {
+    get: () => this.http.get<CustomerInactivitySettings>('/customer-inactivity-settings'),
+    update: (input: Partial<{ noticeAfterDays: number; resetAfterAdditionalDays: number }>) =>
+      this.http.patch<CustomerInactivitySettings>('/customer-inactivity-settings', input),
   };
 }

@@ -60,7 +60,7 @@ export class MicrosoftGraphEmailProvider implements EmailProvider {
           body: JSON.stringify({
             message: {
               subject,
-              body: { contentType: 'Text', content: body },
+              body: { contentType: 'HTML', content: body },
               toRecipients: to.map((address) => ({ emailAddress: { address } })),
             },
             saveToSentItems: false,

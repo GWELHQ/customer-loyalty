@@ -128,10 +128,9 @@ export class CashbackLedgersController {
       recipients.map((u) => u.id),
       { type: NotificationType.LEDGER_STATE_CHANGE, title: input.title, body: input.body, linkPath: input.linkPath },
     );
-    await this.email.send(
-      recipients.map((u) => u.email),
-      input.subject,
-      input.body,
-    );
+    await this.email.send(recipients.map((u) => u.email), input.subject, {
+      title: input.title,
+      bodyLines: [input.body],
+    });
   }
 }

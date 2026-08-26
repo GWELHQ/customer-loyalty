@@ -38,6 +38,8 @@ export enum Permission {
   IMPORTS_VIEW = 'imports:view',
   NOTIFICATIONS_VIEW_OWN = 'notifications:view_own',
   AUDIT_VIEW = 'audit:view',
+  DISBURSEMENT_SETTINGS_MANAGE = 'disbursement_settings:manage',
+  CUSTOMER_INACTIVITY_SETTINGS_MANAGE = 'customer_inactivity_settings:manage',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -63,6 +65,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.AUDIT_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
+  Permission.DISBURSEMENT_SETTINGS_MANAGE,
+  Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 
@@ -139,6 +143,8 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
+  Permission.DISBURSEMENT_SETTINGS_MANAGE,
+  Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
 ];
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [

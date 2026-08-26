@@ -158,6 +158,22 @@ gcloud scheduler jobs create http reconciliation-reminder-check \
 
 For every active station with no reconciliation totals recorded yet for the current Nairobi calendar day, this in-app-notifies that station's Station Supervisor(s) (`Permission.RECONCILIATION_MANAGE`, which Station Supervisors now hold for their own station only — enforced server-side via `assertStationAccessible`). No email/admin-configurable schedule here, unlike price reminders — 20:00 is a fixed default; change the cron schedule directly if a different end-of-shift hour is needed.
 
+## Cloud Scheduler: customer inactivity check
+
+Not yet created — set this up manually:
+
+```bash
+gcloud scheduler jobs create http customer-inactivity-check \
+  --location=<REGION> \
+  --schedule="0 6 * * *" \
+  --time-zone="Africa/Nairobi" \
+  --uri="https://<api-domain>/api/v1/jobs/customer-inactivity-check" \
+  --http-method=POST \
+  --headers="x-scheduler-secret=<value-of-scheduler-shared-secret>"
+```
+
+Daily pass over customers: those with `lastActivityAt` older than `noticeAfterDays` (and no notice already sent) get an SMS notice; those already notified more than `resetAfterAdditionalDays` days ago have `totalCashbackEarned` zeroed. Both periods are Admin/RTSM-configurable from the Prices page settings, or via `PATCH /customer-inactivity-settings`. A fresh sale (`CustomersService.incrementCashback`) clears any pending notice, so a customer who returns before the reset window is never zeroed out.
+
 ## CI/CD
 
 `.github/workflows/backend-deploy.yml` and `.github/workflows/frontend-deploy.yml` redeploy on every push to `main` that touches the relevant paths (or via manual `workflow_dispatch`). Both authenticate to GCP keylessly via Workload Identity Federation — no service account key lives in GitHub. One-time setup already done for `loyalty-points-413d5`:

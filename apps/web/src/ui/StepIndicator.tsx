@@ -46,17 +46,19 @@ export function StepIndicator({ steps }: { steps: StepIndicatorStep[] }) {
                 {step.state === 'rejected' && <Icon name="x" size={15} color={colors.text} />}
                 {(step.state === 'current' || step.state === 'pending') && i + 1}
               </div>
-              <div
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: step.state === 'current' ? 800 : 600,
-                  marginTop: 7,
-                  textAlign: 'center',
-                  color: step.state === 'pending' ? 'var(--color-text-muted)' : 'var(--color-text)',
-                }}
-              >
-                {step.label}
-              </div>
+              {step.state !== 'pending' && (
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: step.state === 'current' ? 800 : 600,
+                    marginTop: 7,
+                    textAlign: 'center',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  {step.label}
+                </div>
+              )}
               {step.subtext && (
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, textAlign: 'center' }}>
                   {step.subtext}

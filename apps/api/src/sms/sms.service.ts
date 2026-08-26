@@ -56,6 +56,48 @@ export class SmsService {
     await this.attemptSend(ref.id, { ...doc, id: ref.id });
   }
 
+  /**
+   * Sends a customer inactivity reset notice — same delivery/log/retry
+   * shape as a sale-confirmation SMS, but with no saleId (nothing to sync
+   * a sale's smsStatus against) and no retry beyond the provider's own result.
+   */
+  async sendInactivityNotice(input: { customerPhone: string; message: string }): Promise<void> {
+    const now = nowIso();
+    const doc: Omit<SmsDelivery, 'id'> = {
+      customerPhone: input.customerPhone,
+      message: input.message,
+      status: SmsStatus.PENDING,
+      providerName: this.provider.name,
+      retryCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const ref = await this.col().add(doc);
+    this.changeEvents.emit(COLLECTION);
+    try {
+      const result = await this.provider.send(input.customerPhone, input.message);
+      await this.col()
+        .doc(ref.id)
+        .update({
+          status: result.success ? SmsStatus.SENT : SmsStatus.FAILED,
+          providerResponse: result.providerResponse,
+          errorReason: result.errorReason,
+          retryCount: 1,
+          sentAt: result.success ? nowIso() : null,
+          updatedAt: nowIso(),
+        });
+    } catch (err) {
+      this.logger.error(`Inactivity notice SMS failed for ${input.customerPhone}`, err instanceof Error ? err.stack : err);
+      await this.col().doc(ref.id).update({
+        status: SmsStatus.FAILED,
+        errorReason: err instanceof Error ? err.message : 'Unknown error',
+        retryCount: 1,
+        updatedAt: nowIso(),
+      });
+    }
+    this.changeEvents.emit(COLLECTION);
+  }
+
   /** Every SMS ever sent (or attempted), newest first — powers the Logs page's SMS tab. */
   async list(cursor?: string): Promise<PaginatedResult<SmsDelivery>> {
     let query = this.col().orderBy('createdAt', 'desc') as FirebaseFirestore.Query;
@@ -115,7 +157,7 @@ export class SmsService {
 
   private async applyOutcome(
     deliveryId: string,
-    saleId: string,
+    saleId: string | undefined,
     success: boolean,
     extra: { providerResponse?: string; errorReason?: string; retryCount: number },
   ): Promise<void> {
@@ -129,6 +171,7 @@ export class SmsService {
       sentAt: success ? now : null,
       updatedAt: now,
     });
+    if (!saleId) return;
     // Keep the sale's own smsStatus (shown in the web app's Sales table) in
     // sync — it's a denormalized read shortcut, the smsDeliveries doc above
     // is the source of truth.
