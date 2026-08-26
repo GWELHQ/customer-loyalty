@@ -18,7 +18,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Cashback ledger', path: '/cashback-ledgers', icon: 'ledger', permission: Permission.LEDGERS_VIEW },
   { label: 'Disbursements', path: '/disbursements', icon: 'disbursements', permission: Permission.DISBURSEMENTS_VIEW },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_ALL },
-  { label: 'Notifications', path: '/notifications', icon: 'bell' },
   { label: 'Users', path: '/users', icon: 'users', permission: Permission.USERS_MANAGE },
   { label: 'Attendants', path: '/attendants', icon: 'customers', permission: Permission.ATTENDANTS_MANAGE },
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },

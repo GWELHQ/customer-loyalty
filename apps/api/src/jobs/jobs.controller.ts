@@ -3,13 +3,17 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { NotificationType, Product, Role } from '@loyalty/shared';
 import { Public } from '../common/decorators/public.decorator';
 import { EmailService } from '../common/email/email.service';
+import { formatEmailCurrency, formatEmailDate } from '../common/email/render-email';
 import { SchedulerSecretGuard } from '../common/guards/scheduler-secret.guard';
 import { nairobiToday } from '../common/time/nairobi';
+import { CustomersService } from '../customers/customers.service';
 import { FraudDetectionService } from '../fraud/fraud-detection.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PriceRemindersService } from '../prices/price-reminders.service';
 import { PricesService } from '../prices/prices.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
+import { CustomerInactivitySettingsService } from '../settings/customer-inactivity-settings.service';
+import { SmsService } from '../sms/sms.service';
 import { StationsService } from '../stations/stations.service';
 import { UsersService } from '../users/users.service';
 
@@ -31,6 +35,9 @@ export class JobsController {
     private readonly stations: StationsService,
     private readonly users: UsersService,
     private readonly notifications: NotificationsService,
+    private readonly customers: CustomersService,
+    private readonly sms: SmsService,
+    private readonly inactivitySettings: CustomerInactivitySettingsService,
     private readonly fraudDetection: FraudDetectionService,
   ) {}
 
@@ -50,15 +57,14 @@ export class JobsController {
     const lines = Object.values(Product).map((product) => {
       const price = current[product];
       return price
-        ? `${product}: KSh ${price.pricePerLitre} (effective ${price.effectiveFrom})`
+        ? `${product}: ${formatEmailCurrency(price.pricePerLitre)} (effective ${formatEmailDate(price.effectiveFrom)})`
         : `${product}: no active price set`;
     });
 
-    await this.email.send(
-      settings.recipientEmails,
-      'Green Wells: monthly fuel price update reminder',
-      `It's time to review next month's PMS/AGO prices.\n\nCurrent prices:\n${lines.join('\n')}`,
-    );
+    await this.email.send(settings.recipientEmails, 'Green Wells: monthly fuel price update reminder', {
+      title: 'Monthly fuel price update reminder',
+      bodyLines: ["It's time to review next month's PMS/AGO prices.", 'Current prices:', ...lines],
+    });
     await this.reminders.markSent();
 
     return { sent: true };
@@ -97,6 +103,40 @@ export class JobsController {
     }
 
     return { remindersSent };
+  }
+
+  /**
+   * Run once daily (see infra/google-cloud/DEPLOYMENT.md). Two independent
+   * passes: notice customers past noticeAfterDays with no notice sent yet,
+   * and reset customers whose notice is now past resetAfterAdditionalDays.
+   */
+  @Post('customer-inactivity-check')
+  @HttpCode(HttpStatus.OK)
+  async runCustomerInactivityCheck() {
+    const settings = await this.inactivitySettings.get();
+    const now = Date.now();
+    const noticeCutoff = new Date(now - settings.noticeAfterDays * 24 * 60 * 60 * 1000).toISOString();
+    const resetCutoff = new Date(now - settings.resetAfterAdditionalDays * 24 * 60 * 60 * 1000).toISOString();
+
+    const dueForNotice = await this.customers.findDueForInactivityNotice(noticeCutoff);
+    let noticesSent = 0;
+    for (const customer of dueForNotice) {
+      await this.sms.sendInactivityNotice({
+        customerPhone: customer.phoneNumber,
+        message: `Green Wells: Your loyalty points have been inactive for a while. They'll reset in ${settings.resetAfterAdditionalDays} days unless you make a purchase.`,
+      });
+      await this.customers.markInactivityNoticeSent(customer.id);
+      noticesSent += 1;
+    }
+
+    const dueForReset = await this.customers.findDueForInactivityReset(resetCutoff);
+    let resetsApplied = 0;
+    for (const customer of dueForReset) {
+      await this.customers.resetInactiveCashback(customer.id);
+      resetsApplied += 1;
+    }
+
+    return { noticesSent, resetsApplied };
   }
 
   /** Run once nightly (see infra/google-cloud/DEPLOYMENT.md) — scans the prior day/week's sales for irregular activity. */

@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
 import { EmailService } from '../common/email/email.service';
+import { formatEmailCurrency, formatEmailDate } from '../common/email/render-email';
 import type { StaffPrincipal } from '../common/types/principal';
 import { UsersService } from '../users/users.service';
 import { CreatePriceDto } from './dto/create-price.dto';
@@ -68,8 +69,13 @@ export class PricesController {
       .map((u) => u.email);
     await this.email.send(
       recipients,
-      `Green Wells: new ${price.product} price — KSh ${price.pricePerLitre}/L`,
-      `${actor.fullName} published a new ${price.product} price of KSh ${price.pricePerLitre} per litre, effective ${price.effectiveFrom}.`,
+      `Green Wells: new ${price.product} price — ${formatEmailCurrency(price.pricePerLitre)}/L`,
+      {
+        title: `New ${price.product} price published`,
+        bodyLines: [
+          `${actor.fullName} published a new ${price.product} price of ${formatEmailCurrency(price.pricePerLitre)} per litre, effective ${formatEmailDate(price.effectiveFrom)}.`,
+        ],
+      },
     );
 
     return price;

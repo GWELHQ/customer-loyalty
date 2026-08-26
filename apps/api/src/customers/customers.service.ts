@@ -180,13 +180,58 @@ export class CustomersService {
   }
 
   async incrementCashback(id: string, amount: number): Promise<void> {
+    const now = nowIso();
     await this.firestore.instance.runTransaction(async (tx) => {
       const ref = this.col().doc(id);
       const snap = await tx.get(ref);
       if (!snap.exists) throw new BadRequestException('Customer not found');
       const current = (snap.data()?.totalCashbackEarned as number) ?? 0;
-      tx.update(ref, { totalCashbackEarned: current + amount, updatedAt: nowIso() });
+      // A fresh sale is activity — clears any pending inactivity notice so
+      // the next inactivity check starts counting from this sale, not the
+      // stale notice from before.
+      tx.update(ref, {
+        totalCashbackEarned: current + amount,
+        lastActivityAt: now,
+        inactivityNoticeSentAt: null,
+        updatedAt: now,
+      });
     });
+    this.changeEvents.emit(COLLECTION);
+  }
+
+  /** Zeroes a customer's lifetime cashback total after sustained inactivity. Only called by the inactivity job. */
+  async resetInactiveCashback(id: string): Promise<void> {
+    await this.col().doc(id).update({
+      totalCashbackEarned: 0,
+      inactivityNoticeSentAt: null,
+      updatedAt: nowIso(),
+    });
+    this.changeEvents.emit(COLLECTION);
+  }
+
+  /**
+   * Customers with lastActivityAt older than the cutoff and no notice sent
+   * yet — candidates for an inactivity SMS notice.
+   */
+  async findDueForInactivityNotice(cutoffIso: string): Promise<Customer[]> {
+    const snap = await this.col()
+      .where('lastActivityAt', '<', cutoffIso)
+      .where('inactivityNoticeSentAt', '==', null)
+      .get();
+    return snap.docs.map((d) => fromDoc<Customer>(d));
+  }
+
+  /** Customers notified long enough ago that continued inactivity now triggers a reset. */
+  async findDueForInactivityReset(noticeCutoffIso: string): Promise<Customer[]> {
+    const snap = await this.col()
+      .where('inactivityNoticeSentAt', '!=', null)
+      .where('inactivityNoticeSentAt', '<', noticeCutoffIso)
+      .get();
+    return snap.docs.map((d) => fromDoc<Customer>(d));
+  }
+
+  async markInactivityNoticeSent(id: string): Promise<void> {
+    await this.col().doc(id).update({ inactivityNoticeSentAt: nowIso(), updatedAt: nowIso() });
     this.changeEvents.emit(COLLECTION);
   }
 }

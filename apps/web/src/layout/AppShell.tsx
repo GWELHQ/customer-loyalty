@@ -1,9 +1,11 @@
-import { CustomerRegistrationStatus, Permission, Role } from '@loyalty/shared';
-import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
+import { CustomerRegistrationStatus, Permission, Role, type Notification } from '@loyalty/shared';
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
+import { formatNairobiDateTime } from '../lib/time';
+import { EmptyState } from '../ui/primitives';
 import { Icon } from '../ui/Icon';
 import { navItemsForRole } from './nav';
 
@@ -25,6 +27,9 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
   const api = useApi();
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingRegistrations, setPendingRegistrations] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const notificationsPanelRef = useRef<HTMLDivElement>(null);
   const canViewRegistrations = !!user && hasPermission(Permission.CUSTOMER_REGISTRATIONS_VIEW);
 
   const reloadUnreadCount = useCallback(() => {
@@ -32,6 +37,14 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
     api.notifications
       .list()
       .then((list) => setUnreadCount(list.filter((n) => !n.read).length))
+      .catch(() => {});
+  }, [api, user]);
+
+  const reloadNotifications = useCallback(() => {
+    if (!user) return;
+    api.notifications
+      .list()
+      .then(setNotifications)
       .catch(() => {});
   }, [api, user]);
 
@@ -45,8 +58,39 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
 
   useEffect(reloadUnreadCount, [reloadUnreadCount, location.pathname]);
   useRealtimeRefresh(['notifications'], reloadUnreadCount);
+  useRealtimeRefresh(['notifications'], () => {
+    if (notificationsOpen) reloadNotifications();
+  });
   useEffect(reloadPendingRegistrations, [reloadPendingRegistrations, location.pathname]);
   useRealtimeRefresh(['customerRegistrationRequests'], reloadPendingRegistrations);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    reloadNotifications();
+    function onClickOutside(e: MouseEvent) {
+      if (notificationsPanelRef.current && !notificationsPanelRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [notificationsOpen, reloadNotifications]);
+
+  async function openNotification(n: Notification) {
+    if (!n.read) {
+      await api.notifications.markRead(n.id);
+      reloadUnreadCount();
+      reloadNotifications();
+    }
+    setNotificationsOpen(false);
+    if (n.linkPath) {
+      // linkPath may point at a per-item detail path (e.g. /cashback-ledgers/2026-08)
+      // that has no dedicated route — the item is decided from its list page instead,
+      // so navigate to that top-level list rather than 404ing.
+      const listPath = '/' + n.linkPath.split('/').filter(Boolean)[0];
+      navigate(listPath);
+    }
+  }
 
   if (!user) return null;
   const nav = navItemsForRole(user.role, hasPermission);
@@ -105,25 +149,6 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
               >
                 <Icon name={n.icon} size={17} color={active ? '#fff' : '#8fa8d0'} />
                 <span style={{ flex: 1 }}>{n.label}</span>
-                {n.path === '/notifications' && unreadCount > 0 && (
-                  <span
-                    style={{
-                      background: 'var(--gw-red-500)',
-                      color: '#fff',
-                      fontSize: 11,
-                      fontWeight: 800,
-                      borderRadius: 999,
-                      minWidth: 18,
-                      height: 18,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 5px',
-                    }}
-                  >
-                    {unreadCount}
-                  </span>
-                )}
                 {n.path === '/customer-registrations' && pendingRegistrations > 0 && (
                   <span
                     style={{
@@ -194,45 +219,122 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em' }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 1 }}>{subtitle}</div>}
           </div>
-          <button
-            onClick={() => navigate('/notifications')}
-            style={{
-              position: 'relative',
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-            aria-label="Notifications"
-          >
-            <Icon name="bell" size={17} color="var(--color-text-secondary)" />
-            {unreadCount > 0 && (
-              <span
+          <div ref={notificationsPanelRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setNotificationsOpen((v) => !v)}
+              style={{
+                position: 'relative',
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              aria-label="Notifications"
+            >
+              <Icon name="bell" size={17} color="var(--color-text-secondary)" />
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -5,
+                    background: 'var(--gw-red-500)',
+                    color: '#fff',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    borderRadius: 999,
+                    minWidth: 17,
+                    height: 17,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div
                 style={{
                   position: 'absolute',
-                  top: -5,
-                  right: -5,
-                  background: 'var(--gw-red-500)',
-                  color: '#fff',
-                  fontSize: 10,
-                  fontWeight: 800,
-                  borderRadius: 999,
-                  minWidth: 17,
-                  height: 17,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  top: 42,
+                  right: 0,
+                  width: 360,
+                  maxHeight: 420,
+                  overflow: 'auto',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 10,
+                  boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                  zIndex: 20,
                 }}
               >
-                {unreadCount}
-              </span>
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderBottom: '1px solid var(--color-border)',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  Notifications
+                </div>
+                {notifications.length === 0 && <EmptyState title="You're all caught up" />}
+                {notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => openNotification(n)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: n.read ? 'transparent' : 'var(--color-primary-tint)',
+                      border: 'none',
+                      borderBottom: '1px solid var(--color-border)',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: n.read ? 'var(--color-border-strong)' : 'var(--color-primary)',
+                        marginTop: 6,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>{n.title}</span>
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: 12,
+                          color: 'var(--color-text-secondary)',
+                          marginTop: 2,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {n.body}
+                      </span>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3 }}>
+                        {formatNairobiDateTime(n.createdAt)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
-          </button>
+          </div>
         </div>
 
         <div style={{ flex: 1, padding: '20px 24px 40px', minWidth: 0 }}>{children}</div>

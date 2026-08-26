@@ -36,6 +36,7 @@ export function Disbursements() {
   const [selected, setSelected] = useState<DisbursementBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const { paged, page, pageCount, setPage } = usePagedRows(batches);
 
   async function downloadBankFile(batch: DisbursementBatch) {
@@ -56,11 +57,14 @@ export function Disbursements() {
   }
 
   async function createBatch() {
+    setCreateError(null);
     setBusy(true);
     try {
       const batch = await api.disbursementBatches.create(month);
       setSelected(batch);
       reload();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Could not create disbursement batch');
     } finally {
       setBusy(false);
     }
@@ -109,13 +113,19 @@ export function Disbursements() {
                 <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
               </Field>
               <Button variant="primary" onClick={createBatch} disabled={busy || !month} style={{ marginTop: 19 }}>
-                Create batch from approved ledger
+                Create disbursement batch
               </Button>
             </>
           )}
           <div style={{ flex: 1 }} />
           <ExportButtons filename="disbursement-batches" title="Disbursement batches" columns={BATCH_COLUMNS} rows={batches} />
         </div>
+
+        {createError && (
+          <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+            {createError}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
           <Card padding={0}>

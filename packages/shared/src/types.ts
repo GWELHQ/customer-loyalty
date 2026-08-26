@@ -66,6 +66,8 @@ export interface Customer extends BaseDoc {
   specialRateEffectiveTo?: ISODateString;
   totalCashbackEarned: number;
   source: 'manual' | 'import' | 'android';
+  lastActivityAt?: ISODateString;
+  inactivityNoticeSentAt?: ISODateString;
 }
 
 export interface ProductPrice extends BaseDoc {
@@ -85,6 +87,19 @@ export interface PriceReminderSetting extends BaseDoc {
   recipientEmails: string[];
   nextReminderAt: ISODateString;
   lastSentAt?: ISODateString;
+}
+
+export interface DisbursementSettings extends BaseDoc {
+  /** Ledger entries with totalCashback below this amount are excluded from
+   *  the month's disbursement batch and carried forward to next month. */
+  minDisbursementAmount: number;
+}
+
+export interface CustomerInactivitySettings extends BaseDoc {
+  /** Days of no activity before a customer gets an SMS reset notice. */
+  noticeAfterDays: number;
+  /** Additional days of continued inactivity after the notice before the reset actually happens. */
+  resetAfterAdditionalDays: number;
 }
 
 export interface SaleSnapshot {
@@ -114,7 +129,8 @@ export interface Sale extends BaseDoc {
 }
 
 export interface SmsDelivery extends BaseDoc {
-  saleId: string;
+  /** Unset for SMS not tied to a sale, e.g. a customer inactivity notice. */
+  saleId?: string;
   customerPhone: string;
   message: string;
   status: SmsStatus;
@@ -190,6 +206,11 @@ export interface MonthlyCashbackLedgerEntry {
   customerPhone: string;
   eligibleSalesCount: number;
   totalCashback: number;
+  /** Amount carried forward from a prior month's below-threshold disbursement exclusion. */
+  carriedForwardAmount?: number;
+  carriedForwardFromMonth?: string;
+  /** Running total already paid out across all of this month's disbursement batches. totalCashback - disbursedAmount = still owed. */
+  disbursedAmount?: number;
 }
 
 export interface MonthlyCashbackLedger extends BaseDoc {

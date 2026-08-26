@@ -3,8 +3,10 @@ import type {
   AttendantLoginInput,
   AuditEvent,
   Customer,
+  CustomerInactivitySettings,
   CustomerRegistrationRequest,
   DisbursementBatch,
+  DisbursementSettings,
   FraudFlag,
   FraudFlagStatus,
   FraudFlagType,
@@ -261,5 +263,17 @@ export class LoyaltyApiClient {
     startReview: (id: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/start-review`, {}),
     resolve: (id: string, note?: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/resolve`, { note }),
     dismiss: (id: string, note?: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/dismiss`, { note }),
+  };
+
+  disbursementSettings = {
+    get: () => this.http.get<DisbursementSettings>('/disbursement-settings'),
+    update: (input: Partial<{ minDisbursementAmount: number }>) =>
+      this.http.patch<DisbursementSettings>('/disbursement-settings', input),
+  };
+
+  customerInactivitySettings = {
+    get: () => this.http.get<CustomerInactivitySettings>('/customer-inactivity-settings'),
+    update: (input: Partial<{ noticeAfterDays: number; resetAfterAdditionalDays: number }>) =>
+      this.http.patch<CustomerInactivitySettings>('/customer-inactivity-settings', input),
   };
 }

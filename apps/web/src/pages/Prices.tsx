@@ -1,4 +1,4 @@
-import type { PriceReminderSetting, ProductPrice } from '@loyalty/shared';
+import type { CustomerInactivitySettings, DisbursementSettings, PriceReminderSetting, ProductPrice } from '@loyalty/shared';
 import { Permission, Product } from '@loyalty/shared';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -13,18 +13,26 @@ export function Prices() {
   const api = useApi();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.PRICES_MANAGE);
+  const canManageDisbursementSettings = hasPermission(Permission.DISBURSEMENT_SETTINGS_MANAGE);
+  const canManageInactivitySettings = hasPermission(Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE);
   const [current, setCurrent] = useState<Record<Product, ProductPrice | null> | null>(null);
   const [reminders, setReminders] = useState<PriceReminderSetting | null>(null);
+  const [disbursementSettings, setDisbursementSettings] = useState<DisbursementSettings | null>(null);
+  const [inactivitySettings, setInactivitySettings] = useState<CustomerInactivitySettings | null>(null);
   const [product, setProduct] = useState<Product>(Product.PMS);
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [pricePerLitre, setPricePerLitre] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editingReminders, setEditingReminders] = useState(false);
+  const [editingDisbursementSettings, setEditingDisbursementSettings] = useState(false);
+  const [editingInactivitySettings, setEditingInactivitySettings] = useState(false);
 
   function reload() {
     api.prices.current().then(setCurrent);
     api.prices.reminderSettings().then(setReminders);
+    if (canManageDisbursementSettings) api.disbursementSettings.get().then(setDisbursementSettings);
+    if (canManageInactivitySettings) api.customerInactivitySettings.get().then(setInactivitySettings);
   }
   useEffect(reload, [api]);
   useRealtimeRefresh(['productPrices'], reload);
@@ -187,6 +195,83 @@ export function Prices() {
             </Card>
           </div>
         )}
+
+        {(canManageDisbursementSettings || canManageInactivitySettings) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+            {canManageDisbursementSettings && (
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Minimum disbursement</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                      Customers below this amount aren't paid out — their cashback carries forward and is re-checked next cycle.
+                    </div>
+                  </div>
+                  {disbursementSettings && !editingDisbursementSettings && (
+                    <Button variant="secondary" size="sm" onClick={() => setEditingDisbursementSettings(true)}>
+                      Edit
+                    </Button>
+                  )}
+                </div>
+                {disbursementSettings && !editingDisbursementSettings && (
+                  <div style={{ marginTop: 14, fontSize: 13 }}>
+                    <Row label="Minimum amount">
+                      <strong>KSh {disbursementSettings.minDisbursementAmount}</strong>
+                    </Row>
+                  </div>
+                )}
+                {disbursementSettings && editingDisbursementSettings && (
+                  <DisbursementSettingsForm
+                    settings={disbursementSettings}
+                    onCancel={() => setEditingDisbursementSettings(false)}
+                    onSaved={() => {
+                      setEditingDisbursementSettings(false);
+                      reload();
+                    }}
+                  />
+                )}
+              </Card>
+            )}
+
+            {canManageInactivitySettings && (
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Customer inactivity reset</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                      An inactive customer gets an SMS notice, then their cashback resets if inactivity continues.
+                    </div>
+                  </div>
+                  {inactivitySettings && !editingInactivitySettings && (
+                    <Button variant="secondary" size="sm" onClick={() => setEditingInactivitySettings(true)}>
+                      Edit
+                    </Button>
+                  )}
+                </div>
+                {inactivitySettings && !editingInactivitySettings && (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+                    <Row label="Notice after">
+                      <strong>{inactivitySettings.noticeAfterDays} days inactive</strong>
+                    </Row>
+                    <Row label="Reset after notice">
+                      <strong>{inactivitySettings.resetAfterAdditionalDays} more days</strong>
+                    </Row>
+                  </div>
+                )}
+                {inactivitySettings && editingInactivitySettings && (
+                  <CustomerInactivitySettingsForm
+                    settings={inactivitySettings}
+                    onCancel={() => setEditingInactivitySettings(false)}
+                    onSaved={() => {
+                      setEditingInactivitySettings(false);
+                      reload();
+                    }}
+                  />
+                )}
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </AppShell>
   );
@@ -271,6 +356,135 @@ function ReminderSettingsForm({
       </div>
       <Field label="Recipient emails (comma-separated)">
         <input style={inputStyle} value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="finance@greenwellsenergies.co.ke, chairman@greenwellsenergies.co.ke" />
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DisbursementSettingsForm({
+  settings,
+  onCancel,
+  onSaved,
+}: {
+  settings: DisbursementSettings;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const api = useApi();
+  const [minDisbursementAmount, setMinDisbursementAmount] = useState(String(settings.minDisbursementAmount));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setError(null);
+    const amount = Number(minDisbursementAmount);
+    if (!Number.isInteger(amount) || amount < 0) {
+      setError('Minimum amount must be a whole number, 0 or greater.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.disbursementSettings.update({ minDisbursementAmount: amount });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save disbursement settings');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+          {error}
+        </div>
+      )}
+      <Field label="Minimum amount (KSh)" required>
+        <input
+          type="number"
+          min={0}
+          style={inputStyle}
+          value={minDisbursementAmount}
+          onChange={(e) => setMinDisbursementAmount(e.target.value)}
+        />
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CustomerInactivitySettingsForm({
+  settings,
+  onCancel,
+  onSaved,
+}: {
+  settings: CustomerInactivitySettings;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const api = useApi();
+  const [noticeAfterDays, setNoticeAfterDays] = useState(String(settings.noticeAfterDays));
+  const [resetAfterAdditionalDays, setResetAfterAdditionalDays] = useState(String(settings.resetAfterAdditionalDays));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setError(null);
+    const notice = Number(noticeAfterDays);
+    const reset = Number(resetAfterAdditionalDays);
+    if (!Number.isInteger(notice) || notice < 1) {
+      setError('Notice period must be a whole number of days, 1 or more.');
+      return;
+    }
+    if (!Number.isInteger(reset) || reset < 1) {
+      setError('Reset period must be a whole number of days, 1 or more.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.customerInactivitySettings.update({ noticeAfterDays: notice, resetAfterAdditionalDays: reset });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save inactivity settings');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+          {error}
+        </div>
+      )}
+      <Field label="Notice after (days inactive)" required>
+        <input type="number" min={1} style={inputStyle} value={noticeAfterDays} onChange={(e) => setNoticeAfterDays(e.target.value)} />
+      </Field>
+      <Field label="Reset after notice (additional days)" required>
+        <input
+          type="number"
+          min={1}
+          style={inputStyle}
+          value={resetAfterAdditionalDays}
+          onChange={(e) => setResetAfterAdditionalDays(e.target.value)}
+        />
       </Field>
       <div style={{ display: 'flex', gap: 8 }}>
         <Button variant="primary" size="sm" onClick={save} disabled={busy}>
