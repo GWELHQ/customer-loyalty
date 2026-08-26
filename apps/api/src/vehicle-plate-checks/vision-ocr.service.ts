@@ -7,23 +7,48 @@ import type { AppConfig } from '../config/configuration';
 type Slot = 'L' | 'D' | { exact: string };
 type PlateShape = Slot[];
 
+interface PlateShapeDef {
+  slots: PlateShape;
+  /**
+   * Kenya's plate system never uses the letters O or I anywhere — deliberately
+   * excluded because they're visually confusable with 0 and 1 (confirmed via
+   * multiple sources on Kenya's registration system). For a Kenyan-origin
+   * shape, a literal "O" or "I" landing in a letter slot is therefore never a
+   * genuine letter — always reject it there instead of accepting it as a
+   * clean 0-correction match. This matters beyond just correctness on its
+   * own: without it, a digit '0' OCR-misread as letter "O" in a *different*
+   * shape's digit slot (e.g. temp/dealer plates, see below) can tie on
+   * correction-count with an old-style shape that wrongly accepts the "O" as
+   * a real letter — this rule removes that false tie by making the
+   * impossible reading fail outright, rather than trying to out-guess it
+   * with a tiebreaker.
+   */
+  kenyaOrigin?: boolean;
+}
+
 /**
  * Plate shapes this app expects to see at a station near the Kenya/Uganda/
- * Tanzania border, including Kenyan government vehicle categories.
- * Deliberately excludes diplomatic and personalized formats from this
- * fixed-shape list — diplomatic plates are handled separately below
- * (genuinely variable-length, doesn't fit a fixed shape), and personalized
- * plates have no pattern at all.
+ * Tanzania border, including Kenyan government/dealer/legacy vehicle
+ * categories. Deliberately excludes diplomatic and personalized formats
+ * from this fixed-shape list — diplomatic plates are handled separately
+ * below (genuinely variable-length, doesn't fit a fixed shape), and
+ * personalized plates have no pattern at all.
  *
  * - Kenya standard, 1989-present (also covers current-era plates,
  *   electric cars — "EVA 001A" — and Government of Kenya vehicles, which
  *   are just a "GK" + department-letter 3-letter prefix like any other
  *   series, e.g. "GKA 227B" — plus Uganda's old pre-2023 format,
  *   "UAA 001A") — all the same 3-letter/3-digit/1-letter shape.
+ * - Kenya's pre-1989 format ("KDE 686") — 3 letters, 3 digits, no suffix
+ *   letter. Exhausted in 1989 (last issued: KZZ 999) so only ever seen on
+ *   genuinely old vehicles, but still occasionally on the road.
  * - Kenya electric motorcycles, 2024- ("EMAA 001A") — 4 letters.
  * - Kenya county government ("42CG 002A") — 2-digit county code, fixed
  *   "CG", 3 digits, 1 letter. "CG" must match exactly (not coercible)
  *   since it's a fixed category marker, not an arbitrary series code.
+ * - Kenya dealer/temporary plates ("KD 0793", green background) — fixed
+ *   "KD" (Kenya Dealer, a specific reserved marker, not a generic 2-letter
+ *   series — per NTSA coverage of "KD plate" enforcement), 4 digits.
  * - Uganda's current digital plates (introduced Nov 2023): private
  *   ("UA 001AA", 2 letters/3 digits/2 letters) and motorcycle/trailer
  *   ("UMA 001AA" / "TUA 001AA", 3 letters/3 digits/2 letters).
@@ -36,20 +61,23 @@ type PlateShape = Slot[];
  *
  * Sources: Wikipedia's "Vehicle registration plates of Kenya"/"of Uganda"/
  * "of Tanzania", cross-checked against money254.co.ke, kenyans.co.ke,
- * biznakenya.com, and The Star for the GK/CG formats specifically (the
- * one NTSA public-notice PDF found was a dead link, but the independent
- * secondary sources agree with each other and with the user's own
- * examples), and a web search for Uganda's current digital format
- * (checked 2026-08-26).
+ * biznakenya.com, The Star, Daily Nation, and Kenyans.co.ke's piece on why
+ * Kenya's plates never use O/I, for the GK/CG/KD/pre-1989 formats
+ * specifically (the one NTSA public-notice PDF found was a dead link, but
+ * the independent secondary sources agree with each other and with the
+ * user's own examples), and a web search for Uganda's current digital
+ * format (checked 2026-08-26).
  */
-const PLATE_SHAPES: PlateShape[] = [
-  ['L', 'L', 'L', 'D', 'D', 'D', 'L'],
-  ['L', 'L', 'L', 'L', 'D', 'D', 'D', 'L'],
-  ['D', 'D', { exact: 'C' }, { exact: 'G' }, 'D', 'D', 'D', 'L'],
-  ['L', 'L', 'D', 'D', 'D', 'L', 'L'],
-  ['L', 'L', 'L', 'D', 'D', 'D', 'L', 'L'],
-  [{ exact: 'T' }, 'D', 'D', 'D', 'L', 'L', 'L'],
-  [{ exact: 'Z' }, 'D', 'D', 'D', 'L', 'L', 'L'],
+const PLATE_SHAPES: PlateShapeDef[] = [
+  { slots: ['L', 'L', 'L', 'D', 'D', 'D', 'L'], kenyaOrigin: true },
+  { slots: ['L', 'L', 'L', 'D', 'D', 'D'], kenyaOrigin: true },
+  { slots: ['L', 'L', 'L', 'L', 'D', 'D', 'D', 'L'], kenyaOrigin: true },
+  { slots: ['D', 'D', { exact: 'C' }, { exact: 'G' }, 'D', 'D', 'D', 'L'], kenyaOrigin: true },
+  { slots: [{ exact: 'K' }, { exact: 'D' }, 'D', 'D', 'D', 'D'] },
+  { slots: ['L', 'L', 'D', 'D', 'D', 'L', 'L'] },
+  { slots: ['L', 'L', 'L', 'D', 'D', 'D', 'L', 'L'] },
+  { slots: [{ exact: 'T' }, 'D', 'D', 'D', 'L', 'L', 'L'] },
+  { slots: [{ exact: 'Z' }, 'D', 'D', 'D', 'L', 'L', 'L'] },
 ];
 
 /**
@@ -105,7 +133,8 @@ interface ShapeMatch {
  * corrections shouldn't win over a different shape that accepts the same
  * candidate exactly as read.
  */
-function coerceToShape(candidate: string, shape: PlateShape, span: number): ShapeMatch | null {
+function coerceToShape(candidate: string, def: PlateShapeDef, span: number): ShapeMatch | null {
+  const { slots: shape, kenyaOrigin } = def;
   if (candidate.length !== shape.length) return null;
   const chars = candidate.split('');
   let corrections = 0;
@@ -116,11 +145,17 @@ function coerceToShape(candidate: string, shape: PlateShape, span: number): Shap
       continue;
     }
     const isLetter = /[A-Z]/.test(chars[i]!);
-    if (slot === 'L' && !isLetter) {
-      const fixed = LETTER_LOOKALIKE[chars[i]!];
-      if (!fixed) return null;
-      chars[i] = fixed;
-      corrections++;
+    if (slot === 'L') {
+      // Kenya never uses O or I as a genuine letter, so on a Kenyan-origin shape
+      // these are always an impossible reading for this slot — reject outright
+      // rather than accepting an "already a letter" match that can't be real.
+      if (kenyaOrigin && (chars[i] === 'O' || chars[i] === 'I')) return null;
+      if (!isLetter) {
+        const fixed = LETTER_LOOKALIKE[chars[i]!];
+        if (!fixed) return null;
+        chars[i] = fixed;
+        corrections++;
+      }
     } else if (slot === 'D' && isLetter) {
       const fixed = DIGIT_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
