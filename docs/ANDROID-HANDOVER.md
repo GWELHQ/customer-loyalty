@@ -165,6 +165,33 @@ Returns `Customer[]`:
 not call `POST /mobile/sales` for them (it will `404`). Instead route the
 attendant to the "register new customer" flow, §4.4 below.
 
+### `GET /mobile/customers?cursor=<value>&limit=<value>&updatedSince=<ISO8601>`
+
+Full or incremental customer sync — use this to cache the whole customer
+master list on login (and periodically thereafter) instead of sweeping
+`customers/search` across every phone prefix. Not station-scoped: loyalty
+customers aren't tied to a single station, same as `customers/search`.
+
+```json
+{
+  "items": [ /* Customer[], same shape as customers/search */ ],
+  "nextCursor": "someCustomerDocId"
+}
+```
+
+- `limit` — optional, default 500, max 1000. At under 1,000 total loyalty
+  customers, a single call with the default limit is enough for a full
+  sync; `nextCursor` is `null` once you've reached the end.
+- `cursor` — optional, pass back the previous response's `nextCursor` to
+  get the next page. Omit for the first page.
+- `updatedSince` — optional ISO8601 timestamp. After an initial full pull,
+  pass the time of that pull (or the latest `updatedAt` you've cached) to
+  get only customers changed since then — cheaper than a full re-pull for
+  periodic refreshes.
+- Results are ordered by `updatedAt` (not name) — this is what makes
+  `updatedSince` filtering possible without a second index, and doesn't
+  matter for a cache-the-whole-list use case.
+
 ### `GET /mobile/prices/current`
 
 Same `prices` array as in bootstrap, standalone — use to refresh prices

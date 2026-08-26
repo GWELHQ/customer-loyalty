@@ -111,6 +111,37 @@ export class CustomersService {
     };
   }
 
+  /**
+   * Full/incremental customer sync for the Android app (`GET
+   * /mobile/customers`) — unscoped by station (loyalty customers aren't
+   * station-locked) and, unlike `list()`, skips the `count()` call since
+   * the mobile client doesn't need a total. Ordered by `updatedAt` rather
+   * than `fullName`: with `updatedSince` set, Firestore requires the first
+   * `orderBy` to match the field used in the range filter, and ordering by
+   * `updatedAt` unconditionally (even for a full pull) keeps one query
+   * shape and avoids a second composite index.
+   */
+  async listForMobile(params: { cursor?: string; limit: number; updatedSince?: string }): Promise<{
+    items: Customer[];
+    nextCursor: string | null;
+  }> {
+    let query = this.col() as FirebaseFirestore.Query;
+    if (params.updatedSince) query = query.where('updatedAt', '>', params.updatedSince);
+    query = query.orderBy('updatedAt');
+
+    if (params.cursor) {
+      const cursorSnap = await this.col().doc(params.cursor).get();
+      if (cursorSnap.exists) query = query.startAfter(cursorSnap);
+    }
+
+    const snap = await query.limit(params.limit).get();
+    const items = snap.docs.map((d) => fromDoc<Customer>(d));
+    return {
+      items,
+      nextCursor: snap.docs.length === params.limit ? snap.docs.at(-1)!.id : null,
+    };
+  }
+
   async create(input: {
     fullName: string;
     phoneNumber: string;

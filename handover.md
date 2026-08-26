@@ -28,3 +28,18 @@ If you're still seeing consistent `null` results after this date, that's
 a new issue, not the one already fixed — grab the failing check's
 `imageUrl` (a `gs://...` pointer into the `vehicle-plate-checks` bucket)
 and we can pull the exact file Vision saw.
+
+---
+
+# Handover — bulk customer list endpoint
+
+Date: 2026-08-26
+
+In response to the request to replace the phone-prefix-sweep sync hack:
+`GET /mobile/customers?cursor=&limit=&updatedSince=` now exists,
+attendant-scoped like the rest of `/mobile/*`, unscoped by station, same
+`Customer` shape as `customers/search`. Default/max `limit` is 500/1000 —
+one call covers the whole customer base at current volume. `updatedSince`
+(ISO8601) supports incremental syncs after the first full pull. Full
+details in `docs/ANDROID-HANDOVER.md` under
+"`GET /mobile/customers?cursor=...`".

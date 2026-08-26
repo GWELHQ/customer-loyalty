@@ -15,6 +15,7 @@ import { StationsService } from '../stations/stations.service';
 import { UsersService } from '../users/users.service';
 import type { AttendantPrincipal } from '../common/types/principal';
 import { BulkSyncDto } from './dto/bulk-sync.dto';
+import { ListMobileCustomersQueryDto } from './dto/list-mobile-customers-query.dto';
 import { MobileCreateSaleDto } from './dto/mobile-create-sale.dto';
 import { ReportSmsStatusDto } from './dto/report-sms-status.dto';
 import { SubmitCustomerRegistrationDto } from './dto/submit-customer-registration.dto';
@@ -60,6 +61,16 @@ export class MobileController {
       configVersion: 1,
       serverTime: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Full/incremental customer sync — lets the app cache the whole customer
+   * master list on login instead of sweeping `customers/search` across
+   * every phone prefix.
+   */
+  @Get('customers')
+  listCustomers(@Query() query: ListMobileCustomersQueryDto) {
+    return this.customers.listForMobile(query);
   }
 
   @Get('customers/search')
