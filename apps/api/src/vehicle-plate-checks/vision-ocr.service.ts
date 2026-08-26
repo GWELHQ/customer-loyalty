@@ -3,8 +3,49 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/configuration';
 
-/** A full Kenyan plate: 3 letters, 3 digits, 1 letter, e.g. "KBW878S". */
-const FULL_PLATE = /^[A-Z]{3}[0-9]{3}[A-Z]$/;
+/** A candidate 7-character run shaped like a Kenyan plate: letter, digit, or ambiguous in each slot. */
+const PLATE_SHAPE = /^[A-Z0-9]{7}$/;
+
+/**
+ * Well-established OCR-confused pairs, keyed by which reading is "wrong"
+ * for the slot in question. Deliberately excludes shakier pairs like G/6 —
+ * tested against a real misread ("005" detected as "GO5") and it produced
+ * a confident but *wrong* digit rather than a safe non-match, which is
+ * worse than declining to guess.
+ */
+const DIGIT_LOOKALIKE: Record<string, string> = { O: '0', I: '1', L: '1', S: '5', B: '8', Z: '2' };
+const LETTER_LOOKALIKE: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z' };
+
+/**
+ * Coerces a 7-character candidate into the fixed Kenyan plate shape (3
+ * letters, 3 digits, 1 letter) by correcting characters that landed in the
+ * "wrong" slot but are well-known OCR lookalikes (0/O, 1/I, 5/S, 8/B, 2/Z,
+ * 6/G) — e.g. Vision reading a plate's embossed zero as a letter "O" or
+ * "G". Since the format at each position is fixed for a real plate, a
+ * mismatched character there is virtually always a misread, not a
+ * genuinely different value. Returns null if a character can't be
+ * reconciled with its expected slot at all.
+ */
+function coerceToPlateShape(candidate: string): string | null {
+  const letterSlots = [0, 1, 2, 6];
+  const digitSlots = [3, 4, 5];
+  const chars = candidate.split('');
+  for (const i of letterSlots) {
+    if (!/[A-Z]/.test(chars[i]!)) {
+      const fixed = LETTER_LOOKALIKE[chars[i]!];
+      if (!fixed) return null;
+      chars[i] = fixed;
+    }
+  }
+  for (const i of digitSlots) {
+    if (!/[0-9]/.test(chars[i]!)) {
+      const fixed = DIGIT_LOOKALIKE[chars[i]!];
+      if (!fixed) return null;
+      chars[i] = fixed;
+    }
+  }
+  return chars.join('');
+}
 
 /**
  * Pulls a plate out of a whitespace-split word list by trying every run of
@@ -20,7 +61,9 @@ function findPlateInWords(words: string[]): string | null {
   for (let i = 0; i < words.length; i++) {
     for (let span = 1; span <= 3 && i + span <= words.length; span++) {
       const combined = words.slice(i, i + span).join('');
-      if (FULL_PLATE.test(combined)) return combined;
+      if (!PLATE_SHAPE.test(combined)) continue;
+      const plate = coerceToPlateShape(combined);
+      if (plate) return plate;
     }
   }
   return null;
