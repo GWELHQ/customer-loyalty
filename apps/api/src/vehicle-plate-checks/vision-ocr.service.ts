@@ -87,6 +87,8 @@ interface ShapeMatch {
   plate: string;
   /** How many characters had to be reinterpreted via a lookalike table to fit this shape. */
   corrections: number;
+  /** How many OCR words were concatenated to build this candidate. */
+  span: number;
 }
 
 /**
@@ -103,7 +105,7 @@ interface ShapeMatch {
  * corrections shouldn't win over a different shape that accepts the same
  * candidate exactly as read.
  */
-function coerceToShape(candidate: string, shape: PlateShape): ShapeMatch | null {
+function coerceToShape(candidate: string, shape: PlateShape, span: number): ShapeMatch | null {
   if (candidate.length !== shape.length) return null;
   const chars = candidate.split('');
   let corrections = 0;
@@ -126,21 +128,32 @@ function coerceToShape(candidate: string, shape: PlateShape): ShapeMatch | null 
       corrections++;
     }
   }
-  return { plate: chars.join(''), corrections };
+  return { plate: chars.join(''), corrections, span };
+}
+
+/** True if `a` is a better match than `b`: fewer corrections wins; on a tie, fewer words wins. */
+function isBetterMatch(a: ShapeMatch, b: ShapeMatch): boolean {
+  if (a.corrections !== b.corrections) return a.corrections < b.corrections;
+  return a.span < b.span;
 }
 
 /**
  * Pulls the best-fitting plate out of a whitespace-split word list by
  * trying every run of up to 3 consecutive words concatenated together
  * against every known plate shape, and keeping whichever match required
- * the fewest lookalike corrections (ties broken by whichever was found
- * first). Kenyan plates are laid out as 1-3 separate OCR "words"
- * depending on spacing/line breaks (e.g. "KBW" + "878S", or "KBW" + "878"
- * + "S", or a single "KBW878S") — trying short consecutive runs handles
- * all of those without assuming a fixed separator, while still requiring
- * the groups to be adjacent words (so unrelated text elsewhere in the
- * photo, e.g. a serial number printed along the plate's edge, can't get
- * spliced into the middle of a match).
+ * the fewest lookalike corrections — ties broken toward fewer words
+ * combined, since a tighter grouping is less likely to have accidentally
+ * swept in a stray character from unrelated nearby text (seen in
+ * practice: a stray "C" picked up next to a plate produced an 8-char
+ * "CKAY851Q" that fit the EV-motorcycle shape with zero corrections, an
+ * equally "clean" match as the correct 7-char "KAY851Q" — span breaks
+ * that tie correctly since the real plate needs fewer words). Kenyan
+ * plates are laid out as 1-3 separate OCR "words" depending on
+ * spacing/line breaks (e.g. "KBW" + "878S", or "KBW" + "878" + "S", or a
+ * single "KBW878S") — trying short consecutive runs handles all of those
+ * without assuming a fixed separator, while still requiring the groups
+ * to be adjacent words (so unrelated text elsewhere in the photo can't
+ * get spliced into the middle of a match).
  */
 function findPlateInWords(words: string[]): ShapeMatch | null {
   let best: ShapeMatch | null = null;
@@ -149,8 +162,8 @@ function findPlateInWords(words: string[]): ShapeMatch | null {
       const combined = words.slice(i, i + span).join('');
       if (!/^[A-Z0-9]+$/.test(combined)) continue;
       for (const shape of PLATE_SHAPES) {
-        const candidate = coerceToShape(combined, shape);
-        if (candidate && (!best || candidate.corrections < best.corrections)) {
+        const candidate = coerceToShape(combined, shape, span);
+        if (candidate && (!best || isBetterMatch(candidate, best))) {
           best = candidate;
         }
       }
