@@ -9,16 +9,21 @@ type PlateShape = Slot[];
 
 /**
  * Plate shapes this app expects to see at a station near the Kenya/Uganda/
- * Tanzania border. Deliberately excludes diplomatic, government, and
- * personalized formats — those are too irregular to pattern-match (e.g.
- * Kenyan diplomatic plates are sequential per-country assignments like
- * "1CD1AK", with no fixed shape at all) and not a realistic customer
- * segment for a cashback loyalty program.
+ * Tanzania border, including Kenyan government vehicle categories.
+ * Deliberately excludes diplomatic and personalized formats from this
+ * fixed-shape list — diplomatic plates are handled separately below
+ * (genuinely variable-length, doesn't fit a fixed shape), and personalized
+ * plates have no pattern at all.
  *
- * - Kenya standard, 1989-present (also covers current-era and electric
- *   cars, e.g. "KAA 123B" / "EVA 001A"), and Uganda's old pre-2023 format
- *   ("UAA 001A") — both are the same 3-letter/3-digit/1-letter shape.
+ * - Kenya standard, 1989-present (also covers current-era plates,
+ *   electric cars — "EVA 001A" — and Government of Kenya vehicles, which
+ *   are just a "GK" + department-letter 3-letter prefix like any other
+ *   series, e.g. "GKA 227B" — plus Uganda's old pre-2023 format,
+ *   "UAA 001A") — all the same 3-letter/3-digit/1-letter shape.
  * - Kenya electric motorcycles, 2024- ("EMAA 001A") — 4 letters.
+ * - Kenya county government ("42CG 002A") — 2-digit county code, fixed
+ *   "CG", 3 digits, 1 letter. "CG" must match exactly (not coercible)
+ *   since it's a fixed category marker, not an arbitrary series code.
  * - Uganda's current digital plates (introduced Nov 2023): private
  *   ("UA 001AA", 2 letters/3 digits/2 letters) and motorcycle/trailer
  *   ("UMA 001AA" / "TUA 001AA", 3 letters/3 digits/2 letters).
@@ -30,17 +35,43 @@ type PlateShape = Slot[];
  *   7-character run and swamp the more specific Kenya/Uganda shapes.
  *
  * Sources: Wikipedia's "Vehicle registration plates of Kenya"/"of Uganda"/
- * "of Tanzania", and a web search for Uganda's current digital format
+ * "of Tanzania", cross-checked against money254.co.ke, kenyans.co.ke,
+ * biznakenya.com, and The Star for the GK/CG formats specifically (the
+ * one NTSA public-notice PDF found was a dead link, but the independent
+ * secondary sources agree with each other and with the user's own
+ * examples), and a web search for Uganda's current digital format
  * (checked 2026-08-26).
  */
 const PLATE_SHAPES: PlateShape[] = [
   ['L', 'L', 'L', 'D', 'D', 'D', 'L'],
   ['L', 'L', 'L', 'L', 'D', 'D', 'D', 'L'],
+  ['D', 'D', { exact: 'C' }, { exact: 'G' }, 'D', 'D', 'D', 'L'],
   ['L', 'L', 'D', 'D', 'D', 'L', 'L'],
   ['L', 'L', 'L', 'D', 'D', 'D', 'L', 'L'],
   [{ exact: 'T' }, 'D', 'D', 'D', 'L', 'L', 'L'],
   [{ exact: 'Z' }, 'D', 'D', 'D', 'L', 'L', 'L'],
 ];
+
+/**
+ * Kenyan diplomatic plates ("25CD 090AK", "5CD 18K") don't fit a fixed
+ * shape — the country-code digit run, sequence-number digit run, and
+ * rank-letter suffix all vary in length across real examples. Matched
+ * separately as two adjacent OCR words: a literal "<digits>CD" marker
+ * (the "CD" is required exact — it's what makes this pattern distinctive
+ * enough to not false-positive on unrelated digit/letter text) followed
+ * by "<digits><1-2 letters>".
+ */
+const DIPLOMATIC_MARKER = /^([0-9]{1,3})CD$/;
+const DIPLOMATIC_SEQUENCE = /^([0-9]{1,3})([A-Z]{1,2})$/;
+
+function findDiplomaticPlate(words: string[]): string | null {
+  for (let i = 0; i + 1 < words.length; i++) {
+    if (!DIPLOMATIC_MARKER.test(words[i]!)) continue;
+    if (!DIPLOMATIC_SEQUENCE.test(words[i + 1]!)) continue;
+    return words[i]! + words[i + 1]!;
+  }
+  return null;
+}
 
 /**
  * Well-established OCR-confused pairs, keyed by which reading is "wrong"
@@ -52,6 +83,12 @@ const PLATE_SHAPES: PlateShape[] = [
 const DIGIT_LOOKALIKE: Record<string, string> = { O: '0', I: '1', L: '1', S: '5', B: '8', Z: '2' };
 const LETTER_LOOKALIKE: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z' };
 
+interface ShapeMatch {
+  plate: string;
+  /** How many characters had to be reinterpreted via a lookalike table to fit this shape. */
+  corrections: number;
+}
+
 /**
  * Coerces a candidate into the given plate shape by correcting characters
  * that landed in the "wrong" slot but are well-known OCR lookalikes (0/O,
@@ -60,10 +97,16 @@ const LETTER_LOOKALIKE: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S',
  * plate, a mismatched character there is virtually always a misread, not
  * a genuinely different value. Returns null if the length doesn't match
  * or a character can't be reconciled with its expected slot at all.
+ * Tracks how many corrections it made — several plate categories share a
+ * total length (e.g. county's 8 chars vs. the EV-motorcycle shape's 8
+ * chars), and a shape that happens to accept a candidate only via
+ * corrections shouldn't win over a different shape that accepts the same
+ * candidate exactly as read.
  */
-function coerceToShape(candidate: string, shape: PlateShape): string | null {
+function coerceToShape(candidate: string, shape: PlateShape): ShapeMatch | null {
   if (candidate.length !== shape.length) return null;
   const chars = candidate.split('');
+  let corrections = 0;
   for (let i = 0; i < shape.length; i++) {
     const slot = shape[i]!;
     if (typeof slot === 'object') {
@@ -75,19 +118,23 @@ function coerceToShape(candidate: string, shape: PlateShape): string | null {
       const fixed = LETTER_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
+      corrections++;
     } else if (slot === 'D' && isLetter) {
       const fixed = DIGIT_LOOKALIKE[chars[i]!];
       if (!fixed) return null;
       chars[i] = fixed;
+      corrections++;
     }
   }
-  return chars.join('');
+  return { plate: chars.join(''), corrections };
 }
 
 /**
- * Pulls a plate out of a whitespace-split word list by trying every run of
- * up to 3 consecutive words concatenated together, against every known
- * plate shape. Kenyan plates are laid out as 1-3 separate OCR "words"
+ * Pulls the best-fitting plate out of a whitespace-split word list by
+ * trying every run of up to 3 consecutive words concatenated together
+ * against every known plate shape, and keeping whichever match required
+ * the fewest lookalike corrections (ties broken by whichever was found
+ * first). Kenyan plates are laid out as 1-3 separate OCR "words"
  * depending on spacing/line breaks (e.g. "KBW" + "878S", or "KBW" + "878"
  * + "S", or a single "KBW878S") — trying short consecutive runs handles
  * all of those without assuming a fixed separator, while still requiring
@@ -95,18 +142,21 @@ function coerceToShape(candidate: string, shape: PlateShape): string | null {
  * photo, e.g. a serial number printed along the plate's edge, can't get
  * spliced into the middle of a match).
  */
-function findPlateInWords(words: string[]): string | null {
+function findPlateInWords(words: string[]): ShapeMatch | null {
+  let best: ShapeMatch | null = null;
   for (let i = 0; i < words.length; i++) {
     for (let span = 1; span <= 3 && i + span <= words.length; span++) {
       const combined = words.slice(i, i + span).join('');
       if (!/^[A-Z0-9]+$/.test(combined)) continue;
       for (const shape of PLATE_SHAPES) {
-        const plate = coerceToShape(combined, shape);
-        if (plate) return plate;
+        const candidate = coerceToShape(combined, shape);
+        if (candidate && (!best || candidate.corrections < best.corrections)) {
+          best = candidate;
+        }
       }
     }
   }
-  return null;
+  return best;
 }
 
 /**
@@ -152,7 +202,11 @@ export class VisionOcrService {
         .replace(/[^A-Z0-9\s]/g, ' ')
         .split(/\s+/)
         .filter(Boolean);
-      const plate = findPlateInWords(words);
+      const shapeMatch = findPlateInWords(words);
+      const diplomaticPlate = findDiplomaticPlate(words);
+      // Diplomatic matches are an exact regex fit (no lookalike correction involved), so
+      // they only lose to a shape match that was itself correction-free.
+      const plate = shapeMatch && shapeMatch.corrections === 0 ? shapeMatch.plate : (diplomaticPlate ?? shapeMatch?.plate ?? null);
       if (!plate) {
         this.logger.warn(`Vision detected text but no plate-shaped token matched. Raw text: ${JSON.stringify(fullText)}`);
       }
