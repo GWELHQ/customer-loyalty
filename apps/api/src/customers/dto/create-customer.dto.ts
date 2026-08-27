@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateCustomerDto {
   @ApiProperty()
@@ -16,10 +16,15 @@ export class CreateCustomerDto {
   @IsString()
   homeStationId?: string;
 
-  @ApiPropertyOptional({ description: 'Registered vehicle plate, e.g. "KAA 123B" — normalized server-side.' })
+  @ApiPropertyOptional({
+    description: 'Registered vehicle plates, e.g. ["KAA 123B", "KBW 878S"] — one customer can fuel more than one vehicle. Normalized server-side.',
+    type: [String],
+  })
   @IsOptional()
-  @IsString()
-  licensePlateNumber?: string;
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  licensePlateNumbers?: string[];
 
   @ApiPropertyOptional({ description: 'Physical NFC tag UID assigned to this customer — normalized server-side, must be unique.' })
   @IsOptional()

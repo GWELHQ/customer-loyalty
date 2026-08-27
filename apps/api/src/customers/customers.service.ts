@@ -147,7 +147,7 @@ export class CustomersService {
     phoneNumber: string;
     homeStationId?: string;
     source?: Customer['source'];
-    licensePlateNumber?: string;
+    licensePlateNumbers?: string[];
     nfcTagId?: string;
   }): Promise<Customer> {
     const normalized = normalizePhoneNumber(input.phoneNumber);
@@ -164,7 +164,7 @@ export class CustomersService {
       homeStationId: input.homeStationId,
       totalCashbackEarned: 0,
       source: input.source ?? 'manual',
-      licensePlateNumber: input.licensePlateNumber ? normalizeLicensePlate(input.licensePlateNumber) : undefined,
+      licensePlateNumbers: input.licensePlateNumbers?.length ? normalizeLicensePlates(input.licensePlateNumbers) : undefined,
       nfcTagId: input.nfcTagId ? normalizeNfcTagId(input.nfcTagId) : undefined,
       createdAt: now,
       updatedAt: now,
@@ -176,12 +176,12 @@ export class CustomersService {
 
   async update(
     id: string,
-    input: Partial<Pick<Customer, 'fullName' | 'homeStationId' | 'licensePlateNumber' | 'nfcTagId'>>,
+    input: Partial<Pick<Customer, 'fullName' | 'homeStationId' | 'licensePlateNumbers' | 'nfcTagId'>>,
   ): Promise<Customer> {
     await this.findById(id);
     const patch: Record<string, unknown> = { ...input, updatedAt: nowIso() };
-    if (input.licensePlateNumber !== undefined) {
-      patch.licensePlateNumber = input.licensePlateNumber ? normalizeLicensePlate(input.licensePlateNumber) : null;
+    if (input.licensePlateNumbers !== undefined) {
+      patch.licensePlateNumbers = input.licensePlateNumbers.length ? normalizeLicensePlates(input.licensePlateNumbers) : null;
     }
     if (input.nfcTagId !== undefined) {
       if (input.nfcTagId) await this.assertNfcTagAvailable(input.nfcTagId, id);
@@ -294,6 +294,11 @@ export class CustomersService {
 /** Uppercase, strip everything but letters/digits — so "kaa 123b" / "KAA-123-B" / "KAA123B" all compare equal. */
 export function normalizeLicensePlate(plate: string): string {
   return plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Normalizes a list of plates, drops blanks, and dedupes — a customer having the same plate listed twice is a no-op, not two vehicles. */
+export function normalizeLicensePlates(plates: string[]): string[] {
+  return [...new Set(plates.map(normalizeLicensePlate).filter(Boolean))];
 }
 
 /** Uppercase, trimmed — NFC tag UIDs are typically hex strings read verbatim off the tag. */

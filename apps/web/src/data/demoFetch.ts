@@ -32,6 +32,17 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
     const phone = new URL(url, 'http://x').searchParams.get('phone') ?? '';
     return json(demoCustomers.filter((c) => c.phoneNumber.includes(phone.replace(/\D/g, ''))));
   }
+  const customerIdMatch = /^\/customers\/([^/]+)$/.exec(path);
+  if (customerIdMatch && method === 'GET') {
+    const customer = demoCustomers.find((c) => c.id === customerIdMatch[1]);
+    return customer ? json(customer) : json({ message: 'Not found' }, 404);
+  }
+  if (customerIdMatch && method === 'PATCH') {
+    const customer = demoCustomers.find((c) => c.id === customerIdMatch[1]);
+    if (!customer) return json({ message: 'Not found' }, 404);
+    Object.assign(customer, JSON.parse((init?.body as string) ?? '{}'), { updatedAt: new Date().toISOString() });
+    return json(customer);
+  }
   if (path.startsWith('/customers') && method === 'GET') {
     return json({ items: demoCustomers, page: 1, pageSize: 20, total: demoCustomers.length, nextCursor: null });
   }

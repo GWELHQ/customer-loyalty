@@ -101,6 +101,7 @@ export const demoCustomers = [
     homeStationId: 'st-kis1',
     totalCashbackEarned: 640,
     source: 'manual' as const,
+    licensePlateNumbers: ['KVP005R'],
     createdAt: '2026-01-10T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
   },

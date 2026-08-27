@@ -133,7 +133,10 @@ export function CustomerProfile() {
                   <div style={{ marginTop: 4 }}>
                     Home station: {stations.find((s) => s.id === customer.homeStationId)?.name ?? 'None set'}
                   </div>
-                  <div style={{ marginTop: 4 }}>License plate: {customer.licensePlateNumber ?? 'None set'}</div>
+                  <div style={{ marginTop: 4 }}>
+                    License plate{(customer.licensePlateNumbers?.length ?? 0) > 1 ? 's' : ''}:{' '}
+                    {customer.licensePlateNumbers?.length ? customer.licensePlateNumbers.join(', ') : 'None set'}
+                  </div>
                   <div style={{ marginTop: 4 }}>NFC tag: {customer.nfcTagId ?? 'None assigned'}</div>
                 </div>
               ) : (
@@ -254,10 +257,18 @@ function CustomerDetailsForm({
   const api = useApi();
   const [fullName, setFullName] = useState(customer.fullName);
   const [homeStationId, setHomeStationId] = useState(customer.homeStationId ?? '');
-  const [licensePlateNumber, setLicensePlateNumber] = useState(customer.licensePlateNumber ?? '');
+  const [licensePlateNumbers, setLicensePlateNumbers] = useState<string[]>(customer.licensePlateNumbers ?? []);
+  const [newPlate, setNewPlate] = useState('');
   const [nfcTagId, setNfcTagId] = useState(customer.nfcTagId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  function addPlate() {
+    const trimmed = newPlate.trim();
+    if (!trimmed) return;
+    setLicensePlateNumbers((prev) => [...prev, trimmed]);
+    setNewPlate('');
+  }
 
   async function save() {
     setError(null);
@@ -266,7 +277,7 @@ function CustomerDetailsForm({
       await api.customers.update(customer.id, {
         fullName,
         homeStationId: homeStationId || undefined,
-        licensePlateNumber: licensePlateNumber || undefined,
+        licensePlateNumbers,
         nfcTagId: nfcTagId || undefined,
       });
       onSaved();
@@ -297,13 +308,39 @@ function CustomerDetailsForm({
           ))}
         </select>
       </Field>
-      <Field label="License plate number">
-        <input
-          style={inputStyle}
-          value={licensePlateNumber}
-          onChange={(e) => setLicensePlateNumber(e.target.value)}
-          placeholder="e.g. KAA 123B"
-        />
+      <Field label="License plate numbers">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {licensePlateNumbers.map((plate, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ ...inputStyle, flex: 1, display: 'flex', alignItems: 'center' }}>{plate}</div>
+              <button
+                type="button"
+                onClick={() => setLicensePlateNumbers((prev) => prev.filter((_, j) => j !== i))}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 }}
+                aria-label={`Remove ${plate}`}
+              >
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              style={{ ...inputStyle, flex: 1 }}
+              value={newPlate}
+              onChange={(e) => setNewPlate(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addPlate();
+                }
+              }}
+              placeholder="e.g. KAA 123B"
+            />
+            <Button variant="secondary" size="sm" onClick={addPlate} disabled={!newPlate.trim()}>
+              <Icon name="plus" size={13} />
+            </Button>
+          </div>
+        </div>
       </Field>
       <Field label="NFC tag ID">
         <input

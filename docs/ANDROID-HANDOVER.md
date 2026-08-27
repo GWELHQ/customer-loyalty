@@ -155,11 +155,20 @@ Returns `Customer[]`:
     "specialRateEffectiveTo": null,
     "totalCashbackEarned": 1240.5,
     "source": "manual",
+    "licensePlateNumbers": ["KAA123B", "KBW878S"],
+    "nfcTagId": "04A2B3C4D5E680",
     "createdAt": "...",
     "updatedAt": "..."
   }
 ]
 ```
+
+`licensePlateNumbers` is an array — a customer can have more than one
+vehicle on file (family car + motorcycle, etc.); absent or `[]` means
+none set. `nfcTagId` is likewise absent, not an error, when no tag is
+assigned. Both appear on every `Customer`-returning endpoint (this one,
+`GET /mobile/customers`, `GET /mobile/customers/:id`,
+`GET /mobile/customers/nfc/:tagId`).
 
 **If the phone number isn't found**, this customer doesn't exist yet — do
 not call `POST /mobile/sales` for them (it will `404`). Instead route the

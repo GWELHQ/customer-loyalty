@@ -4,6 +4,7 @@ import { useApi } from '../../data/client';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import { Button, Card, Field, inputStyle } from '../../ui/primitives';
+import { Icon } from '../../ui/Icon';
 
 export function CustomerCreate() {
   const api = useApi();
@@ -12,10 +13,18 @@ export function CustomerCreate() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [homeStationId, setHomeStationId] = useState('');
-  const [licensePlateNumber, setLicensePlateNumber] = useState('');
+  const [licensePlateNumbers, setLicensePlateNumbers] = useState<string[]>([]);
+  const [newPlate, setNewPlate] = useState('');
   const [nfcTagId, setNfcTagId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  function addPlate() {
+    const trimmed = newPlate.trim();
+    if (!trimmed) return;
+    setLicensePlateNumbers((prev) => [...prev, trimmed]);
+    setNewPlate('');
+  }
 
   async function submit() {
     setError(null);
@@ -25,7 +34,7 @@ export function CustomerCreate() {
         fullName,
         phoneNumber,
         homeStationId: homeStationId || undefined,
-        licensePlateNumber: licensePlateNumber || undefined,
+        licensePlateNumbers: licensePlateNumbers.length ? licensePlateNumbers : undefined,
         nfcTagId: nfcTagId || undefined,
       });
       navigate(`/customers/${customer.id}`);
@@ -61,13 +70,39 @@ export function CustomerCreate() {
               ))}
             </select>
           </Field>
-          <Field label="License plate number (optional)">
-            <input
-              style={inputStyle}
-              value={licensePlateNumber}
-              onChange={(e) => setLicensePlateNumber(e.target.value)}
-              placeholder="e.g. KAA 123B"
-            />
+          <Field label="License plate numbers (optional)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {licensePlateNumbers.map((plate, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ ...inputStyle, flex: 1, display: 'flex', alignItems: 'center' }}>{plate}</div>
+                  <button
+                    type="button"
+                    onClick={() => setLicensePlateNumbers((prev) => prev.filter((_, j) => j !== i))}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 }}
+                    aria-label={`Remove ${plate}`}
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  value={newPlate}
+                  onChange={(e) => setNewPlate(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addPlate();
+                    }
+                  }}
+                  placeholder="e.g. KAA 123B"
+                />
+                <Button variant="secondary" size="sm" onClick={addPlate} disabled={!newPlate.trim()}>
+                  <Icon name="plus" size={13} />
+                </Button>
+              </div>
+            </div>
           </Field>
           <Field label="NFC tag ID (optional)">
             <input style={inputStyle} value={nfcTagId} onChange={(e) => setNfcTagId(e.target.value)} placeholder="Scanned tag UID" />

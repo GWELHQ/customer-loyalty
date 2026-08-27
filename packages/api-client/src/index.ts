@@ -121,12 +121,12 @@ export class LoyaltyApiClient {
       fullName: string;
       phoneNumber: string;
       homeStationId?: string;
-      licensePlateNumber?: string;
+      licensePlateNumbers?: string[];
       nfcTagId?: string;
     }) => this.http.post<Customer>('/customers', input),
     update: (
       id: string,
-      input: Partial<{ fullName: string; homeStationId: string; licensePlateNumber: string; nfcTagId: string }>,
+      input: Partial<{ fullName: string; homeStationId: string; licensePlateNumbers: string[]; nfcTagId: string }>,
     ) => this.http.patch<Customer>(`/customers/${id}`, input),
     delete: (id: string) => this.http.delete<{ success: boolean }>(`/customers/${id}`),
     uploadImport: (file: File, homeStationId: string) => {

@@ -40,10 +40,10 @@ export class VehiclePlateChecksService {
       this.vision.detectLicensePlate(file.buffer),
     ]);
 
+    // Plates are already normalized at write time; re-normalizing here is defensive, not load-bearing.
     const matched =
       detectedPlateNumber != null &&
-      customer.licensePlateNumber != null &&
-      detectedPlateNumber === normalizeLicensePlate(customer.licensePlateNumber);
+      (customer.licensePlateNumbers ?? []).some((plate) => normalizeLicensePlate(plate) === detectedPlateNumber);
 
     const now = nowIso();
     const doc: Omit<VehiclePlateCheck, 'id'> = {

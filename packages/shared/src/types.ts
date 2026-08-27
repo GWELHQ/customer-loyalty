@@ -69,8 +69,8 @@ export interface Customer extends BaseDoc {
   source: 'manual' | 'import' | 'android';
   lastActivityAt?: ISODateString;
   inactivityNoticeSentAt?: ISODateString;
-  /** Normalized uppercase, spaces/dashes stripped. Compared against OCR results from vehicle-plate-check photos. */
-  licensePlateNumber?: string;
+  /** Normalized uppercase, spaces/dashes stripped, one per vehicle the customer fuels. Compared against OCR results from vehicle-plate-check photos. */
+  licensePlateNumbers?: string[];
   /** Normalized uppercase. Physical NFC tag UID, staff-assigned via the admin app, unique across customers. */
   nfcTagId?: string;
 }

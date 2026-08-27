@@ -101,7 +101,7 @@ export class FraudDetectionService {
       evidence: {
         plateCheckId: check.plateCheckId,
         detectedPlateNumber: check.detectedPlateNumber,
-        customerLicensePlateNumber: customer?.licensePlateNumber ?? null,
+        customerLicensePlateNumbers: customer?.licensePlateNumbers ?? null,
       },
     });
   }
