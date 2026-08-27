@@ -6,6 +6,7 @@ import { Public } from '../common/decorators/public.decorator';
 import type { AuthPrincipal } from '../common/types/principal';
 import { AuthService } from './auth.service';
 import { AttendantLoginDto } from './dto/attendant-login.dto';
+import { AttendantNfcLoginDto } from './dto/attendant-nfc-login.dto';
 import { MicrosoftCallbackDto } from './dto/microsoft-callback.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
@@ -40,6 +41,18 @@ export class AuthController {
   @Post('attendant/login')
   attendantLogin(@Body() dto: AttendantLoginDto) {
     return this.auth.loginAttendant(dto.employeeId, dto.pin);
+  }
+
+  /**
+   * Badge-tap login — no PIN. Same throttle as PIN login: a wrong/unregistered
+   * tag isn't a guessable secret, but this still caps how fast a scanning
+   * device (or someone probing) can hammer the endpoint.
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('attendant/nfc-login')
+  attendantNfcLogin(@Body() dto: AttendantNfcLoginDto) {
+    return this.auth.loginAttendantByNfcTag(dto.tagId);
   }
 
   @Post('logout')

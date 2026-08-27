@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role, UserStatus } from '@loyalty/shared';
+import { Role, UserStatus, type Attendant } from '@loyalty/shared';
 import { AttendantsService } from '../attendants/attendants.service';
 import { AuditService } from '../common/audit/audit.service';
 import { TokenService } from '../common/token/token.service';
@@ -112,7 +112,19 @@ export class AuthService {
 
   async loginAttendant(employeeId: string, pin: string): Promise<AttendantSession> {
     const attendant = await this.attendants.verifyCredentials(employeeId, pin);
+    return this.issueAttendantSession(attendant, 'auth.attendant_login');
+  }
 
+  /** Badge-tap login — no PIN, see AttendantsService.verifyByNfcTag for the security tradeoff this accepts. */
+  async loginAttendantByNfcTag(tagId: string): Promise<AttendantSession> {
+    const attendant = await this.attendants.verifyByNfcTag(tagId);
+    return this.issueAttendantSession(attendant, 'auth.attendant_nfc_login');
+  }
+
+  private async issueAttendantSession(
+    attendant: Attendant,
+    auditAction: 'auth.attendant_login' | 'auth.attendant_nfc_login',
+  ): Promise<AttendantSession> {
     const principal: AttendantPrincipal = {
       kind: 'attendant',
       attendantId: attendant.id,
@@ -126,7 +138,7 @@ export class AuthService {
 
     await this.audit.record({
       actor: principal,
-      action: 'auth.attendant_login',
+      action: auditAction,
       entityType: 'attendant',
       entityId: attendant.id,
       entityLabel: attendant.fullName,

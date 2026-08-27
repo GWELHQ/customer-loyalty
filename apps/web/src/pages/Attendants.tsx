@@ -17,6 +17,7 @@ function attendantColumns(stations: Station[]): ExportColumn<Attendant>[] {
     { header: 'Employee ID', value: (a) => a.employeeId },
     { header: 'Station', value: (a) => stations.find((s) => s.id === a.assignedStationId)?.name ?? 'Unknown station' },
     { header: 'Status', value: (a) => a.status },
+    { header: 'RFID/NFC badge assigned', value: (a) => (a.nfcTagId ? 'Yes' : 'No') },
   ];
 }
 
@@ -95,6 +96,7 @@ export function Attendants() {
                 <Th>Employee ID</Th>
                 <Th>Station</Th>
                 <Th>Status</Th>
+                <Th>Badge</Th>
                 <Th align="right">Actions</Th>
               </tr>
             </thead>
@@ -107,6 +109,7 @@ export function Attendants() {
                   <Td>
                     <Badge tone={a.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>{a.status}</Badge>
                   </Td>
+                  <Td>{a.nfcTagId ? <Badge tone="info">Assigned</Badge> : <span style={{ color: 'var(--color-text-muted)' }}>None</span>}</Td>
                   <Td align="right">
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Button variant="secondary" size="sm" onClick={() => setEditing(a)}>
@@ -192,6 +195,7 @@ function EditAttendantForm({
   const [fullName, setFullName] = useState(attendant.fullName);
   const [employeeId, setEmployeeId] = useState(attendant.employeeId);
   const [assignedStationId, setAssignedStationId] = useState(attendant.assignedStationId);
+  const [nfcTagId, setNfcTagId] = useState(attendant.nfcTagId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -199,7 +203,10 @@ function EditAttendantForm({
     setBusy(true);
     setError(null);
     try {
-      await api.attendants.update(attendant.id, { fullName, employeeId });
+      // nfcTagId is always sent, even empty — the backend treats an omitted
+      // field as "leave unchanged" but an empty string as "clear it", so
+      // unassigning a lost/stolen badge needs the explicit empty string.
+      await api.attendants.update(attendant.id, { fullName, employeeId, nfcTagId });
       if (assignedStationId !== attendant.assignedStationId) {
         await api.attendants.assignStation(attendant.id, assignedStationId);
       }
@@ -233,6 +240,14 @@ function EditAttendantForm({
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="RFID/NFC badge UID">
+          <input
+            style={inputStyle}
+            value={nfcTagId}
+            onChange={(e) => setNfcTagId(e.target.value)}
+            placeholder="Scanned badge UID — leave blank for none"
+          />
         </Field>
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

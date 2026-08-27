@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { normalizePhoneNumber, type Customer } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { normalizeNfcTagId } from '../common/nfc/normalize-nfc-tag-id';
 import type { PaginatedResult, PaginationQueryDto } from '../common/dto/pagination.dto';
 import { ChangeEventsService } from '../events/change-events.service';
 
@@ -301,7 +302,3 @@ export function normalizeLicensePlates(plates: string[]): string[] {
   return [...new Set(plates.map(normalizeLicensePlate).filter(Boolean))];
 }
 
-/** Uppercase, trimmed — NFC tag UIDs are typically hex strings read verbatim off the tag. */
-export function normalizeNfcTagId(tagId: string): string {
-  return tagId.trim().toUpperCase();
-}

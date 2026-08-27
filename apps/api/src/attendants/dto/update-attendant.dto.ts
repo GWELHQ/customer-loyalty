@@ -12,4 +12,9 @@ export class UpdateAttendantDto {
   @IsOptional()
   @IsString()
   employeeId?: string;
+
+  @ApiPropertyOptional({ description: 'Physical RFID/NFC badge UID assigned to this attendant — normalized server-side, must be unique. Logs the attendant straight in, no PIN.' })
+  @IsOptional()
+  @IsString()
+  nfcTagId?: string;
 }

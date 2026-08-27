@@ -98,7 +98,7 @@ export class LoyaltyApiClient {
     resetPin: (id: string, newPin: string) => this.http.post<{ success: boolean }>(`/attendants/${id}/reset-pin`, { newPin }),
     setStatus: (id: string, status: 'active' | 'inactive') => this.http.patch<Attendant>(`/attendants/${id}/status`, { status }),
     assignStation: (id: string, stationId: string) => this.http.patch<Attendant>(`/attendants/${id}/station`, { stationId }),
-    update: (id: string, input: Partial<{ fullName: string; employeeId: string }>) =>
+    update: (id: string, input: Partial<{ fullName: string; employeeId: string; nfcTagId: string }>) =>
       this.http.patch<Attendant>(`/attendants/${id}`, input),
     delete: (id: string) => this.http.delete<{ success: boolean }>(`/attendants/${id}`),
   };

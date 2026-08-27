@@ -278,7 +278,10 @@ function CustomerDetailsForm({
         fullName,
         homeStationId: homeStationId || undefined,
         licensePlateNumbers,
-        nfcTagId: nfcTagId || undefined,
+        // Always sent (even empty) — the backend treats an omitted field as
+        // "leave unchanged" but an empty string as "clear it", so `|| undefined`
+        // here would make it impossible to unassign a tag once set.
+        nfcTagId,
       });
       onSaved();
     } catch (err) {

@@ -70,3 +70,47 @@ Nothing else about the vehicle-plate-check flow changes — same
 `plateCheckId` handoff into `POST /mobile/sales`/`sync`, same
 never-blocks-the-sale behavior. The backend now matches a detected plate
 against *any* of the customer's plates, not just one.
+
+---
+
+# Handover — attendant login via RFID/NFC badge
+
+Date: 2026-08-27
+
+New second way to log an attendant in, alongside the existing employeeId
++ PIN flow — reuses the same tag-lookup pattern already built for
+customer NFC selection.
+
+```
+POST /auth/attendant/nfc-login
+Body: { "tagId": "<raw UID read off the tapped badge>" }
+```
+
+Same response shape, same session type/TTL, same rate limit as PIN
+login — full details in `docs/ANDROID-HANDOVER.md` §3.1b. Confirmed with
+you (Phil) before building: **this is tap-only, no PIN required** — the
+badge UID alone is the credential. That's a deliberately weaker
+guarantee than a PIN (a lost/stolen/cloned badge is a valid login until
+an Admin unassigns it), accepted for speed at the pump. Both login
+methods stay fully available side by side; PIN login is completely
+unchanged.
+
+Badges are assigned to attendants by an Admin in the web admin app
+(Attendants → Edit → "RFID/NFC badge UID") — same uniqueness/normalization
+rules as customer NFC tags, just a separate namespace (an attendant's
+badge and a customer's loyalty-card tag are independent, so the same
+physical UID could theoretically exist in both without conflict, though
+that'd be an unusual coincidence in practice).
+
+Every badge login is audit-logged as `auth.attendant_nfc_login`,
+distinct from `auth.attendant_login` (PIN), so a lost-badge incident is
+traceable after the fact.
+
+Verified end-to-end against production data before shipping: unregistered
+tag → `401`, registered tag → valid session that successfully
+authenticates against a real protected route, audit trail correct,
+`lastLoginAt` updates.
+
+Implementation: `apps/api/src/attendants/attendants.service.ts`
+(`verifyByNfcTag`), `apps/api/src/auth/auth.service.ts`
+(`loginAttendantByNfcTag`).

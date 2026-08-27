@@ -94,7 +94,38 @@ Response:
 - There's no `/auth/logout` call needed beyond discarding the token
   locally — sessions are stateless JWTs, nothing to invalidate server-side.
 
-### 3.2 Every other mobile call
+### 3.1b Badge login (RFID/NFC tap, no PIN)
+
+```
+POST /auth/attendant/nfc-login
+Body: { "tagId": "<raw UID read off the tapped badge>" }
+```
+
+Same response shape as PIN login (`accessToken` + `attendant`), same
+`ATTENDANT_JWT_TTL` session, same "no refresh token" behavior — this is
+just a second way to obtain the same kind of session, not a different
+token type. `tagId` is normalized server-side (uppercased/trimmed), so
+send whatever raw string your NFC read returns.
+
+- Rate-limited the same as PIN login (10/60s per client).
+- `401` if the tag isn't assigned to any attendant, or the attendant is
+  inactive — same "contact your supervisor" handling as PIN login's `401`.
+- **This is a deliberately weaker credential than a PIN**, by design: the
+  badge UID alone is sufficient to log in, no second factor. A lost or
+  stolen badge is a valid login until an Admin unassigns it from the
+  attendant's profile in the web admin app. If your UX lets a device
+  remember "last logged-in attendant" or similar, don't let badge login
+  bypass anything PIN login wouldn't also bypass — treat it as exactly
+  equivalent to typing the PIN, not as a lesser check.
+- Badges are assigned to attendants by an Admin in the web admin app
+  (Attendants → Edit → "RFID/NFC badge UID") — there's no in-app flow for
+  Android to register a badge itself, same pattern as customer NFC tags.
+- A tag can only ever be assigned to one attendant at a time (same
+  uniqueness rule as customer NFC tags).
+
+**UX suggestion, not a requirement:** show both a "Tap badge" and a
+"Enter ID + PIN" option on the same login screen, so a lost/dead badge
+never blocks an attendant from working a shift.
 
 Attach `Authorization: Bearer <accessToken>`. A `401` on any call means the
 token is invalid/expired or the attendant was deactivated — send the user

@@ -117,7 +117,7 @@ export class AttendantsController {
       entityType: 'attendant',
       entityId: id,
       entityLabel: attendant.fullName,
-      metadata: { fullName: dto.fullName, employeeId: dto.employeeId },
+      metadata: { fullName: dto.fullName, employeeId: dto.employeeId, nfcTagAssigned: dto.nfcTagId !== undefined },
     });
     return attendant;
   }

@@ -55,6 +55,8 @@ export interface Attendant extends BaseDoc {
   failedPinAttempts: number;
   lockedUntil?: ISODateString;
   lastLoginAt?: ISODateString;
+  /** Normalized uppercase. Physical RFID/NFC staff badge UID — logs the attendant straight in, no PIN. Unique across attendants, staff-assigned via the admin app. */
+  nfcTagId?: string;
 }
 
 export interface Customer extends BaseDoc {

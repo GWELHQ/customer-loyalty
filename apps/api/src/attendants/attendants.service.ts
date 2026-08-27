@@ -3,6 +3,7 @@ import * as argon2 from 'argon2';
 import { PIN_LOCKOUT_MINUTES, PIN_MAX_FAILED_ATTEMPTS, UserStatus, type Attendant } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import { normalizeNfcTagId } from '../common/nfc/normalize-nfc-tag-id';
 import { ChangeEventsService } from '../events/change-events.service';
 
 const COLLECTION = 'attendants';
@@ -32,6 +33,11 @@ export class AttendantsService {
 
   async findByEmployeeId(employeeId: string): Promise<Attendant | null> {
     const snap = await this.col().where('employeeId', '==', employeeId).limit(1).get();
+    return snap.empty ? null : fromDoc<Attendant>(snap.docs[0]!);
+  }
+
+  async findByNfcTagId(tagId: string): Promise<Attendant | null> {
+    const snap = await this.col().where('nfcTagId', '==', normalizeNfcTagId(tagId)).limit(1).get();
     return snap.empty ? null : fromDoc<Attendant>(snap.docs[0]!);
   }
 
@@ -90,14 +96,22 @@ export class AttendantsService {
     return (await this.findById(id))!;
   }
 
-  async update(id: string, input: Partial<{ fullName: string; employeeId: string }>): Promise<Attendant> {
+  async update(
+    id: string,
+    input: Partial<{ fullName: string; employeeId: string; nfcTagId: string }>,
+  ): Promise<Attendant> {
     const attendant = await this.findById(id);
     if (!attendant) throw new NotFoundException('Attendant not found');
     if (input.employeeId && input.employeeId !== attendant.employeeId) {
       const existing = await this.findByEmployeeId(input.employeeId);
       if (existing) throw new ConflictException('Employee ID already in use');
     }
-    await this.col().doc(id).update({ ...input, updatedAt: nowIso() });
+    const patch: Record<string, unknown> = { ...input, updatedAt: nowIso() };
+    if (input.nfcTagId !== undefined) {
+      if (input.nfcTagId) await this.assertNfcTagAvailable(input.nfcTagId, id);
+      patch.nfcTagId = input.nfcTagId ? normalizeNfcTagId(input.nfcTagId) : null;
+    }
+    await this.col().doc(id).update(patch);
     this.changeEvents.emit(COLLECTION);
     return (await this.findById(id))!;
   }
@@ -149,6 +163,38 @@ export class AttendantsService {
     await this.col().doc(attendant.id).update({ lastLoginAt: nowIso() });
 
     return attendant;
+  }
+
+  /**
+   * Logs an attendant in from a tapped RFID/NFC badge alone — no PIN. The
+   * badge UID is the sole credential for this path, by design (confirmed
+   * with the user): faster at the pump, at the cost of anyone holding a
+   * lost/stolen/cloned badge being able to log in as that attendant until
+   * an Admin unassigns the tag. There's no PIN-style lockout counter here
+   * — a wrong/unregistered tag just doesn't resolve to an account, it
+   * isn't a guessable secret being brute-forced against one — but the
+   * login route itself is still rate-limited (see AuthController) and
+   * every tag login is audit-logged distinctly from a PIN login so a lost
+   * badge is traceable after the fact.
+   */
+  async verifyByNfcTag(tagId: string): Promise<Attendant> {
+    const attendant = await this.findByNfcTagId(tagId);
+    if (!attendant) throw new UnauthorizedException('No attendant is registered for this badge');
+
+    if (attendant.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('This attendant account is inactive');
+    }
+
+    await this.col().doc(attendant.id).update({ lastLoginAt: nowIso() });
+    return attendant;
+  }
+
+  /** Throws if the given NFC/RFID tag is already assigned to a different attendant. */
+  private async assertNfcTagAvailable(tagId: string, excludingAttendantId?: string): Promise<void> {
+    const existing = await this.findByNfcTagId(tagId);
+    if (existing && existing.id !== excludingAttendantId) {
+      throw new ConflictException(`Badge ${normalizeNfcTagId(tagId)} is already assigned to another attendant`);
+    }
   }
 
   private async registerFailedAttempt(attendant: Attendant): Promise<void> {
