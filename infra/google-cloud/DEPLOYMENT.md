@@ -185,7 +185,7 @@ gcloud iam workload-identity-pools create github-actions --location=global
 gcloud iam workload-identity-pools providers create-oidc github \
   --location=global --workload-identity-pool=github-actions \
   --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-  --attribute-condition="assertion.repository=='verisence/customer-loyalty'" \
+  --attribute-condition="assertion.repository=='GWELHQ/customer-loyalty'" \
   --issuer-uri="https://token.actions.githubusercontent.com"
 
 gcloud iam service-accounts create github-actions-deployer
