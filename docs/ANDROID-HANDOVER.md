@@ -104,8 +104,12 @@ Body: { "tagId": "<raw UID read off the tapped badge>" }
 Same response shape as PIN login (`accessToken` + `attendant`), same
 `ATTENDANT_JWT_TTL` session, same "no refresh token" behavior — this is
 just a second way to obtain the same kind of session, not a different
-token type. `tagId` is normalized server-side (uppercased/trimmed), so
-send whatever raw string your NFC read returns.
+token type. `tagId` is normalized server-side — uppercased, and every
+character that isn't a letter or digit (colons, dashes, spaces) is
+stripped — so `"F9:45:EF:A2"`, `"F9-45-EF-A2"`, and `"F945EFA2"` all
+normalize to the same value and match each other. Applied identically at
+registration time (web admin) and lookup time, so send whatever raw
+string your NFC read returns, punctuated or not.
 
 - Rate-limited the same as PIN login (10/60s per client).
 - `401` if the tag isn't assigned to any attendant, or the attendant is
@@ -241,10 +245,11 @@ camera and parses the id out of it locally, same as always.
 Resolves a tapped NFC tag's UID to a customer. Staff assign a tag to a
 customer once, from the web admin (Customer profile → "NFC tag ID"
 field) — there's no in-app flow for Android to register a tag itself.
-`404` if no customer has that tag assigned. Tag IDs are matched
-case-insensitively (normalized uppercase server-side, so send whatever
-raw string your NFC read returns) — send the raw tag content as-is, this
-one hasn't changed and isn't a URL.
+`404` if no customer has that tag assigned. Tag IDs are matched the same
+way as badge login above: uppercased with all non-alphanumeric characters
+(colons, dashes, spaces) stripped before comparing, so it doesn't matter
+whether the UID was typed into the web admin with separators or not — send
+the raw tag content as-is, this one hasn't changed and isn't a URL.
 
 Neither of these two endpoints is station-scoped — same as phone search,
 a customer can be selected at any station.

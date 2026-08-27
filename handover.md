@@ -144,3 +144,36 @@ parses the id out locally.
 Full details, including the exact one-line extraction and the (also
 newly-documented) NFC lookup endpoint: `docs/ANDROID-HANDOVER.md`, "§
 `GET /mobile/customers/:id` — QR code lookup".
+
+---
+
+# Handover — NFC tag matching now ignores separators
+
+Date: 2026-08-27
+Audience: Android pump-attendant app team
+
+In response to your report that `POST /auth/attendant/nfc-login` and
+`GET /mobile/customers/nfc/{tagId}` weren't matching two test tags even
+though the phone read them fine: both routes exist, are deployed, and
+were already documented (§3.1b and the NFC tap lookup section of
+`docs/ANDROID-HANDOVER.md`) — if you were seeing otherwise, you were
+likely reading a copy of the doc from before those sections landed.
+
+The real bug: tag matching used to be trim + uppercase only, with no
+separator handling. Our two test records had been registered through the
+web admin's free-text UID field as `F9:45:EF:A2` and `89:65:32:99`
+(colon-separated, as a human would type a UID), while `NfcTagReader.kt`
+sends unseparated hex (`F945EFA2`, `89653299`) — two different strings to
+an exact match, so both lookups failed even though the hardware read the
+tags correctly.
+
+Fixed properly rather than just patching the two records:
+`normalizeNfcTagId()` (`apps/api/src/common/nfc/normalize-nfc-tag-id.ts`)
+now strips every non-alphanumeric character before uppercasing, so
+`"F9:45:EF:A2"`, `"F9-45-EF-A2"`, and `"F945EFA2"` all normalize to the
+same value. Applied identically at registration time and lookup time, for
+both attendant badges and customer tags, so this can't recur regardless
+of how a UID gets typed into the web admin going forward. The two test
+records have also been corrected directly (now stored unseparated) — no
+client-side change needed, retest should work now. Docs updated to match
+in `docs/ANDROID-HANDOVER.md`.
