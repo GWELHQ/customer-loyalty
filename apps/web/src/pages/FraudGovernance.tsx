@@ -8,6 +8,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
+import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, EmptyState, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const TYPE_LABELS: Record<FraudFlagType, string> = {
@@ -114,6 +115,8 @@ export function FraudGovernance() {
   const [selected, setSelected] = useState<FraudFlag | null>(null);
   const [busy, setBusy] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [resolveTarget, setResolveTarget] = useState<FraudFlag | null>(null);
+  const [dismissTarget, setDismissTarget] = useState<FraudFlag | null>(null);
 
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
@@ -180,8 +183,8 @@ export function FraudGovernance() {
     }
   }
 
-  async function resolve(flag: FraudFlag) {
-    const note = window.prompt('Resolution note (what was found)?') ?? undefined;
+  async function resolve(flag: FraudFlag, note: string) {
+    setResolveTarget(null);
     setBusy(true);
     try {
       const updated = await api.fraudFlags.resolve(flag.id, note);
@@ -191,8 +194,8 @@ export function FraudGovernance() {
     }
   }
 
-  async function dismiss(flag: FraudFlag) {
-    const note = window.prompt('Reason for dismissing this flag?') ?? undefined;
+  async function dismiss(flag: FraudFlag, note: string) {
+    setDismissTarget(null);
     setBusy(true);
     try {
       const updated = await api.fraudFlags.dismiss(flag.id, note);
@@ -385,10 +388,10 @@ export function FraudGovernance() {
             )}
             {canManage && (selected.status === FraudFlagStatus.OPEN || selected.status === FraudFlagStatus.UNDER_REVIEW) && (
               <>
-                <Button variant="primary" size="sm" onClick={() => resolve(selected)} disabled={busy} style={{ marginTop: 12, marginRight: 8 }}>
+                <Button variant="primary" size="sm" onClick={() => setResolveTarget(selected)} disabled={busy} style={{ marginTop: 12, marginRight: 8 }}>
                   Resolve
                 </Button>
-                <Button variant="danger" size="sm" onClick={() => dismiss(selected)} disabled={busy} style={{ marginTop: 12 }}>
+                <Button variant="danger" size="sm" onClick={() => setDismissTarget(selected)} disabled={busy} style={{ marginTop: 12 }}>
                   Dismiss
                 </Button>
               </>
@@ -396,6 +399,27 @@ export function FraudGovernance() {
           </Card>
         )}
       </div>
+
+      {resolveTarget && (
+        <PromptModal
+          title="Resolve fraud flag"
+          label="Resolution note (what was found)"
+          confirmLabel="Resolve"
+          onCancel={() => setResolveTarget(null)}
+          onSubmit={(note) => resolve(resolveTarget, note)}
+        />
+      )}
+
+      {dismissTarget && (
+        <PromptModal
+          title="Dismiss fraud flag"
+          label="Reason for dismissing this flag"
+          confirmLabel="Dismiss"
+          destructive
+          onCancel={() => setDismissTarget(null)}
+          onSubmit={(note) => dismiss(dismissTarget, note)}
+        />
+      )}
     </AppShell>
   );
 }

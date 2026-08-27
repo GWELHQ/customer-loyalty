@@ -9,6 +9,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDate, formatNairobiDateTime, nairobiThisMonth } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
+import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { StepIndicator, type StepIndicatorStep, type StepState } from '../ui/StepIndicator';
 
@@ -82,6 +83,7 @@ export function CashbackLedgers() {
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
+  const [showReject, setShowReject] = useState(false);
   const { paged, page, pageCount, setPage } = usePagedRows(ledger?.entries ?? []);
 
   function reload() {
@@ -108,9 +110,8 @@ export function CashbackLedgers() {
       setBusy(false);
     }
   }
-  async function reject() {
-    const reason = window.prompt('Reason for rejecting this ledger?');
-    if (!reason) return;
+  async function reject(reason: string) {
+    setShowReject(false);
     setBusy(true);
     try {
       await api.cashbackLedgers.reject(month, reason);
@@ -139,7 +140,7 @@ export function CashbackLedgers() {
               <Button variant="primary" onClick={approve} disabled={busy}>
                 Approve
               </Button>
-              <Button variant="danger" onClick={reject} disabled={busy}>
+              <Button variant="danger" onClick={() => setShowReject(true)} disabled={busy}>
                 Reject
               </Button>
             </>
@@ -214,6 +215,17 @@ export function CashbackLedgers() {
           {selected && <CustomerMonthSales entry={selected} month={month} onClose={() => setSelected(null)} />}
         </div>
       </div>
+
+      {showReject && (
+        <PromptModal
+          title="Reject cashback ledger"
+          label="Reason for rejecting this ledger"
+          confirmLabel="Reject"
+          destructive
+          onCancel={() => setShowReject(false)}
+          onSubmit={reject}
+        />
+      )}
     </AppShell>
   );
 }

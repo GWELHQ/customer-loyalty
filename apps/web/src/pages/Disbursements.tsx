@@ -10,6 +10,7 @@ import type { ExportColumn } from '../lib/exportTable';
 import { nairobiThisMonth } from '../lib/time';
 import { Icon } from '../ui/Icon';
 import { ExportButtons } from '../ui/ExportButtons';
+import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
@@ -34,6 +35,7 @@ export function Disbursements() {
   const { items: batches, refresh: reload } = useDisbursementBatchesCache();
   const [month, setMonth] = useState(nairobiThisMonth);
   const [selected, setSelected] = useState<DisbursementBatch | null>(null);
+  const [holdTarget, setHoldTarget] = useState<DisbursementBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -70,18 +72,26 @@ export function Disbursements() {
     }
   }
 
-  async function transition(action: 'confirm' | 'markProcessing' | 'hold', batch: DisbursementBatch) {
+  async function transition(action: 'confirm' | 'markProcessing', batch: DisbursementBatch) {
     setBusy(true);
     try {
-      if (action === 'hold') {
-        const reason = window.prompt('Reason for holding this batch?');
-        if (!reason) return;
-        await api.disbursementBatches.hold(batch.id, reason);
-      } else if (action === 'confirm') {
+      if (action === 'confirm') {
         await api.disbursementBatches.confirm(batch.id);
       } else {
         await api.disbursementBatches.markProcessing(batch.id);
       }
+      reload();
+      setSelected(await api.disbursementBatches.get(batch.id));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function holdBatch(batch: DisbursementBatch, reason: string) {
+    setHoldTarget(null);
+    setBusy(true);
+    try {
+      await api.disbursementBatches.hold(batch.id, reason);
       reload();
       setSelected(await api.disbursementBatches.get(batch.id));
     } finally {
@@ -200,7 +210,7 @@ export function Disbursements() {
                     </Button>
                   )}
                   {selected.status !== DisbursementBatchStatus.COMPLETED && (
-                    <Button variant="danger" size="sm" onClick={() => transition('hold', selected)} disabled={busy}>
+                    <Button variant="danger" size="sm" onClick={() => setHoldTarget(selected)} disabled={busy}>
                       Hold batch
                     </Button>
                   )}
@@ -210,6 +220,18 @@ export function Disbursements() {
           )}
         </div>
       </div>
+
+      {holdTarget && (
+        <PromptModal
+          title="Hold disbursement batch"
+          label="Reason for holding this batch"
+          placeholder="e.g. discrepancy found in entry for..."
+          confirmLabel="Hold batch"
+          destructive
+          onCancel={() => setHoldTarget(null)}
+          onSubmit={(reason) => holdBatch(holdTarget, reason)}
+        />
+      )}
     </AppShell>
   );
 }

@@ -7,6 +7,7 @@ import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import { formatNairobiDate, formatNairobiDateTime } from '../lib/time';
+import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, EmptyState, Field, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 export function SalesApprovals() {
@@ -30,6 +31,7 @@ export function SalesApprovals() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [approveResult, setApproveResult] = useState<{ approved: string[]; skipped: { saleId: string; reason: string }[] } | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Sale | null>(null);
 
   function resetToFirstPage() {
     setCursorStack([undefined]);
@@ -96,9 +98,8 @@ export function SalesApprovals() {
     }
   }
 
-  async function rejectOne(sale: Sale) {
-    const reason = window.prompt('Reason for rejecting this sale (cashback will never be credited)?');
-    if (!reason) return;
+  async function rejectOne(sale: Sale, reason: string) {
+    setRejectTarget(null);
     setBusy(true);
     try {
       await api.sales.reject(sale.id, reason);
@@ -175,7 +176,7 @@ export function SalesApprovals() {
                         <strong>KSh {s.snapshot.cashbackEarned}</strong>
                       </Td>
                       <Td>
-                        <Button variant="danger" size="sm" onClick={() => rejectOne(s)} disabled={busy}>
+                        <Button variant="danger" size="sm" onClick={() => setRejectTarget(s)} disabled={busy}>
                           Reject
                         </Button>
                       </Td>
@@ -229,6 +230,17 @@ export function SalesApprovals() {
             Close
           </Button>
         </Modal>
+      )}
+
+      {rejectTarget && (
+        <PromptModal
+          title="Reject sale"
+          label="Reason for rejecting this sale (cashback will never be credited)"
+          confirmLabel="Reject"
+          destructive
+          onCancel={() => setRejectTarget(null)}
+          onSubmit={(reason) => rejectOne(rejectTarget, reason)}
+        />
       )}
     </AppShell>
   );
