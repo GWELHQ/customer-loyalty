@@ -205,6 +205,50 @@ assigned. Both appear on every `Customer`-returning endpoint (this one,
 not call `POST /mobile/sales` for them (it will `404`). Instead route the
 attendant to the "register new customer" flow, §4.4 below.
 
+### `GET /mobile/customers/:id` — QR code lookup
+
+The QR code shown on a customer's profile in the web admin app is a full
+URL, not a bare id — as of 2026-08-27 (see below for what changed and
+why). Scan it, extract the customer id from it, and call this endpoint
+with that id to get back the same `Customer` shape as every other
+customer-returning endpoint. `404` if the id doesn't exist.
+
+**⚠️ Action required — the QR payload format changed.** It used to be
+just the bare customer id as plain text; it's now a URL shaped like:
+
+```
+https://loyalty-points-413d5.web.app/qr/<customerId>
+```
+
+**Take the id as everything after the last `/`.** That's it — no need to
+parse the URL as a URL, validate the host, or handle query
+strings/fragments (there aren't any). Concretely: split the scanned
+string on `/` and take the last segment. This also means old-format QR
+codes (a bare id, no slashes at all) keep working unchanged with the
+exact same one-line logic, so there's no "detect which format" branching
+needed.
+
+**Why the payload changed:** so that scanning a customer's QR code with
+some *other* app (a generic camera/QR reader, not ours) does something
+sensible instead of just displaying a meaningless id string — Firebase
+Hosting redirects any `/qr/*` path straight to
+`https://greenwellsenergies.com/our-products-services/`. Our own app
+never actually requests that URL — it just reads the same text off the
+camera and parses the id out of it locally, same as always.
+
+### `GET /mobile/customers/nfc/:tagId` — NFC tap lookup
+
+Resolves a tapped NFC tag's UID to a customer. Staff assign a tag to a
+customer once, from the web admin (Customer profile → "NFC tag ID"
+field) — there's no in-app flow for Android to register a tag itself.
+`404` if no customer has that tag assigned. Tag IDs are matched
+case-insensitively (normalized uppercase server-side, so send whatever
+raw string your NFC read returns) — send the raw tag content as-is, this
+one hasn't changed and isn't a URL.
+
+Neither of these two endpoints is station-scoped — same as phone search,
+a customer can be selected at any station.
+
 ### `GET /mobile/customers?cursor=<value>&limit=<value>&updatedSince=<ISO8601>`
 
 Full or incremental customer sync — use this to cache the whole customer

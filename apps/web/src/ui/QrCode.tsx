@@ -7,7 +7,7 @@ const QR_DARK_GREEN = '#20713b';
 const QR_MID_GREEN = '#278e4a';
 const QR_PALE_GREEN = '#eafaf0';
 
-/** Renders a value (a plain customer id, not a URL) as a scannable, brand-styled QR code. */
+/** Renders any string as a scannable, brand-styled QR code — caller decides what the content means. */
 export function QrCode({ value, size = 176 }: { value: string; size?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');

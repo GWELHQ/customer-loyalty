@@ -155,7 +155,15 @@ export function CustomerProfile() {
 
           <Card>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Customer QR code</div>
-            <QrCode value={customer.id} size={140} />
+            {/*
+              A real URL, not a bare id: our own mobile app's scanner parses
+              the customer id out of it directly (see docs/ANDROID-HANDOVER.md
+              §2), while any other QR reader just opens it as a normal link —
+              Firebase Hosting 302s /qr/** straight to the marketing site
+              (firebase.json), so a curious customer scanning with their
+              phone's camera lands somewhere useful instead of a bare id string.
+            */}
+            <QrCode value={`${window.location.origin}/qr/${customer.id}`} size={140} />
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>
               Scan at point of sale to select this customer
             </div>

@@ -6,6 +6,13 @@
   "hosting": {
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*"],
+    "redirects": [
+      {
+        "source": "/qr/**",
+        "destination": "https://greenwellsenergies.com/our-products-services/",
+        "type": 302
+      }
+    ],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   }
 }

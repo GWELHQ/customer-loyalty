@@ -114,3 +114,33 @@ authenticates against a real protected route, audit trail correct,
 Implementation: `apps/api/src/attendants/attendants.service.ts`
 (`verifyByNfcTag`), `apps/api/src/auth/auth.service.ts`
 (`loginAttendantByNfcTag`).
+
+---
+
+# Handover — ⚠️ breaking: customer QR code payload changed
+
+Date: 2026-08-27
+
+**Action required if your app scans the customer QR code.** It used to
+encode a bare customer id as plain text; it now encodes a full URL:
+
+```
+https://loyalty-points-413d5.web.app/qr/<customerId>
+```
+
+**Fix is one line:** take everything after the last `/` in the scanned
+string — that's the customer id, same as before. Old-format QR codes (no
+slashes) keep working unchanged with that exact same logic, so this
+isn't a "detect the format" branch, just a strictly more general way to
+extract the id that happens to also handle the new format.
+
+**Why:** so a customer scanning their own QR with a random camera/QR app
+(not ours) lands somewhere useful — Firebase Hosting now redirects any
+`/qr/*` path to `https://greenwellsenergies.com/our-products-services/`
+— instead of just seeing a bare id string with no context. Our app never
+requests that URL itself; it reads the same camera text as always and
+parses the id out locally.
+
+Full details, including the exact one-line extraction and the (also
+newly-documented) NFC lookup endpoint: `docs/ANDROID-HANDOVER.md`, "§
+`GET /mobile/customers/:id` — QR code lookup".
