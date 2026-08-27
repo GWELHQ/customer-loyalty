@@ -1,0 +1,50 @@
+name: Deploy Firestore indexes
+
+# Firestore composite indexes are declarative (firestore.indexes.json) but
+# NOT automatically applied by writing the file — `firebase deploy --only
+# firestore:indexes` has to actually run for a new index to take effect.
+# Before this workflow existed, that step was manual and easy to forget:
+# multiple features (sale approvals, fraud flags, customer inactivity) each
+# had their required index added to this file but never deployed, so their
+# queries silently threw FAILED_PRECONDITION in production until someone
+# noticed. This workflow makes deployment automatic instead of a step a
+# person has to remember.
+#
+# Deliberately does NOT deploy firestore.rules here — access-control rule
+# changes are a different risk profile than adding an index and are left
+# as a manual `firebase deploy --only firestore:rules` step.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/firestore-indexes-deploy.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: firestore-indexes-deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_ID: loyalty-points-413d5
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: projects/220192479053/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Deploy Firestore indexes
+        run: npx firebase-tools@latest deploy --only firestore:indexes --project ${{ env.PROJECT_ID }} --non-interactive
