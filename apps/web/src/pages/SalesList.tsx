@@ -1,5 +1,6 @@
-import type { Sale } from '@loyalty/shared';
+import { Permission, type Sale } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useCustomersCache } from '../data/useCustomersCache';
 import { useRealtimeRefresh } from '../data/realtime';
@@ -8,6 +9,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
+import { PlateCheckPhoto } from '../ui/PlateCheckPhoto';
 import { Badge, Button, Card, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
 const PAGE_SIZE = 25;
@@ -28,6 +30,8 @@ const SALE_COLUMNS: ExportColumn<Sale>[] = [
 
 export function SalesList() {
   const api = useApi();
+  const { hasPermission } = useAuth();
+  const canViewPlatePhoto = hasPermission(Permission.FRAUD_VIEW);
   const [sales, setSales] = useState<Sale[]>([]);
   const [total, setTotal] = useState(0);
   const { stations } = useStations();
@@ -168,13 +172,14 @@ export function SalesList() {
             )}
             {selected.rejectionReason && <DetailRow label="Rejection reason" value={selected.rejectionReason} />}
             {selected.licensePlateCheck && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--color-border)', fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--color-border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-text-secondary)' }}>License plate</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {selected.licensePlateCheck.detectedPlateNumber ?? 'Not detected'}
                   <Badge tone={selected.licensePlateCheck.matched ? 'success' : 'danger'}>
                     {selected.licensePlateCheck.matched ? 'Matched' : 'Mismatch'}
                   </Badge>
+                  {canViewPlatePhoto && <PlateCheckPhoto plateCheckId={selected.licensePlateCheck.plateCheckId} />}
                 </span>
               </div>
             )}

@@ -27,6 +27,7 @@ import type {
   Station,
   User,
   UserStatus,
+  VehiclePlateCheck,
 } from '@loyalty/shared';
 import { ApiError, HttpClient, toQueryString, type ApiClientOptions } from './http.js';
 
@@ -186,6 +187,11 @@ export class LoyaltyApiClient {
         saleIds,
       }),
     reject: (id: string, reason: string) => this.http.post<Sale>(`/sales/${id}/reject`, { reason }),
+  };
+
+  vehiclePlateChecks = {
+    /** `viewUrl` is a short-lived signed URL (~15 min) — fetch fresh each time you want to display the photo, don't cache it. */
+    get: (id: string) => this.http.get<VehiclePlateCheck & { viewUrl: string }>(`/vehicle-plate-checks/${id}`),
   };
 
   salesDelegations = {

@@ -8,6 +8,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
+import { PlateCheckPhoto } from '../ui/PlateCheckPhoto';
 import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, EmptyState, Modal, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 
@@ -372,6 +373,11 @@ export function FraudGovernance() {
                 </div>
               ))}
             </div>
+            {typeof selected.evidence.plateCheckId === 'string' && (
+              <div style={{ marginTop: 8 }}>
+                <PlateCheckPhoto plateCheckId={selected.evidence.plateCheckId} />
+              </div>
+            )}
 
             {selected.reviewedByName && (
               <>

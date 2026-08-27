@@ -28,6 +28,18 @@ export class VehiclePlateChecksService {
     return fromDoc<VehiclePlateCheck>(snap);
   }
 
+  /**
+   * For staff viewing the photo (fraud review, sale detail) — `imageUrl` is
+   * a `gs://` URI, not something a browser can load directly, so this signs
+   * a short-lived HTTPS URL on every call rather than persisting one (signed
+   * URLs expire; the underlying object doesn't).
+   */
+  async findByIdWithViewUrl(id: string): Promise<VehiclePlateCheck & { viewUrl: string }> {
+    const check = await this.findById(id);
+    const viewUrl = await this.storage.getSignedReadUrl(check.imageUrl);
+    return { ...check, viewUrl };
+  }
+
   async create(
     customerId: string,
     file: { originalname: string; buffer: Buffer; mimetype: string },
