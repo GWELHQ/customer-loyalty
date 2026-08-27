@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PROJECT_ID: loyalty-points-413d5
-  VITE_API_BASE_URL: https://loyalty-api-220192479053.us-central1.run.app/api/v1
+  PROJECT_ID: customer-loyalty-3af1a
+  VITE_API_BASE_URL: https://loyalty-api-1092254911440.us-central1.run.app/api/v1
   VITE_MS_ENTRA_TENANT_ID: 1ef1a63a-37ad-4132-b4b4-4a186937954c
   VITE_MS_ENTRA_CLIENT_ID: d3d57425-01fd-44e0-b14c-f0aeef62e424
   VITE_DATA_MODE: api
@@ -52,7 +52,7 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
-          workload_identity_provider: projects/220192479053/locations/global/workloadIdentityPools/github-actions/providers/github
+          workload_identity_provider: projects/1092254911440/locations/global/workloadIdentityPools/github-actions/providers/github
           service_account: github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
 
       - name: Deploy to Firebase Hosting

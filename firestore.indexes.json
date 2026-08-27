@@ -147,13 +147,6 @@
       ]
     },
     {
-      "collectionGroup": "customers",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "inactivityNoticeSentAt", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "fraudFlags",
       "queryScope": "COLLECTION",
       "fields": [
