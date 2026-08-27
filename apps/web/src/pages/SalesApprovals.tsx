@@ -26,6 +26,7 @@ export function SalesApprovals() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [approveResult, setApproveResult] = useState<{ approved: string[]; skipped: { saleId: string; reason: string }[] } | null>(null);
@@ -38,12 +39,22 @@ export function SalesApprovals() {
 
   const reload = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     api.sales
       .listPendingApproval({ stationId: stationId || undefined, cursor: cursorStack[pageIndex] })
       .then((res) => {
         setSales(res.items);
         setTotal(res.total);
         setNextCursor(res.nextCursor);
+      })
+      .catch((err) => {
+        // Surfaced explicitly rather than left to fall through to the "nothing
+        // pending" empty state — this page's whole job is showing what needs
+        // attention, so a failed fetch must never look identical to "all clear."
+        setSales([]);
+        setTotal(0);
+        setNextCursor(null);
+        setLoadError(err instanceof Error ? err.message : 'Could not load pending sales');
       })
       .finally(() => setLoading(false));
   }, [api, stationId, cursorStack, pageIndex]);
@@ -125,10 +136,15 @@ export function SalesApprovals() {
 
           <Card padding={0}>
             {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-            {!loading && sales.length === 0 && (
+            {!loading && loadError && (
+              <div style={{ padding: 20, color: 'var(--color-danger)', background: 'var(--color-danger-tint)' }}>
+                Couldn't load pending sales: {loadError}
+              </div>
+            )}
+            {!loading && !loadError && sales.length === 0 && (
               <EmptyState title="Nothing awaiting approval" body="Every sale here has already been approved or rejected." />
             )}
-            {!loading && sales.length > 0 && (
+            {!loading && !loadError && sales.length > 0 && (
               <Table>
                 <thead>
                   <tr>
