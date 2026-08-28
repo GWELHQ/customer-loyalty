@@ -196,14 +196,5 @@
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }
-  ],
-  "fieldOverrides": [
-    {
-      "collectionGroup": "customers",
-      "fieldPath": "phoneNumber",
-      "indexes": [
-        { "order": "ASCENDING", "queryScope": "COLLECTION" }
-      ]
-    }
   ]
 }
