@@ -5,7 +5,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "product", "order": "ASCENDING" },
-        { "fieldPath": "effectiveFrom", "order": "ASCENDING" }
+        { "fieldPath": "effectiveFrom", "order": "DESCENDING" }
       ]
     },
     {
