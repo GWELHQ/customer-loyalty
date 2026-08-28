@@ -18,6 +18,7 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.STATION_SUPERVISOR]: 'Station Supervisor',
   [Role.ATTENDANT]: 'Attendant',
   [Role.EXEC_VIEWER]: 'Exec Viewer',
+  [Role.AUDIT]: 'Audit',
 };
 
 export function AppShell({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {

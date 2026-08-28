@@ -31,6 +31,7 @@ const ROLE_LABELS: Record<Role, string> = {
   [Role.STATION_SUPERVISOR]: 'Station Supervisor',
   [Role.ATTENDANT]: 'Attendant',
   [Role.EXEC_VIEWER]: 'Exec Viewer',
+  [Role.AUDIT]: 'Audit',
 };
 
 const ASSIGNABLE_ROLES = [
@@ -41,6 +42,7 @@ const ASSIGNABLE_ROLES = [
   Role.RTSM,
   Role.STATION_SUPERVISOR,
   Role.EXEC_VIEWER,
+  Role.AUDIT,
 ];
 
 function userColumns(stations: Station[]): ExportColumn<User>[] {

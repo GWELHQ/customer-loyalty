@@ -104,6 +104,11 @@ const EXEC_VIEWER_PERMISSIONS: Permission[] = CHAIRMAN_PERMISSIONS.filter(
   (p) => p !== Permission.SPECIAL_RATES_APPROVE && p !== Permission.SPECIAL_RATES_REQUEST,
 );
 
+// Same rights as Exec Viewer — a distinct role for staff whose function is
+// auditing rather than executive oversight, but who need the same read-only
+// visibility across the system.
+const AUDIT_PERMISSIONS: Permission[] = EXEC_VIEWER_PERMISSIONS;
+
 // Checks and approves the monthly ledger RTSM releases. Deliberately does
 // NOT hold DISBURSEMENTS_MANAGE — approving and executing a payout are
 // different people by design (segregation of duties), see
@@ -188,6 +193,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.STATION_SUPERVISOR]: STATION_SUPERVISOR_PERMISSIONS,
   [Role.ATTENDANT]: ATTENDANT_PERMISSIONS,
   [Role.EXEC_VIEWER]: EXEC_VIEWER_PERMISSIONS,
+  [Role.AUDIT]: AUDIT_PERMISSIONS,
 };
 
 export function roleHasPermission(role: Role, permission: Permission): boolean {

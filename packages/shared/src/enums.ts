@@ -10,6 +10,8 @@ export enum Role {
   ATTENDANT = 'attendant',
   /** Read-only view of everything the Chairman sees — cannot approve special rates or change anything. */
   EXEC_VIEWER = 'exec_viewer',
+  /** Same rights as Exec Viewer — a distinct role name for staff whose function is auditing rather than executive oversight. */
+  AUDIT = 'audit',
 }
 
 /** Roles that authenticate via Microsoft Entra ID. Attendants use PIN auth instead. */
@@ -21,6 +23,7 @@ export const MICROSOFT_AUTH_ROLES: readonly Role[] = [
   Role.RTSM,
   Role.STATION_SUPERVISOR,
   Role.EXEC_VIEWER,
+  Role.AUDIT,
 ];
 
 export enum Product {
