@@ -74,14 +74,6 @@
       ]
     },
     {
-      "collectionGroup": "productPrices",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "product", "order": "ASCENDING" },
-        { "fieldPath": "effectiveFrom", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "reconciliationDaily",
       "queryScope": "COLLECTION",
       "fields": [
