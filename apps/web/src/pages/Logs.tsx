@@ -5,8 +5,31 @@ import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
+import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr } from '../ui/primitives';
+
+// Every entityType value any audit.record() call in apps/api/src currently
+// uses — kept as a flat allow-list rather than derived from live data so the
+// dropdown is stable even on a quiet day with no recent events of a type.
+const AUDIT_ENTITY_TYPES = [
+  'sale',
+  'customer',
+  'customerRegistrationRequest',
+  'attendant',
+  'user',
+  'station',
+  'productPrice',
+  'priceReminderSetting',
+  'specialRateRequest',
+  'monthlyCashbackLedger',
+  'disbursementBatch',
+  'disbursementSettings',
+  'customerInactivitySettings',
+  'reconciliationDaily',
+  'fraudFlags',
+  'importJob',
+  'saleApprovalDelegations',
+].sort();
 
 type Tab = 'audit' | 'sms';
 
@@ -43,6 +66,7 @@ function AuditLogTab() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [entityType, setEntityType] = useState('');
   // Cursor pagination is forward-only server-side; this stack lets "Previous" step back through pages already visited this session.
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -51,7 +75,7 @@ function AuditLogTab() {
   function reload() {
     setLoading(true);
     api.auditEvents
-      .list({ cursor: cursorStack[pageIndex] })
+      .list({ cursor: cursorStack[pageIndex], entityType: entityType || undefined })
       .then((res) => {
         setEvents(res.items);
         setTotal(res.total);
@@ -59,11 +83,17 @@ function AuditLogTab() {
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, pageIndex]);
+  useEffect(reload, [api, pageIndex, entityType]);
   useRealtimeRefresh(['auditEvents'], () => {
     setCursorStack([undefined]);
     setPageIndex(0);
   });
+
+  function changeEntityType(value: string) {
+    setEntityType(value);
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  }
 
   function goNext() {
     if (!nextCursor) return;
@@ -78,7 +108,7 @@ function AuditLogTab() {
     const all: AuditEvent[] = [];
     let cursor: string | undefined;
     for (;;) {
-      const res = await api.auditEvents.list({ cursor });
+      const res = await api.auditEvents.list({ cursor, entityType: entityType || undefined });
       all.push(...res.items);
       if (!res.nextCursor || all.length >= res.total) break;
       cursor = res.nextCursor;
@@ -88,11 +118,26 @@ function AuditLogTab() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10 }}>
+        <select
+          style={{ ...inputStyle, maxWidth: 220 }}
+          value={entityType}
+          onChange={(e) => changeEntityType(e.target.value)}
+          aria-label="Filter by action type"
+        >
+          <option value="">All actions</option>
+          {AUDIT_ENTITY_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
         <ExportButtons filename="audit-log" title="Audit log" columns={AUDIT_COLUMNS} rows={fetchAllForExport} />
       </div>
       <Card padding={0}>
-        {!loading && events.length === 0 && <EmptyState title="No audit events yet" />}
+        {!loading && events.length === 0 && (
+          <EmptyState title={entityType ? `No "${entityType}" events yet` : 'No audit events yet'} />
+        )}
         {events.length > 0 && (
           <Table>
             <thead>
