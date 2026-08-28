@@ -22,17 +22,30 @@ export class CustomersService {
   async findById(id: string): Promise<Customer> {
     const snap = await this.col().doc(id).get();
     if (!snap.exists) throw new NotFoundException('Customer not found');
-    return fromDoc<Customer>(snap);
+    const customer = fromDoc<Customer>(snap);
+    if (customer.deletedAt) throw new NotFoundException('Customer not found');
+    return customer;
   }
 
+  /**
+   * Phone numbers are unique among *active* customers, but a deleted customer's old doc can
+   * briefly coexist with a newly (re-)registered one at the same number — `limit(5)` instead of
+   * `limit(1)` so filtering out the deleted doc in memory here can't accidentally miss the live
+   * one. Filtered in memory rather than via a `deletedAt` Firestore filter to avoid needing a new
+   * composite index and because existing customer docs predate this field entirely (Firestore's
+   * `== null` doesn't match a field that's simply absent).
+   */
   async findByPhone(normalizedPhone: string): Promise<Customer | null> {
-    const snap = await this.col().where('phoneNumber', '==', normalizedPhone).limit(1).get();
-    return snap.empty ? null : fromDoc<Customer>(snap.docs[0]!);
+    const snap = await this.col().where('phoneNumber', '==', normalizedPhone).limit(5).get();
+    const active = snap.docs.map((d) => fromDoc<Customer>(d)).find((c) => !c.deletedAt);
+    return active ?? null;
   }
 
+  /** See [findByPhone] re: limit(5) + in-memory filtering rationale — a freed-up tag can be reassigned once its previous holder is soft-deleted. */
   async findByNfcTagId(tagId: string): Promise<Customer | null> {
-    const snap = await this.col().where('nfcTagId', '==', normalizeNfcTagId(tagId)).limit(1).get();
-    return snap.empty ? null : fromDoc<Customer>(snap.docs[0]!);
+    const snap = await this.col().where('nfcTagId', '==', normalizeNfcTagId(tagId)).limit(5).get();
+    const active = snap.docs.map((d) => fromDoc<Customer>(d)).find((c) => !c.deletedAt);
+    return active ?? null;
   }
 
   /**
@@ -75,7 +88,7 @@ export class CustomersService {
       .where('phoneNumber', '<=', prefix + '')
       .limit(20)
       .get();
-    return snap.docs.map((d) => fromDoc<Customer>(d));
+    return snap.docs.map((d) => fromDoc<Customer>(d)).filter((c) => !c.deletedAt);
   }
 
   async list(
@@ -96,7 +109,14 @@ export class CustomersService {
     }
 
     const snap = await query.limit(pagination.pageSize).get();
-    let items = snap.docs.map((d) => fromDoc<Customer>(d));
+    // Soft-deleted customers are filtered out here rather than via a Firestore `where` clause —
+    // same reasoning as findByPhone/findByNfcTagId (no new composite index, no issue with
+    // pre-existing docs that predate this field). Same caveat as the pre-existing `filters.name`
+    // filter below: filtering after the page-limited query means a page can come back shorter
+    // than `pageSize`, and `total` (from the unfiltered count() above) may overcount by however
+    // many deleted customers exist — acceptable at this customer-list scale, not worth a second
+    // full-count query.
+    let items = snap.docs.map((d) => fromDoc<Customer>(d)).filter((c) => !c.deletedAt);
 
     if (filters.name) {
       const needle = filters.name.toLowerCase();
@@ -228,9 +248,18 @@ export class CustomersService {
     this.changeEvents.emit(COLLECTION);
   }
 
+  /**
+   * Soft-delete: sets `deletedAt` instead of removing the document. A hard delete is invisible to
+   * `listForMobile`'s `updatedSince` delta query — the doc just vanishes with no `updatedAt` bump,
+   * so any device that had already synced this customer would keep it forever. Setting
+   * `deletedAt` (which also bumps `updatedAt`) makes the deletion show up as a normal change on
+   * the next sync; `CustomerRepository.syncCustomers()` on the Android side checks for it and
+   * removes its local copy instead of upserting.
+   */
   async delete(id: string): Promise<Customer> {
     const customer = await this.findById(id);
-    await this.col().doc(id).delete();
+    const now = nowIso();
+    await this.col().doc(id).update({ deletedAt: now, updatedAt: now });
     this.changeEvents.emit(COLLECTION);
     return customer;
   }

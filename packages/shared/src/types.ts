@@ -75,6 +75,8 @@ export interface Customer extends BaseDoc {
   licensePlateNumbers?: string[];
   /** Normalized uppercase. Physical NFC tag UID, staff-assigned via the admin app, unique across customers. */
   nfcTagId?: string;
+  /** Soft-delete marker — set instead of removing the document, so the mobile delta sync (GET /mobile/customers?updatedSince=) sees the deletion via the normal updatedAt bump and can drop its local copy. Absent/undefined means active. */
+  deletedAt?: ISODateString | null;
 }
 
 export interface ProductPrice extends BaseDoc {
