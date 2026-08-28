@@ -192,11 +192,13 @@ export class SalesService {
     const saleRef = this.col().doc(saleId);
     const licensePlateCheck = await this.resolvePlateCheck(params.plateCheckId, customer.id);
 
+    let wasCreated = false;
     const sale = await this.firestore.instance.runTransaction(async (tx) => {
       const existing = await tx.get(saleRef);
       if (existing.exists) {
         return fromDoc<Sale>(existing);
       }
+      wasCreated = true;
 
       await this.reconciliation.reserveLoyaltySaleAmount(tx, {
         stationId: params.stationId,
@@ -251,6 +253,22 @@ export class SalesService {
 
     // Never fails the sale — see FraudDetectionService.runRealtimeChecks.
     await this.fraudDetection.runRealtimeChecks(sale);
+
+    // Same SMS path approveOne() uses for a manually-approved sale — while
+    // FEATURE_FLAGS.salesApprovals is off, this sale was just auto-approved
+    // and credited above, so this is the only place left that would ever
+    // send it. Android sales send their own SMS client-side regardless (see
+    // handover.md), hence still gated to admin_manual only.
+    if (wasCreated && !FEATURE_FLAGS.salesApprovals && sale.source === 'admin_manual') {
+      const monthKey = nairobiMonthKey(sale.saleDate);
+      const summary = await this.monthlySummary(sale.customerId, monthKey);
+      await this.sms.sendSaleConfirmation({
+        saleId: sale.id,
+        customerPhone: sale.customerPhoneAtSale,
+        cashbackEarned: sale.snapshot.cashbackEarned,
+        monthToDateCashback: summary.totalCashback,
+      });
+    }
 
     return sale;
   }
