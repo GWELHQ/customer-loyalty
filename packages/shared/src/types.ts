@@ -335,6 +335,8 @@ export interface AuditEvent extends BaseDoc {
   /** Human-readable name for the affected record (e.g. a customer's or station's name) — the UI shows this instead of the raw Firestore document ID. */
   entityLabel?: string;
   metadata?: Record<string, unknown>;
+  /** Only populated for entityType 'sale' — true if any fraud flag (open or resolved) is related to this sale. Computed server-side per audit-events list response, not stored. */
+  hasFraudFlag?: boolean;
 }
 
 export interface VehiclePlateCheck extends BaseDoc {

@@ -286,9 +286,13 @@ export function Td({ children, align }: PropsWithChildren<{ align?: 'left' | 'ri
   );
 }
 
-export function Tr({ children, onClick }: PropsWithChildren<{ onClick?: () => void }>) {
+export function Tr({
+  children,
+  onClick,
+  style,
+}: PropsWithChildren<{ onClick?: () => void; style?: CSSProperties }>) {
   return (
-    <tr onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+    <tr onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', ...style }}>
       {children}
     </tr>
   );

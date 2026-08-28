@@ -78,6 +78,34 @@ export class FraudFlagsService {
   }
 
   /**
+   * Sale ids (out of the given set) that have at least one fraud flag —
+   * resolved/dismissed included, this answers "was this sale ever flagged",
+   * not "is it still open". Used to color flagged sales in the audit log.
+   */
+  async findSaleIdsWithFlags(saleIds: string[]): Promise<Set<string>> {
+    const unique = [...new Set(saleIds)];
+    if (unique.length === 0) return new Set();
+
+    // array-contains-any accepts at most 30 values per query.
+    const chunks: string[][] = [];
+    for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+
+    const flagged = new Set<string>();
+    const snaps = await Promise.all(
+      chunks.map((chunk) => this.col().where('relatedSaleIds', 'array-contains-any', chunk).get()),
+    );
+    for (const snap of snaps) {
+      for (const doc of snap.docs) {
+        const flag = fromDoc<FraudFlag>(doc);
+        for (const saleId of flag.relatedSaleIds) {
+          if (unique.includes(saleId)) flagged.add(saleId);
+        }
+      }
+    }
+    return flagged;
+  }
+
+  /**
    * True if an open/under-review flag of this type already exists for the
    * given subject (a customer or an attendant). Once a flag is
    * resolved/dismissed it no longer matches, so the same irregularity can

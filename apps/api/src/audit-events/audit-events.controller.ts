@@ -6,6 +6,7 @@ import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
+import { FraudFlagsService } from '../fraud/fraud-flags.service';
 
 const PAGE_SIZE = 50;
 
@@ -15,7 +16,10 @@ const PAGE_SIZE = 50;
 @RequirePermissions(Permission.AUDIT_VIEW)
 @Controller('audit-events')
 export class AuditEventsController {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly fraudFlags: FraudFlagsService,
+  ) {}
 
   @Get()
   async list(
@@ -39,8 +43,17 @@ export class AuditEventsController {
     const snap = await query.limit(PAGE_SIZE).get();
     const items = snap.docs.map((d) => fromDoc<AuditEvent>(d));
 
+    // Sale entities may have a fraud flag raised against them — surfaced so
+    // the Logs page can highlight those rows. One batched lookup per page
+    // rather than a flag check per row.
+    const saleIds = items.filter((e) => e.entityType === 'sale').map((e) => e.entityId);
+    const flaggedSaleIds = await this.fraudFlags.findSaleIdsWithFlags(saleIds);
+    const enrichedItems = items.map((e) =>
+      e.entityType === 'sale' ? { ...e, hasFraudFlag: flaggedSaleIds.has(e.entityId) } : e,
+    );
+
     return {
-      items,
+      items: enrichedItems,
       page: 1,
       pageSize: PAGE_SIZE,
       total,

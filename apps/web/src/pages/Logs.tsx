@@ -58,6 +58,7 @@ const AUDIT_COLUMNS: ExportColumn<AuditEvent>[] = [
   { header: 'Entity type', value: (e) => e.entityType },
   { header: 'Entity', value: (e) => e.entityLabel ?? '' },
   { header: 'Entity ID', value: (e) => e.entityId },
+  { header: 'Fraud flag', value: (e) => (e.hasFraudFlag ? 'Yes' : '') },
   { header: 'Details', value: (e) => (e.metadata ? JSON.stringify(e.metadata) : '') },
 ];
 
@@ -152,11 +153,21 @@ function AuditLogTab() {
             </thead>
             <tbody>
               {events.map((e) => (
-                <Tr key={e.id}>
+                <Tr
+                  key={e.id}
+                  style={e.hasFraudFlag ? { background: 'var(--color-danger-tint)' } : undefined}
+                >
                   <Td>{formatNairobiDateTime(e.createdAt)}</Td>
                   <Td>{e.actorName}</Td>
                   <Td>{e.action}</Td>
-                  <Td>{e.entityLabel ? `${e.entityType} · ${e.entityLabel}` : e.entityType}</Td>
+                  <Td>
+                    {e.entityLabel ? `${e.entityType} · ${e.entityLabel}` : e.entityType}
+                    {e.hasFraudFlag && (
+                      <span style={{ marginLeft: 6 }}>
+                        <Badge tone="danger">Fraud</Badge>
+                      </span>
+                    )}
+                  </Td>
                   <Td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--color-text-muted)' }}>
                       {e.entityId}
