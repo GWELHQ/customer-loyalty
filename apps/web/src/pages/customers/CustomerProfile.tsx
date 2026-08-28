@@ -9,6 +9,7 @@ import { usePagedRows } from '../../data/usePagedRows';
 import { useRealtimeRefresh } from '../../data/realtime';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
+import { generateCustomerStickerPdf } from '../../lib/customerSticker';
 import type { ExportColumn } from '../../lib/exportTable';
 import { formatNairobiDate } from '../../lib/time';
 import { ExportButtons } from '../../ui/ExportButtons';
@@ -40,6 +41,8 @@ export function CustomerProfile() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [printingSticker, setPrintingSticker] = useState(false);
+  const [stickerError, setStickerError] = useState<string | null>(null);
   const { paged, page, pageCount, setPage } = usePagedRows(sales);
 
   function reload() {
@@ -53,6 +56,19 @@ export function CustomerProfile() {
   }
   useEffect(reload, [api, id]);
   useRealtimeRefresh(['customers', 'sales'], reload);
+
+  async function printSticker() {
+    if (!customer) return;
+    setStickerError(null);
+    setPrintingSticker(true);
+    try {
+      await generateCustomerStickerPdf(customer);
+    } catch (err) {
+      setStickerError(err instanceof Error ? err.message : 'Could not generate the sticker');
+    } finally {
+      setPrintingSticker(false);
+    }
+  }
 
   async function confirmDelete() {
     if (!id) return;
@@ -167,6 +183,21 @@ export function CustomerProfile() {
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>
               Scan at point of sale to select this customer
             </div>
+            {stickerError && (
+              <div style={{ fontSize: 12, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 10, marginTop: 10 }}>
+                {stickerError}
+              </div>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={printSticker}
+              disabled={printingSticker}
+              style={{ marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              <Icon name="download" size={13} />
+              {printingSticker ? 'Generating…' : 'Print sticker'}
+            </Button>
           </Card>
 
           <Card>

@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { FEATURE_FLAGS } from '../common/feature-flags';
 import { Public } from '../common/decorators/public.decorator';
 import type { AuthPrincipal } from '../common/types/principal';
 import { AuthService } from './auth.service';
@@ -52,6 +53,9 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('attendant/nfc-login')
   attendantNfcLogin(@Body() dto: AttendantNfcLoginDto) {
+    if (!FEATURE_FLAGS.attendantNfcLogin) {
+      throw new BadRequestException('This feature is currently disabled');
+    }
     return this.auth.loginAttendantByNfcTag(dto.tagId);
   }
 

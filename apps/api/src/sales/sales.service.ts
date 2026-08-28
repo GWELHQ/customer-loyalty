@@ -14,6 +14,7 @@ import {
   type Sale,
 } from '@loyalty/shared';
 import { CustomersService } from '../customers/customers.service';
+import { FEATURE_FLAGS } from '../common/feature-flags';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { nairobiDateKey, nairobiMonthBoundsUtc, nairobiMonthKey } from '../common/time/nairobi';
@@ -229,11 +230,19 @@ export class SalesService {
         // Cashback isn't credited to the customer yet — that only happens
         // once a station supervisor (or their delegate, or RTSM/Admin)
         // approves this sale. See approveBatch()/reject() below.
-        approvalStatus: SaleApprovalStatus.PENDING_APPROVAL,
+        //
+        // While FEATURE_FLAGS.salesApprovals is off, that gate is skipped
+        // entirely — every sale is approved and credited immediately below,
+        // same as approveOne() does for a manual approval.
+        approvalStatus: FEATURE_FLAGS.salesApprovals ? SaleApprovalStatus.PENDING_APPROVAL : SaleApprovalStatus.APPROVED,
         createdAt: now,
         updatedAt: now,
       };
       tx.set(saleRef, doc);
+      if (!FEATURE_FLAGS.salesApprovals) {
+        const customerRef = this.customers.col().doc(customer.id);
+        tx.update(customerRef, { totalCashbackEarned: FieldValue.increment(snapshot.cashbackEarned), updatedAt: now });
+      }
       return { ...doc, id: saleId };
     });
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { resolveStationScope } from '../common/access/station-scope';
@@ -7,6 +7,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../common/decorators/any-permission.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
+import { FEATURE_FLAGS } from '../common/feature-flags';
 import type { StaffPrincipal } from '../common/types/principal';
 import { SmsService } from '../sms/sms.service';
 import { ApproveSalesBatchDto } from './dto/approve-sales-batch.dto';
@@ -55,6 +56,9 @@ export class SalesController {
 
   @Post('approve-batch')
   async approveBatch(@Body() dto: ApproveSalesBatchDto, @CurrentUser() actor: StaffPrincipal) {
+    if (!FEATURE_FLAGS.salesApprovals) {
+      throw new BadRequestException('This feature is currently disabled — sales are auto-approved on creation');
+    }
     const result = await this.sales.approveBatch(dto.saleIds, actor);
     await this.audit.record({
       actor,
@@ -68,6 +72,9 @@ export class SalesController {
 
   @Post(':id/reject')
   async reject(@Param('id') id: string, @Body() dto: RejectSaleDto, @CurrentUser() actor: StaffPrincipal) {
+    if (!FEATURE_FLAGS.salesApprovals) {
+      throw new BadRequestException('This feature is currently disabled — sales are auto-approved on creation');
+    }
     const sale = await this.sales.reject(id, dto.reason, actor);
     await this.audit.record({
       actor,

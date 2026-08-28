@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { AttendantOnly } from '../common/decorators/attendant-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { FEATURE_FLAGS } from '../common/feature-flags';
 import type { AttendantPrincipal } from '../common/types/principal';
 import { VehiclePlateChecksService } from './vehicle-plate-checks.service';
 
@@ -27,6 +28,9 @@ export class VehiclePlateChecksController {
     @Body('customerId') customerId: string,
     @CurrentUser() actor: AttendantPrincipal,
   ) {
+    if (!FEATURE_FLAGS.licensePlateScanning) {
+      throw new BadRequestException('This feature is currently disabled');
+    }
     if (!customerId) throw new BadRequestException('customerId is required');
     if (!file) throw new BadRequestException('image is required');
     return this.plateChecks.create(customerId, file, actor);

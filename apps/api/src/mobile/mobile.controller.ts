@@ -1,8 +1,9 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificationType, Role } from '@loyalty/shared';
 import { AttendantOnly } from '../common/decorators/attendant-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { FEATURE_FLAGS } from '../common/feature-flags';
 import { nairobiDayBoundsUtc, nairobiMonthKey, nairobiToday } from '../common/time/nairobi';
 import { CustomerRegistrationsService } from '../customer-registrations/customer-registrations.service';
 import { CustomersService } from '../customers/customers.service';
@@ -82,6 +83,9 @@ export class MobileController {
   /** Resolves a scanned NFC tag UID to its customer — declared ahead of `customers/:id` so it isn't shadowed by it. */
   @Get('customers/nfc/:tagId')
   async getCustomerByNfc(@Param('tagId') tagId: string) {
+    if (!FEATURE_FLAGS.customerRfidScanning) {
+      throw new BadRequestException('This feature is currently disabled');
+    }
     const customer = await this.customers.findByNfcTagId(tagId);
     if (!customer) throw new NotFoundException('No customer registered for this NFC tag');
     return customer;

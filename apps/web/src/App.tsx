@@ -16,7 +16,6 @@ import { PendingActivation } from './pages/PendingActivation';
 import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
-import { SalesApprovals } from './pages/SalesApprovals';
 import { SalesList } from './pages/SalesList';
 import { SignIn } from './pages/SignIn';
 import { SpecialRates } from './pages/SpecialRates';
@@ -54,7 +53,6 @@ export function App() {
         permission-gated for discoverability; this route itself defers to
         the page/API to decide what the actor can actually do.
       */}
-      <Route path="/sales-approvals" element={<RequireStaff><SalesApprovals /></RequireStaff>} />
 
       <Route path="/prices" element={<RequireStaff permission={Permission.PRICES_VIEW}><Prices /></RequireStaff>} />
 
