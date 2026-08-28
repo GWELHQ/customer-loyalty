@@ -44,6 +44,14 @@
       "collectionGroup": "sales",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "saleDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "product", "order": "ASCENDING" },
         { "fieldPath": "saleDate", "order": "DESCENDING" }
       ]
@@ -63,6 +71,14 @@
         { "fieldPath": "approvalStatus", "order": "ASCENDING" },
         { "fieldPath": "stationId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "productPrices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "product", "order": "ASCENDING" },
+        { "fieldPath": "effectiveFrom", "order": "DESCENDING" }
       ]
     },
     {
