@@ -1,7 +1,8 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { NotificationType, Role } from '@loyalty/shared';
+import { NotificationType, Role, SyncRecordResult } from '@loyalty/shared';
 import { AttendantOnly } from '../common/decorators/attendant-only.decorator';
+import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FEATURE_FLAGS } from '../common/feature-flags';
 import { nairobiDayBoundsUtc, nairobiMonthKey, nairobiToday } from '../common/time/nairobi';
@@ -44,6 +45,7 @@ export class MobileController {
     private readonly notifications: NotificationsService,
     private readonly users: UsersService,
     private readonly sms: SmsService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get('bootstrap')
@@ -110,6 +112,14 @@ export class MobileController {
   @Post('sales')
   async createSale(@Body() dto: MobileCreateSaleDto, @CurrentUser() actor: AttendantPrincipal) {
     const sale = await this.sales.createSale(dto, actor);
+    await this.audit.record({
+      actor,
+      action: 'sale.create_android',
+      entityType: 'sale',
+      entityId: sale.id,
+      entityLabel: `${sale.customerPhoneAtSale} · ${sale.stationNameAtSale}`,
+      metadata: { stationId: sale.stationId, product: sale.product },
+    });
     const summary = await this.sales.monthlySummary(sale.customerId, nairobiMonthKey(sale.saleDate));
     return { ...sale, monthToDateCashback: summary.totalCashback };
   }
@@ -183,6 +193,21 @@ export class MobileController {
     for (const sale of dto.sales) {
       const outcome = await this.sales.syncOne(sale, actor);
       await this.syncOps.record(actor.attendantId, outcome);
+      // Only outcomes that actually created (or re-created) a sale doc —
+      // ALREADY_PROCESSED/REJECTED never touched the sales collection.
+      if (
+        (outcome.result === SyncRecordResult.ACCEPTED || outcome.result === SyncRecordResult.NEEDS_REVIEW) &&
+        outcome.saleId
+      ) {
+        await this.audit.record({
+          actor,
+          action: 'sale.sync',
+          entityType: 'sale',
+          entityId: outcome.saleId,
+          entityLabel: outcome.customerPhone,
+          metadata: { result: outcome.result, stationId: actor.assignedStationId },
+        });
+      }
       results.push(outcome);
     }
     return { results };
