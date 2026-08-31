@@ -1,21 +1,27 @@
-import type { CustomerInactivitySettings, DisbursementSettings, PriceReminderSetting, ProductPrice } from '@loyalty/shared';
+import type { CustomerInactivitySettings, DisbursementSettings, PriceReminderSetting, ProductPrice, Station } from '@loyalty/shared';
 import { Permission, Product } from '@loyalty/shared';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
+import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import { formatNairobiDate, formatNairobiDateTime } from '../lib/time';
 import { Icon } from '../ui/Icon';
 import { Badge, Button, Card, Field, inputStyle } from '../ui/primitives';
 
+type AllStationsCurrent = Array<{ station: Station; prices: Record<Product, ProductPrice | null> }>;
+
 export function Prices() {
   const api = useApi();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { stations } = useStations();
   const canManage = hasPermission(Permission.PRICES_MANAGE);
   const canManageDisbursementSettings = hasPermission(Permission.DISBURSEMENT_SETTINGS_MANAGE);
   const canManageInactivitySettings = hasPermission(Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE);
+  const [stationId, setStationId] = useState(user?.assignedStationId ?? '');
   const [current, setCurrent] = useState<Record<Product, ProductPrice | null> | null>(null);
+  const [allStationsCurrent, setAllStationsCurrent] = useState<AllStationsCurrent | null>(null);
   const [reminders, setReminders] = useState<PriceReminderSetting | null>(null);
   const [disbursementSettings, setDisbursementSettings] = useState<DisbursementSettings | null>(null);
   const [inactivitySettings, setInactivitySettings] = useState<CustomerInactivitySettings | null>(null);
@@ -28,20 +34,39 @@ export function Prices() {
   const [editingDisbursementSettings, setEditingDisbursementSettings] = useState(false);
   const [editingInactivitySettings, setEditingInactivitySettings] = useState(false);
 
+  // Roles without an assigned station (Admin/RTSM/Chairman/Finance Approver)
+  // default to the first station once the list loads, rather than querying
+  // with an empty stationId.
+  useEffect(() => {
+    if (!stationId && stations.length > 0) setStationId(stations[0]!.id);
+  }, [stationId, stations]);
+
   function reload() {
-    api.prices.current().then(setCurrent);
+    if (stationId) {
+      api.prices.current(stationId).then((res) => setCurrent(res as Record<Product, ProductPrice | null>));
+    }
+    api.prices.current().then((res) => setAllStationsCurrent(res as AllStationsCurrent));
     api.prices.reminderSettings().then(setReminders);
     if (canManageDisbursementSettings) api.disbursementSettings.get().then(setDisbursementSettings);
     if (canManageInactivitySettings) api.customerInactivitySettings.get().then(setInactivitySettings);
   }
-  useEffect(reload, [api]);
+  useEffect(reload, [api, stationId]);
   useRealtimeRefresh(['productPrices'], reload);
 
   async function publish() {
     setError(null);
+    if (!stationId) {
+      setError('Select a station first.');
+      return;
+    }
     setBusy(true);
     try {
-      await api.prices.create({ product, pricePerLitre: Number(pricePerLitre), effectiveFrom: new Date(effectiveFrom).toISOString() });
+      await api.prices.create({
+        stationId,
+        product,
+        pricePerLitre: Number(pricePerLitre),
+        effectiveFrom: new Date(effectiveFrom).toISOString(),
+      });
       setPricePerLitre('');
       reload();
     } catch (err) {
@@ -51,24 +76,38 @@ export function Prices() {
     }
   }
 
-  const missing = current ? Object.values(Product).filter((p) => !current[p]) : [];
+  const missingByStation = (allStationsCurrent ?? []).flatMap(({ station, prices }) =>
+    Object.values(Product)
+      .filter((p) => !prices[p])
+      .map((p) => `${station.name} has no ${p} price set`),
+  );
 
   return (
     <AppShell title="Fuel prices" subtitle="PMS and AGO price per litre, with a full audit history">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
-        {missing.length > 0 && (
+        {missingByStation.length > 0 && (
           <div style={{ background: 'var(--color-danger-tint)', border: '1px solid var(--gw-red-500)', borderRadius: 12, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <Icon name="alertTriangle" size={19} color="var(--color-danger)" />
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14.5 }}>
-                {missing.join(' and ')} {missing.length > 1 ? 'have' : 'has'} no active price set
-              </div>
+              <div style={{ fontWeight: 700, fontSize: 14.5 }}>{missingByStation.join(', ')}</div>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                Attendants cannot record a sale for a product with no active price — every sale for it is blocked at the pump.
+                Attendants cannot record a sale for a product with no active price at their station — every sale for it is blocked at the pump.
               </div>
             </div>
           </div>
         )}
+
+        <Card padding={16}>
+          <Field label="Station">
+            <select style={inputStyle} value={stationId} onChange={(e) => setStationId(e.target.value)}>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </Card>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {Object.values(Product).map((p) => {
@@ -105,9 +144,11 @@ export function Prices() {
         {canManage && (
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
             <Card>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Set next price</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
+                Set next price — {stations.find((s) => s.id === stationId)?.name ?? 'select a station above'}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                A new price never replaces the old one. Sales keep the price that was live when they happened.
+                Applies only to the station selected above. A new price never replaces the old one — sales keep the price that was live when they happened.
               </div>
               {error && (
                 <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>

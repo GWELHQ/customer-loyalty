@@ -53,17 +53,19 @@ export class JobsController {
       return { sent: false, reason: 'no recipients configured' };
     }
 
-    const current = await this.prices.getCurrent();
-    const lines = Object.values(Product).map((product) => {
-      const price = current[product];
-      return price
-        ? `${product}: ${formatEmailCurrency(price.pricePerLitre)} (effective ${formatEmailDate(price.effectiveFrom)})`
-        : `${product}: no active price set`;
-    });
+    const allStations = await this.prices.getCurrentForAllStations();
+    const lines = allStations.flatMap(({ station, prices }) =>
+      Object.values(Product).map((product) => {
+        const price = prices[product];
+        return price
+          ? `${station.name} — ${product}: ${formatEmailCurrency(price.pricePerLitre)} (effective ${formatEmailDate(price.effectiveFrom)})`
+          : `${station.name} — ${product}: no active price set`;
+      }),
+    );
 
     await this.email.send(settings.recipientEmails, 'Green Wells: monthly fuel price update reminder', {
       title: 'Monthly fuel price update reminder',
-      bodyLines: ["It's time to review next month's PMS/AGO prices.", 'Current prices:', ...lines],
+      bodyLines: ["It's time to review next month's PMS/AGO prices.", 'Current prices by station:', ...lines],
     });
     await this.reminders.markSent();
 

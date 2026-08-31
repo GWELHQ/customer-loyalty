@@ -80,6 +80,8 @@ export interface Customer extends BaseDoc {
 }
 
 export interface ProductPrice extends BaseDoc {
+  stationId: string;
+  stationNameAtPrice: string;
   product: Product;
   pricePerLitre: number;
   effectiveFrom: ISODateString;

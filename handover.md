@@ -11,3 +11,7 @@ Three point-of-sale features are turned off server-side for now (code intact, no
 **`POST /mobile/sales` behavior change**: sales are now auto-approved and cashback is credited to the customer immediately on creation — there's no more pending-approval delay. If the app was polling or showing an "awaiting approval" state anywhere, that's no longer applicable; the response from `createSale` already reflects the final approved state.
 
 These are code-level toggles (`apps/api/src/common/feature-flags.ts`), not endpoint removals — no contract changes when they're switched back on, and no advance notice should be needed for that.
+
+## 2026-08-31 — Fuel prices are now per station (no Android code change needed)
+
+`GET /mobile/bootstrap`'s `prices` field and `GET /mobile/prices/current` return the exact same shape as before (`{PMS: ProductPrice|null, AGO: ProductPrice|null}`) — no contract change. Behind the scenes, prices are now scoped per station rather than one global price for everyone: two attendants at different stations may now legitimately see different PMS/AGO prices in bootstrap. Nothing to change in the app — it already just displays whatever bootstrap/currentPrices returns for the logged-in attendant's own station — this note is only so it's not mistaken for a bug if two attendants compare numbers.

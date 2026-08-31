@@ -29,20 +29,20 @@ export class PricesController {
 
   @Get('prices')
   @RequirePermissions(Permission.PRICES_VIEW)
-  history(@Query('product') product?: Product) {
-    return this.prices.history(product);
+  history(@Query('product') product?: Product, @Query('stationId') stationId?: string) {
+    return this.prices.history(product, stationId);
   }
 
   @Get('prices/current')
   @RequirePermissions(Permission.PRICES_VIEW)
-  current() {
-    return this.prices.getCurrent();
+  current(@Query('stationId') stationId?: string) {
+    return stationId ? this.prices.getCurrent(stationId) : this.prices.getCurrentForAllStations();
   }
 
   @Get('prices/history')
   @RequirePermissions(Permission.PRICES_VIEW)
-  explicitHistory(@Query('product') product?: Product) {
-    return this.prices.history(product);
+  explicitHistory(@Query('product') product?: Product, @Query('stationId') stationId?: string) {
+    return this.prices.history(product, stationId);
   }
 
   @Post('prices')
@@ -54,26 +54,28 @@ export class PricesController {
       action: 'price.publish',
       entityType: 'productPrice',
       entityId: price.id,
-      entityLabel: `${price.product} @ KSh ${price.pricePerLitre}/L`,
-      metadata: { product: price.product, pricePerLitre: price.pricePerLitre },
+      entityLabel: `${price.product} @ KSh ${price.pricePerLitre}/L — ${price.stationNameAtPrice}`,
+      metadata: { product: price.product, pricePerLitre: price.pricePerLitre, stationId: price.stationId },
     });
 
-    // Station Supervisors need the new price to reconcile against, and
-    // Admins oversee pricing regardless of who published it.
+    // Only the affected station's own Station Supervisor(s) need the new
+    // price to reconcile against now that prices are per-station — Admins
+    // oversee pricing everywhere regardless of who published it.
     const recipients = (await this.users.list())
       .filter(
         (u) =>
           u.status === UserStatus.ACTIVE &&
-          (u.role === Role.STATION_SUPERVISOR || u.role === Role.ADMIN),
+          (u.role === Role.ADMIN ||
+            (u.role === Role.STATION_SUPERVISOR && u.assignedStationId === price.stationId)),
       )
       .map((u) => u.email);
     await this.email.send(
       recipients,
-      `Green Wells: new ${price.product} price — ${formatEmailCurrency(price.pricePerLitre)}/L`,
+      `Green Wells: new ${price.product} price — ${formatEmailCurrency(price.pricePerLitre)}/L (${price.stationNameAtPrice})`,
       {
         title: `New ${price.product} price published`,
         bodyLines: [
-          `${actor.fullName} published a new ${price.product} price of ${formatEmailCurrency(price.pricePerLitre)} per litre, effective ${formatEmailDate(price.effectiveFrom)}.`,
+          `${actor.fullName} published a new ${price.product} price of ${formatEmailCurrency(price.pricePerLitre)} per litre for ${price.stationNameAtPrice}, effective ${formatEmailDate(price.effectiveFrom)}.`,
         ],
       },
     );

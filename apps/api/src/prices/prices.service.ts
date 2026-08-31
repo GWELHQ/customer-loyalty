@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Product, type ProductPrice } from '@loyalty/shared';
+import { Product, type ProductPrice, type Station } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import type { StaffPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
+import { StationsService } from '../stations/stations.service';
 
 const COLLECTION = 'productPrices';
 
@@ -12,15 +13,17 @@ export class PricesService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly changeEvents: ChangeEventsService,
+    private readonly stations: StationsService,
   ) {}
 
   private col() {
     return this.firestore.collection(COLLECTION);
   }
 
-  /** The price in effect for a product at a given instant (defaults to now). Authoritative for sale calculation. */
-  async getCurrentForProduct(product: Product, at: Date = new Date()): Promise<ProductPrice | null> {
+  /** The price in effect for a product at a station at a given instant (defaults to now). Authoritative for sale calculation. */
+  async getCurrentForProduct(stationId: string, product: Product, at: Date = new Date()): Promise<ProductPrice | null> {
     const snap = await this.col()
+      .where('stationId', '==', stationId)
       .where('product', '==', product)
       .where('effectiveFrom', '<=', at.toISOString())
       .orderBy('effectiveFrom', 'desc')
@@ -29,40 +32,57 @@ export class PricesService {
     return snap.empty ? null : fromDoc<ProductPrice>(snap.docs[0]!);
   }
 
-  async getCurrent(): Promise<Record<Product, ProductPrice | null>> {
+  async getCurrent(stationId: string): Promise<Record<Product, ProductPrice | null>> {
     const [pms, ago] = await Promise.all([
-      this.getCurrentForProduct(Product.PMS),
-      this.getCurrentForProduct(Product.AGO),
+      this.getCurrentForProduct(stationId, Product.PMS),
+      this.getCurrentForProduct(stationId, Product.AGO),
     ]);
     return { [Product.PMS]: pms, [Product.AGO]: ago };
   }
 
-  async history(product?: Product): Promise<ProductPrice[]> {
+  /**
+   * Every active station's current prices — powers the admin cross-station
+   * "missing price" check and the price-reminder job. Cheap at current
+   * scale (a handful of stations × 2 products).
+   */
+  async getCurrentForAllStations(): Promise<Array<{ station: Station; prices: Record<Product, ProductPrice | null> }>> {
+    const stations = (await this.stations.list()).filter((s) => s.active);
+    return Promise.all(stations.map(async (station) => ({ station, prices: await this.getCurrent(station.id) })));
+  }
+
+  async history(product?: Product, stationId?: string): Promise<ProductPrice[]> {
     let query = this.col().orderBy('effectiveFrom', 'desc') as FirebaseFirestore.Query;
+    if (stationId) query = query.where('stationId', '==', stationId);
     if (product) query = query.where('product', '==', product);
     const snap = await query.get();
     return snap.docs.map((d) => fromDoc<ProductPrice>(d));
   }
 
   /**
-   * Publishes a new price. A new price never overwrites the old one — sales
-   * keep the price that was live when they happened via their own snapshot.
-   * The previously-current record for the product is closed off with
-   * effectiveTo for a clean audit history.
+   * Publishes a new price for a station. A new price never overwrites the
+   * old one — sales keep the price that was live when they happened via
+   * their own snapshot. The previously-current record for that
+   * station+product is closed off with effectiveTo for a clean audit
+   * history.
    */
   async create(
-    input: { product: Product; pricePerLitre: number; effectiveFrom: string },
+    input: { stationId: string; product: Product; pricePerLitre: number; effectiveFrom: string },
     createdBy: StaffPrincipal,
   ): Promise<ProductPrice> {
-    const previous = await this.getCurrentForProduct(input.product, new Date(input.effectiveFrom));
+    const station = await this.stations.findById(input.stationId);
+    if (!station) throw new NotFoundException('Station not found');
+
+    const previous = await this.getCurrentForProduct(input.stationId, input.product, new Date(input.effectiveFrom));
     if (previous && new Date(previous.effectiveFrom) >= new Date(input.effectiveFrom)) {
       throw new BadRequestException(
-        'effectiveFrom must be after the currently effective price for this product',
+        'effectiveFrom must be after the currently effective price for this product at this station',
       );
     }
 
     const now = nowIso();
     const doc: Omit<ProductPrice, 'id'> = {
+      stationId: input.stationId,
+      stationNameAtPrice: station.name,
       product: input.product,
       pricePerLitre: input.pricePerLitre,
       effectiveFrom: input.effectiveFrom,

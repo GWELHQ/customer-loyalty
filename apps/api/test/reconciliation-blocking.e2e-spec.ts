@@ -42,6 +42,7 @@ describe('Reconciliation blocking rule (e2e)', () => {
     });
     await prices.create(
       {
+        stationId: station.id,
         product: Product.AGO,
         pricePerLitre: 100,
         effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),

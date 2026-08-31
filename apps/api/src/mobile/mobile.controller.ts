@@ -52,7 +52,7 @@ export class MobileController {
   async bootstrap(@CurrentUser() attendant: AttendantPrincipal) {
     const [station, prices] = await Promise.all([
       this.stations.findById(attendant.assignedStationId),
-      this.prices.getCurrent(),
+      this.prices.getCurrent(attendant.assignedStationId),
     ]);
     return {
       attendant,
@@ -100,8 +100,8 @@ export class MobileController {
   }
 
   @Get('prices/current')
-  currentPrices() {
-    return this.prices.getCurrent();
+  currentPrices(@CurrentUser() attendant: AttendantPrincipal) {
+    return this.prices.getCurrent(attendant.assignedStationId);
   }
 
   /**

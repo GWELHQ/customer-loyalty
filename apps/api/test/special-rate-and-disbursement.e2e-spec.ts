@@ -70,6 +70,7 @@ describe('Special rate approval -> sale -> ledger -> disbursement (e2e)', () => 
     });
     await prices.create(
       {
+        stationId: station.id,
         product: Product.PMS,
         pricePerLitre: 200,
         effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),

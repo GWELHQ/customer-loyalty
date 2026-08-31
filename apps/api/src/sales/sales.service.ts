@@ -166,7 +166,7 @@ export class SalesService {
     if (!station) throw new NotFoundException('Station not found');
 
     const saleDate = params.saleDate ?? nowIso();
-    const price = await this.prices.getCurrentForProduct(params.product, new Date(saleDate));
+    const price = await this.prices.getCurrentForProduct(params.stationId, params.product, new Date(saleDate));
     if (!price) {
       throw new BadRequestException(`No active price is set for ${params.product}. Cannot record a sale.`);
     }

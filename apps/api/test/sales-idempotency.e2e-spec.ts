@@ -33,6 +33,7 @@ describe('Sales idempotency (e2e)', () => {
 
     await prices.create(
       {
+        stationId,
         product: Product.PMS,
         pricePerLitre: 200,
         effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),

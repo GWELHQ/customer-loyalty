@@ -94,37 +94,35 @@ async function seed() {
     pin: '1234',
   });
 
-  console.log('Seeding current prices...');
-  await pricesSvc.create(
-    {
-      product: 'PMS' as never,
-      pricePerLitre: 194.5,
-      effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
-    },
-    {
-      kind: 'staff',
-      userId: admin.id,
-      email: admin.email,
-      fullName: admin.fullName,
-      role: Role.ADMIN,
-      status: UserStatus.ACTIVE,
-    },
-  );
-  await pricesSvc.create(
-    {
-      product: 'AGO' as never,
-      pricePerLitre: 223.08,
-      effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
-    },
-    {
-      kind: 'staff',
-      userId: admin.id,
-      email: admin.email,
-      fullName: admin.fullName,
-      role: Role.ADMIN,
-      status: UserStatus.ACTIVE,
-    },
-  );
+  console.log('Seeding current prices (per station)...');
+  const priceActor = {
+    kind: 'staff' as const,
+    userId: admin.id,
+    email: admin.email,
+    fullName: admin.fullName,
+    role: Role.ADMIN,
+    status: UserStatus.ACTIVE,
+  };
+  for (const stationId of [stations.KIS1!, stations.KIS2!]) {
+    await pricesSvc.create(
+      {
+        stationId,
+        product: 'PMS' as never,
+        pricePerLitre: 194.5,
+        effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+      priceActor,
+    );
+    await pricesSvc.create(
+      {
+        stationId,
+        product: 'AGO' as never,
+        pricePerLitre: 223.08,
+        effectiveFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+      priceActor,
+    );
+  }
 
   console.log('Seeding customers...');
   await customersSvc.create({

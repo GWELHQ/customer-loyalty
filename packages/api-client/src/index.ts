@@ -145,9 +145,14 @@ export class LoyaltyApiClient {
   };
 
   prices = {
-    history: (product?: Product) => this.http.get<ProductPrice[]>(`/prices${toQueryString({ product })}`),
-    current: () => this.http.get<Record<Product, ProductPrice | null>>('/prices/current'),
-    create: (input: { product: Product; pricePerLitre: number; effectiveFrom: string }) =>
+    history: (product?: Product, stationId?: string) =>
+      this.http.get<ProductPrice[]>(`/prices${toQueryString({ product, stationId })}`),
+    /** Pass a stationId for one station's current prices; omit it for every active station's current prices. */
+    current: (stationId?: string) =>
+      this.http.get<Record<Product, ProductPrice | null> | Array<{ station: Station; prices: Record<Product, ProductPrice | null> }>>(
+        `/prices/current${toQueryString({ stationId })}`,
+      ),
+    create: (input: { stationId: string; product: Product; pricePerLitre: number; effectiveFrom: string }) =>
       this.http.post<ProductPrice>('/prices', input),
     reminderSettings: () => this.http.get<PriceReminderSetting>('/price-reminders'),
     updateReminderSettings: (
