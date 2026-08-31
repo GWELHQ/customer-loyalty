@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { useApi } from '../../data/client';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
@@ -9,10 +10,11 @@ import { Icon } from '../../ui/Icon';
 export function CustomerCreate() {
   const api = useApi();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { stations } = useStations();
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [homeStationId, setHomeStationId] = useState('');
+  const [homeStationId, setHomeStationId] = useState(user?.assignedStationId ?? '');
   const [licensePlateNumbers, setLicensePlateNumbers] = useState<string[]>([]);
   const [newPlate, setNewPlate] = useState('');
   const [nfcTagId, setNfcTagId] = useState('');

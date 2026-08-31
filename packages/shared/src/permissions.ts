@@ -173,6 +173,11 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   // calls mid-flow (CustomerImportWizard.tsx) — without it step 2 onward 403s.
   Permission.CUSTOMERS_IMPORT,
   Permission.IMPORTS_VIEW,
+  // Read-only — needed so the branch/home-station dropdowns in customer
+  // create and import can populate at all (CustomerCreate.tsx,
+  // CustomerImportWizard.tsx both default the selection to the
+  // supervisor's own station, but still list every station).
+  Permission.STATIONS_VIEW,
   Permission.PRICES_VIEW,
   Permission.SALES_VIEW_OWN_STATION,
   Permission.RECONCILIATION_VIEW_OWN_STATION,
