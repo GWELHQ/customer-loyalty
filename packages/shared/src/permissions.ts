@@ -167,6 +167,7 @@ const RTSM_PERMISSIONS: Permission[] = [
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   Permission.CUSTOMERS_VIEW,
+  Permission.CUSTOMERS_MANAGE,
   Permission.PRICES_VIEW,
   Permission.SALES_VIEW_OWN_STATION,
   Permission.RECONCILIATION_VIEW_OWN_STATION,
