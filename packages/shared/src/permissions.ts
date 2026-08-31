@@ -168,6 +168,11 @@ const RTSM_PERMISSIONS: Permission[] = [
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   Permission.CUSTOMERS_VIEW,
   Permission.CUSTOMERS_MANAGE,
+  // Excel import needs both: CUSTOMERS_IMPORT gates the upload/remap/confirm
+  // steps, IMPORTS_VIEW gates the preview/results fetch the wizard also
+  // calls mid-flow (CustomerImportWizard.tsx) — without it step 2 onward 403s.
+  Permission.CUSTOMERS_IMPORT,
+  Permission.IMPORTS_VIEW,
   Permission.PRICES_VIEW,
   Permission.SALES_VIEW_OWN_STATION,
   Permission.RECONCILIATION_VIEW_OWN_STATION,
