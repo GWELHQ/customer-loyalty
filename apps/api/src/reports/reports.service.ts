@@ -1,8 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { Product, ReconciliationStatus, SpecialRateStatus, type Sale, type Station } from '@loyalty/shared';
+import {
+  Product,
+  ReconciliationStatus,
+  SpecialRateStatus,
+  type Sale,
+  type SalesReportGroup,
+  type SalesReportGroupBy,
+  type Station,
+} from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
-import { nairobiDateKey, nairobiDayBoundsUtc, nairobiMonthBoundsUtc, nairobiMonthKey, nairobiToday } from '../common/time/nairobi';
+import {
+  nairobiDateKey,
+  nairobiDayBoundsUtc,
+  nairobiMonthBoundsUtc,
+  nairobiMonthKey,
+  nairobiShiftBucket,
+  nairobiToday,
+} from '../common/time/nairobi';
+
+// A full year for a busy business can exceed the previous 1000-row cap
+// (originally sized for a single month's "sales by product" view) — this
+// is still an in-memory-aggregation limit, not true server-side
+// aggregation, so it's a known scaling ceiling rather than a hard
+// guarantee of completeness for very large date ranges.
+const SALES_REPORT_LIMIT = 5000;
 
 @Injectable()
 export class ReportsService {
@@ -113,12 +135,12 @@ export class ReportsService {
     return stations.map((s) => ({ stationId: s.id, name: s.name, value: round2(byStation.get(s.id) ?? 0) }));
   }
 
-  async salesReport(filters: { stationId?: string; from?: string; to?: string }) {
+  async salesReport(filters: { stationId?: string; from?: string; to?: string; groupBy?: SalesReportGroupBy }) {
     let query = this.firestore.collection('sales').orderBy('saleDate', 'desc') as FirebaseFirestore.Query;
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);
     if (filters.from) query = query.where('saleDate', '>=', filters.from);
     if (filters.to) query = query.where('saleDate', '<=', filters.to);
-    const snap = await query.limit(1000).get();
+    const snap = await query.limit(SALES_REPORT_LIMIT).get();
     const sales = snap.docs.map((d) => fromDoc<Sale>(d));
 
     const byProduct: Record<string, { count: number; amount: number; cashback: number }> = {};
@@ -129,7 +151,10 @@ export class ReportsService {
       bucket.cashback = round2(bucket.cashback + sale.snapshot.cashbackEarned);
     }
 
-    return { sales, byProduct };
+    const groupBy = filters.groupBy ?? 'product';
+    const groups = groupSales(sales, groupBy);
+
+    return { sales, byProduct, groupBy, groups };
   }
 
   async reconciliationReport(filters: { stationId?: string; date?: string }) {
@@ -161,4 +186,29 @@ export class ReportsService {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function groupSales(sales: Sale[], groupBy: SalesReportGroupBy): SalesReportGroup[] {
+  const buckets = new Map<string, SalesReportGroup>();
+  for (const sale of sales) {
+    const [key, label] =
+      groupBy === 'attendant'
+        ? [sale.attendantId, sale.attendantNameAtSale]
+        : groupBy === 'station'
+          ? [sale.stationId, sale.stationNameAtSale]
+          : groupBy === 'shift'
+            ? shiftKeyAndLabel(sale.saleDate)
+            : [sale.product, sale.product];
+    const bucket = buckets.get(key) ?? { key, label, count: 0, amount: 0, cashback: 0 };
+    bucket.count += 1;
+    bucket.amount = round2(bucket.amount + sale.amountPaid);
+    bucket.cashback = round2(bucket.cashback + sale.snapshot.cashbackEarned);
+    buckets.set(key, bucket);
+  }
+  return [...buckets.values()].sort((a, b) => b.amount - a.amount);
+}
+
+function shiftKeyAndLabel(saleDateIso: string): [string, string] {
+  const { shift } = nairobiShiftBucket(saleDateIso);
+  return [shift, shift === 'day' ? 'Day' : 'Night'];
 }

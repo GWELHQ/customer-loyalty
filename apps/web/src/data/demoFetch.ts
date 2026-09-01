@@ -71,6 +71,9 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
     if (notification) notification.read = true;
     return json(notification ?? {});
   }
+  if (path === '/reports/sales') {
+    return json({ sales: [], byProduct: {}, groupBy: 'station', groups: [] });
+  }
   if (path === '/reports/dashboard') {
     return json({
       month: '2026-08',

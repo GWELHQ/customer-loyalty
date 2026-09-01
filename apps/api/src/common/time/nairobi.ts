@@ -44,6 +44,36 @@ export function nairobiMonthBoundsUtc(monthKey: string): { startUtc: string; end
   };
 }
 
+/** The Nairobi calendar quarter (YYYY-QN) a UTC instant falls in. */
+export function nairobiQuarterKey(input: string | Date = new Date()): string {
+  const monthKey = nairobiMonthKey(input);
+  const quarter = Math.floor((Number(monthKey.slice(5, 7)) - 1) / 3) + 1;
+  return `${monthKey.slice(0, 4)}-Q${quarter}`;
+}
+
+/** UTC instant bounds [startUtc, endUtc) covering one Nairobi calendar quarter. */
+export function nairobiQuarterBoundsUtc(quarterKey: string): { startUtc: string; endUtc: string } {
+  const year = Number(quarterKey.slice(0, 4));
+  const quarter = Number(quarterKey.slice(6));
+  const startMonth = (quarter - 1) * 3;
+  const startMs = Date.UTC(year, startMonth, 1, 0, 0, 0) - NAIROBI_OFFSET_MS;
+  const endMs = Date.UTC(year, startMonth + 3, 1, 0, 0, 0) - NAIROBI_OFFSET_MS;
+  return {
+    startUtc: new Date(startMs).toISOString(),
+    endUtc: new Date(endMs).toISOString(),
+  };
+}
+
+/** UTC instant bounds [startUtc, endUtc) covering one Nairobi calendar year. */
+export function nairobiYearBoundsUtc(year: number): { startUtc: string; endUtc: string } {
+  const startMs = Date.UTC(year, 0, 1, 0, 0, 0) - NAIROBI_OFFSET_MS;
+  const endMs = Date.UTC(year + 1, 0, 1, 0, 0, 0) - NAIROBI_OFFSET_MS;
+  return {
+    startUtc: new Date(startMs).toISOString(),
+    endUtc: new Date(endMs).toISOString(),
+  };
+}
+
 const DAY_SHIFT_START_MIN = 7 * 60 + 30; // 07:30
 const DAY_SHIFT_END_MIN = 16 * 60 + 30; // 16:30
 

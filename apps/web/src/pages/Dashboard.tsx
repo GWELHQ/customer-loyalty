@@ -1,4 +1,4 @@
-import type { Sale } from '@loyalty/shared';
+import type { Sale, SalesReportGroup } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -199,6 +199,7 @@ export function Dashboard() {
           </div>
 
           <RecentSalesCard />
+          <TopAttendantsCard />
         </div>
       )}
     </AppShell>
@@ -268,6 +269,66 @@ function RecentSalesCard() {
                     {s.smsStatus}
                   </Badge>
                 </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Card>
+  );
+}
+
+function TopAttendantsCard() {
+  const api = useApi();
+  const navigate = useNavigate();
+  const [groups, setGroups] = useState<SalesReportGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  function reload() {
+    api.reports
+      .sales({ preset: 'this_month', groupBy: 'attendant' })
+      .then((r) => setGroups(r.groups.slice(0, 5)))
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [api]);
+  useRealtimeRefresh(['sales'], reload);
+
+  return (
+    <Card padding={0}>
+      <div
+        style={{
+          padding: '14px 16px',
+          borderBottom: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Top attendants this month</div>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/reports')}>
+          View full report
+        </Button>
+      </div>
+      {!loading && groups.length === 0 && (
+        <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No sales recorded this month yet.</div>
+      )}
+      {groups.length > 0 && (
+        <Table>
+          <thead>
+            <tr>
+              <Th>Attendant</Th>
+              <Th align="right">Sales</Th>
+              <Th align="right">Amount (KSh)</Th>
+              <Th align="right">Cashback (KSh)</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => (
+              <Tr key={g.key} onClick={() => navigate('/reports')}>
+                <Td>{g.label}</Td>
+                <Td align="right">{g.count}</Td>
+                <Td align="right">{g.amount.toLocaleString('en-KE')}</Td>
+                <Td align="right">{g.cashback.toLocaleString('en-KE')}</Td>
               </Tr>
             ))}
           </tbody>

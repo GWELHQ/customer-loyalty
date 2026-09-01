@@ -24,6 +24,8 @@ import type {
   RoleDefinition,
   Sale,
   SaleApprovalDelegation,
+  SalesReportGroup,
+  SalesReportGroupBy,
   ShiftRoster,
   ShiftType,
   SmsDelivery,
@@ -289,8 +291,13 @@ export class LoyaltyApiClient {
 
   reports = {
     dashboard: (stationId?: string) => this.http.get(`/reports/dashboard${toQueryString({ stationId })}`),
-    sales: (params: { stationId?: string; from?: string; to?: string } = {}) =>
-      this.http.get(`/reports/sales${toQueryString(params)}`),
+    sales: (params: { stationId?: string; from?: string; to?: string; preset?: string; groupBy?: SalesReportGroupBy } = {}) =>
+      this.http.get<{
+        sales: Sale[];
+        byProduct: Record<string, { count: number; amount: number; cashback: number }>;
+        groupBy: SalesReportGroupBy;
+        groups: SalesReportGroup[];
+      }>(`/reports/sales${toQueryString(params)}`),
     reconciliation: (params: { stationId?: string; date?: string } = {}) =>
       this.http.get(`/reports/reconciliation${toQueryString(params)}`),
     disbursements: (month?: string) => this.http.get(`/reports/disbursements${toQueryString({ month })}`),

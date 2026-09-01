@@ -243,6 +243,16 @@ export interface ReconciliationDaily extends BaseDoc {
   flaggedSaleIds: string[];
 }
 
+export type SalesReportGroupBy = 'attendant' | 'station' | 'shift' | 'product';
+
+export interface SalesReportGroup {
+  key: string;
+  label: string;
+  count: number;
+  amount: number;
+  cashback: number;
+}
+
 export interface ShiftRoster extends BaseDoc {
   stationId: string;
   /** The Nairobi calendar day the shift *starts* on — see nairobiShiftBucket. */
