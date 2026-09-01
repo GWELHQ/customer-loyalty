@@ -16,6 +16,7 @@ import { PendingActivation } from './pages/PendingActivation';
 import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
+import { RolesAdmin } from './pages/RolesAdmin';
 import { SalesList } from './pages/SalesList';
 import { SignIn } from './pages/SignIn';
 import { SpecialRates } from './pages/SpecialRates';
@@ -78,6 +79,7 @@ export function App() {
       <Route path="/audit-log" element={<Navigate to="/logs" replace />} />
       <Route path="/fraud" element={<RequireStaff permission={Permission.FRAUD_VIEW}><FraudGovernance /></RequireStaff>} />
       <Route path="/users" element={<RequireStaff permission={Permission.USERS_MANAGE}><Users /></RequireStaff>} />
+      <Route path="/roles" element={<RequireStaff permission={Permission.RBAC_MANAGE}><RolesAdmin /></RequireStaff>} />
       <Route path="/attendants" element={<RequireStaff permission={Permission.ATTENDANTS_MANAGE}><Attendants /></RequireStaff>} />
       <Route path="/stations" element={<RequireStaff permission={Permission.STATIONS_VIEW}><Stations /></RequireStaff>} />
 

@@ -1,4 +1,4 @@
-import { Permission, type Role } from '@loyalty/shared';
+import { Permission } from '@loyalty/shared';
 
 export interface NavItem {
   label: string;
@@ -19,6 +19,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Disbursements', path: '/disbursements', icon: 'disbursements', permission: Permission.DISBURSEMENTS_VIEW },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_ALL },
   { label: 'Users', path: '/users', icon: 'users', permission: Permission.USERS_MANAGE },
+  { label: 'Roles', path: '/roles', icon: 'key', permission: Permission.RBAC_MANAGE },
   { label: 'Attendants', path: '/attendants', icon: 'customers', permission: Permission.ATTENDANTS_MANAGE },
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },
   { label: 'Logs', path: '/logs', icon: 'audit', permission: Permission.AUDIT_VIEW },
@@ -35,7 +36,7 @@ const STATION_SCOPED_NAV_ITEMS: NavItem[] = [
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_OWN_STATION },
 ];
 
-export function navItemsForRole(role: Role, hasPermission: (p: Permission) => boolean): NavItem[] {
+export function navItemsForRole(role: string, hasPermission: (p: Permission) => boolean): NavItem[] {
   const merged = [...ALL_NAV_ITEMS, ...STATION_SCOPED_NAV_ITEMS];
   const seenPaths = new Set<string>();
   const result: NavItem[] = [];

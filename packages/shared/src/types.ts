@@ -11,7 +11,6 @@ import type {
   NotificationType,
   Product,
   ReconciliationStatus,
-  Role,
   SaleApprovalStatus,
   SmsStatus,
   SpecialRateStatus,
@@ -38,7 +37,8 @@ export interface Station extends BaseDoc {
 export interface User extends BaseDoc {
   fullName: string;
   email: string;
-  role: Role;
+  /** A Role enum value, or a custom role key created via /rbac/roles — not a fixed enum anymore, see RbacService. */
+  role: string;
   status: UserStatus;
   /** Required and singular for station_supervisor; must be undefined for every other role. */
   assignedStationId?: string;

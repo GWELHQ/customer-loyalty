@@ -44,6 +44,7 @@ describe('Sales idempotency (e2e)', () => {
         email: 'seed@greenwellsenergies.co.ke',
         fullName: 'Seed',
         role: 'admin' as never,
+        permissions: [],
         status: UserStatus.ACTIVE,
       },
     );

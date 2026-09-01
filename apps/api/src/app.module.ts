@@ -25,6 +25,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { MobileModule } from './mobile/mobile.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PricesModule } from './prices/prices.module';
+import { RbacModule } from './rbac/rbac.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
 import { ReportsModule } from './reports/reports.module';
 import { SalesModule } from './sales/sales.module';
@@ -47,6 +48,7 @@ import { VehiclePlateChecksModule } from './vehicle-plate-checks/vehicle-plate-c
     TokenModule,
     AuditModule,
     EmailModule,
+    RbacModule,
     AuthModule,
     UsersModule,
     AttendantsModule,

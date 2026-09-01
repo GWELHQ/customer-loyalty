@@ -1,6 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Role } from '@loyalty/shared';
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateUserDto {
   @ApiPropertyOptional()
@@ -9,10 +8,10 @@ export class UpdateUserDto {
   @MinLength(2)
   fullName?: string;
 
-  @ApiPropertyOptional({ enum: Role, enumName: 'Role' })
+  @ApiPropertyOptional({ description: 'A built-in Role value, or a custom role key created via /rbac/roles.' })
   @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+  @IsString()
+  role?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

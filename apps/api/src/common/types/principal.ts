@@ -1,4 +1,4 @@
-import { Role, UserStatus } from '@loyalty/shared';
+import { Permission, Role, UserStatus } from '@loyalty/shared';
 
 export type PrincipalKind = 'staff' | 'attendant';
 
@@ -7,7 +7,18 @@ export interface StaffPrincipal {
   userId: string;
   email: string;
   fullName: string;
-  role: Role;
+  /** A Role enum value, or a custom role key created via /rbac/roles. */
+  role: string;
+  /**
+   * Resolved once at session-mint time (login/token refresh) from the
+   * role's current definition (RbacService.getPermissionsForRole) and
+   * signed straight into the JWT alongside the rest of this principal —
+   * PermissionsGuard reads this directly rather than re-resolving from
+   * Firestore on every request. Stale for at most one access-token TTL
+   * after a role's permissions change, same envelope `role` itself
+   * already has today.
+   */
+  permissions: Permission[];
   /** Present and singular only for station_supervisor. */
   assignedStationId?: string;
   /**

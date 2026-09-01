@@ -254,7 +254,7 @@ function DelegationPanel() {
 
   const [stationId, setStationId] = useState(isAdmin ? '' : (user?.assignedStationId ?? ''));
   const [current, setCurrent] = useState<SaleApprovalDelegation | null>(null);
-  const [eligibleStaff, setEligibleStaff] = useState<{ id: string; fullName: string; role: Role }[]>([]);
+  const [eligibleStaff, setEligibleStaff] = useState<{ id: string; fullName: string; role: string }[]>([]);
   const [delegateUserId, setDelegateUserId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');

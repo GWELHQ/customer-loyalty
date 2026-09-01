@@ -44,6 +44,8 @@ export enum Permission {
   CUSTOMER_INACTIVITY_SETTINGS_MANAGE = 'customer_inactivity_settings:manage',
   SALES_APPROVE_ALL = 'sales:approve_all',
   SALES_APPROVE_OWN_STATION = 'sales:approve_own_station',
+  /** Create/edit/delete dynamic role definitions (`/rbac/roles`). Granted only to Admin by default — see SYSTEM_ROLE_DEFINITIONS below. */
+  RBAC_MANAGE = 'rbac:manage',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -74,6 +76,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   Permission.SALES_APPROVE_ALL,
+  Permission.RBAC_MANAGE,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 
@@ -195,17 +198,107 @@ const ATTENDANT_PERMISSIONS: Permission[] = [
   Permission.PRICES_VIEW,
 ];
 
-export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  [Role.ADMIN]: ADMIN_PERMISSIONS,
-  [Role.CHAIRMAN]: CHAIRMAN_PERMISSIONS,
-  [Role.FINANCE_APPROVER]: FINANCE_APPROVER_PERMISSIONS,
-  [Role.FINANCE_DISBURSER]: FINANCE_DISBURSER_PERMISSIONS,
-  [Role.RTSM]: RTSM_PERMISSIONS,
-  [Role.STATION_SUPERVISOR]: STATION_SUPERVISOR_PERMISSIONS,
-  [Role.ATTENDANT]: ATTENDANT_PERMISSIONS,
-  [Role.EXEC_VIEWER]: EXEC_VIEWER_PERMISSIONS,
-  [Role.AUDIT]: AUDIT_PERMISSIONS,
+/**
+ * A role's live definition: its display metadata plus permission set.
+ * `isSystem` roles (the 9 built into this table) can never be deleted and
+ * always exist even with no Firestore `roleDefinitions` doc — see
+ * `apps/api/src/rbac/rbac.service.ts`, the single place both the API's
+ * `PermissionsGuard`-embedded-in-JWT permission list and the web app's
+ * roles catalogue ultimately resolve from. A custom role created by an
+ * Admin at runtime has the same shape with `isSystem: false`.
+ */
+export interface RoleDefinition {
+  key: string;
+  displayName: string;
+  description: string;
+  permissions: Permission[];
+  isSystem: boolean;
+}
+
+/**
+ * Static defaults for the 9 built-in roles — every one of these still
+ * works identically even if `roleDefinitions` in Firestore is completely
+ * empty (no migration/backfill needed to ship dynamic roles). This is
+ * also the single source of a role's display name now, replacing what
+ * used to be two separately hand-maintained `ROLE_LABELS` maps in
+ * `apps/web/src/layout/AppShell.tsx` and `apps/web/src/pages/Users.tsx`.
+ */
+export const SYSTEM_ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
+  [Role.ADMIN]: {
+    key: Role.ADMIN,
+    displayName: 'Admin',
+    description: 'Full operational access, including creating roles and assigning permissions.',
+    permissions: ADMIN_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.CHAIRMAN]: {
+    key: Role.CHAIRMAN,
+    displayName: 'Chairman',
+    description: 'Approves special cashback rates and has read-only executive visibility.',
+    permissions: CHAIRMAN_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.FINANCE_APPROVER]: {
+    key: Role.FINANCE_APPROVER,
+    displayName: 'Finance Approver',
+    description: 'Checks and approves the monthly cashback ledger RTSM releases.',
+    permissions: FINANCE_APPROVER_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.FINANCE_DISBURSER]: {
+    key: Role.FINANCE_DISBURSER,
+    displayName: 'Finance Disburser',
+    description: 'Executes approved disbursement batches.',
+    permissions: FINANCE_DISBURSER_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.RTSM]: {
+    key: Role.RTSM,
+    displayName: 'Retail Sales Manager',
+    description: 'Manages customers, prices, and reconciliation; releases the monthly cashback ledger.',
+    permissions: RTSM_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.STATION_SUPERVISOR]: {
+    key: Role.STATION_SUPERVISOR,
+    displayName: 'Station Supervisor',
+    description: 'Manages one station’s day-to-day operations, reconciliation, and sale approvals.',
+    permissions: STATION_SUPERVISOR_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.ATTENDANT]: {
+    key: Role.ATTENDANT,
+    displayName: 'Attendant',
+    description: 'Records sales at the pump via the mobile app. Not assignable to a staff (web) account.',
+    permissions: ATTENDANT_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.EXEC_VIEWER]: {
+    key: Role.EXEC_VIEWER,
+    displayName: 'Exec Viewer',
+    description: 'Read-only view of everything the Chairman sees.',
+    permissions: EXEC_VIEWER_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.AUDIT]: {
+    key: Role.AUDIT,
+    displayName: 'Audit',
+    description: 'Same read-only visibility as Exec Viewer, for staff whose function is auditing.',
+    permissions: AUDIT_PERMISSIONS,
+    isSystem: true,
+  },
 };
+
+/**
+ * Static-defaults-only view of every role's permissions — NOT the live
+ * security boundary. The API resolves permissions dynamically per
+ * request via `RbacService` (Firestore `roleDefinitions` overrides
+ * merged over this table); this export exists for `permissions.test.ts`
+ * and the frontend's backend-less demo-mode session.
+ */
+export const ROLE_PERMISSIONS: Record<Role, Permission[]> = Object.fromEntries(
+  Object.entries(SYSTEM_ROLE_DEFINITIONS).map(([key, def]) => [key, def.permissions]),
+) as Record<Role, Permission[]>;
 
 export function roleHasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;

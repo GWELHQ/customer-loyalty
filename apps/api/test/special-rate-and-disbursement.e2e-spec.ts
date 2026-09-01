@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { LedgerStatus, Product, Role, SpecialRateStatus, UserStatus } from '@loyalty/shared';
+import { getPermissionsForRole, LedgerStatus, Product, Role, SpecialRateStatus, UserStatus } from '@loyalty/shared';
 import { CashbackLedgersService } from '../src/cashback-ledgers/cashback-ledgers.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { DisbursementBatchesService } from '../src/disbursement-batches/disbursement-batches.service';
@@ -17,6 +17,7 @@ const rtsm: StaffPrincipal = {
   email: 'rtsm@greenwellsenergies.co.ke',
   fullName: 'RTSM Person',
   role: Role.RTSM,
+  permissions: getPermissionsForRole(Role.RTSM),
   status: UserStatus.ACTIVE,
 };
 const chairman: StaffPrincipal = {
@@ -25,6 +26,7 @@ const chairman: StaffPrincipal = {
   email: 'chairman@greenwellsenergies.co.ke',
   fullName: 'Chairman Person',
   role: Role.CHAIRMAN,
+  permissions: getPermissionsForRole(Role.CHAIRMAN),
   status: UserStatus.ACTIVE,
 };
 const finance: StaffPrincipal = {
@@ -33,6 +35,7 @@ const finance: StaffPrincipal = {
   email: 'finance@greenwellsenergies.co.ke',
   fullName: 'Finance Person',
   role: Role.FINANCE_APPROVER,
+  permissions: getPermissionsForRole(Role.FINANCE_APPROVER),
   status: UserStatus.ACTIVE,
 };
 const admin: StaffPrincipal = {
@@ -41,6 +44,7 @@ const admin: StaffPrincipal = {
   email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: Role.ADMIN,
+  permissions: getPermissionsForRole(Role.ADMIN),
   status: UserStatus.ACTIVE,
 };
 

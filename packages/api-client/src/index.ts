@@ -15,11 +15,13 @@ import type {
   MonthlyCashbackLedger,
   Notification,
   PaginatedResult,
+  Permission,
   PriceReminderSetting,
   Product,
   ProductPrice,
   ReconciliationDaily,
   Role,
+  RoleDefinition,
   Sale,
   SaleApprovalDelegation,
   SmsDelivery,
@@ -42,7 +44,8 @@ export interface StaffSessionResponse {
     userId: string;
     email: string;
     fullName: string;
-    role: Role;
+    role: string;
+    permissions: Permission[];
     assignedStationId?: string;
     status: UserStatus;
   };
@@ -84,12 +87,23 @@ export class LoyaltyApiClient {
   users = {
     list: () => this.http.get<User[]>('/users'),
     get: (id: string) => this.http.get<User>(`/users/${id}`),
-    create: (input: { fullName: string; email: string; role: Role; assignedStationId?: string }) =>
+    create: (input: { fullName: string; email: string; role: string; assignedStationId?: string }) =>
       this.http.post<User>('/users', input),
-    update: (id: string, input: Partial<{ fullName: string; role: Role; assignedStationId: string }>) =>
+    update: (id: string, input: Partial<{ fullName: string; role: string; assignedStationId: string }>) =>
       this.http.patch<User>(`/users/${id}`, input),
     setStatus: (id: string, status: 'active' | 'inactive') =>
       this.http.patch<User>(`/users/${id}/status`, { status }),
+  };
+
+  rbac = {
+    listRoles: () => this.http.get<RoleDefinition[]>('/rbac/roles'),
+    getRole: (key: string) => this.http.get<RoleDefinition>(`/rbac/roles/${key}`),
+    listPermissions: () => this.http.get<Permission[]>('/rbac/permissions'),
+    createRole: (input: { key: string; displayName: string; description: string; permissions: Permission[] }) =>
+      this.http.post<RoleDefinition>('/rbac/roles', input),
+    updateRole: (key: string, input: Partial<{ displayName: string; description: string; permissions: Permission[] }>) =>
+      this.http.patch<RoleDefinition>(`/rbac/roles/${key}`, input),
+    deleteRole: (key: string) => this.http.delete<{ success: boolean }>(`/rbac/roles/${key}`),
   };
 
   attendants = {
@@ -202,7 +216,7 @@ export class LoyaltyApiClient {
   salesDelegations = {
     listForStation: (stationId: string) =>
       this.http.get<SaleApprovalDelegation[]>(`/sales-delegations${toQueryString({ stationId })}`),
-    listEligibleStaff: () => this.http.get<{ id: string; fullName: string; role: Role }[]>('/sales-delegations/eligible-staff'),
+    listEligibleStaff: () => this.http.get<{ id: string; fullName: string; role: string }[]>('/sales-delegations/eligible-staff'),
     create: (input: { stationId: string; delegateUserId: string; startDate: string; endDate: string }) =>
       this.http.post<SaleApprovalDelegation>('/sales-delegations', input),
     revoke: (id: string) => this.http.post<SaleApprovalDelegation>(`/sales-delegations/${id}/revoke`, {}),

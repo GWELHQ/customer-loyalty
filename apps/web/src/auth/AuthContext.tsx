@@ -20,7 +20,10 @@ export interface StaffUser {
   userId: string;
   email: string;
   fullName: string;
-  role: Role;
+  /** A Role enum value, or a custom role key created via /rbac/roles. */
+  role: string;
+  /** Resolved server-side at login/token-refresh time — see StaffPrincipal in the API. */
+  permissions: Permission[];
   assignedStationId?: string;
   status: UserStatus;
 }
@@ -71,7 +74,7 @@ async function refreshStoredSession(api: LoyaltyApiClient): Promise<StoredSessio
   }
 }
 
-export function landingPathForRole(role: Role): string {
+export function landingPathForRole(role: string): string {
   switch (role) {
     case Role.CHAIRMAN:
       return '/special-rates';
@@ -232,7 +235,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // links to routes every request would 403 on.
       hasPermission: (permission) =>
         session && session.user.status === UserStatus.ACTIVE
-          ? getPermissionsForRole(session.user.role).includes(permission)
+          ? session.user.permissions.includes(permission)
           : false,
       signInWithMicrosoft,
       signOut,
@@ -264,6 +267,8 @@ function demoSession(): StoredSession {
       email: 'a.wanjiru@greenwellsenergies.co.ke',
       fullName: 'Amina Wanjiru',
       role: Role.ADMIN,
+      // Demo mode has no backend to resolve this from — use the static default.
+      permissions: getPermissionsForRole(Role.ADMIN),
       status: UserStatus.ACTIVE,
     },
   };

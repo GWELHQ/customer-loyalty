@@ -203,7 +203,7 @@ export class CustomerRegistrationsService {
   assertCanDecide(user: StaffPrincipal): void {
     // Defense in depth: PermissionsGuard already enforces
     // CUSTOMER_REGISTRATIONS_APPROVE at the route level.
-    if (![Role.ADMIN, Role.RTSM, Role.STATION_SUPERVISOR].includes(user.role)) {
+    if (!([Role.ADMIN, Role.RTSM, Role.STATION_SUPERVISOR] as string[]).includes(user.role)) {
       throw new ForbiddenException('You may not approve or reject customer registration requests');
     }
   }

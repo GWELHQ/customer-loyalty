@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Role, UserStatus } from '@loyalty/shared';
+import { getPermissionsForRole, Role, UserStatus } from '@loyalty/shared';
 import { AppModule } from '../../src/app.module';
 import { TokenService } from '../../src/common/token/token.service';
 import type { AttendantPrincipal, StaffPrincipal } from '../../src/common/types/principal';
@@ -19,12 +19,14 @@ export async function mintStaffToken(
   overrides: Partial<StaffPrincipal> = {},
 ): Promise<string> {
   const tokens = app.get(TokenService);
+  const role = overrides.role ?? Role.ADMIN;
   const principal: StaffPrincipal = {
     kind: 'staff',
     userId: overrides.userId ?? 'test-user-1',
     email: overrides.email ?? 'test@greenwellsenergies.co.ke',
     fullName: overrides.fullName ?? 'Test User',
-    role: overrides.role ?? Role.ADMIN,
+    role,
+    permissions: overrides.permissions ?? getPermissionsForRole(role as Role),
     assignedStationId: overrides.assignedStationId,
     status: overrides.status ?? UserStatus.ACTIVE,
   };

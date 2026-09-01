@@ -1,14 +1,22 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { roleHasPermission, UserStatus, type Permission } from '@loyalty/shared';
+import { getPermissionsForRole, UserStatus, type Permission } from '@loyalty/shared';
 import { ANY_PERMISSION_KEY } from '../decorators/any-permission.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import type { AuthPrincipal } from '../types/principal';
 
 /**
- * Enforces the centralized RBAC matrix from @loyalty/shared against the
- * authenticated principal's role. This is the actual security boundary —
- * the React app's nav-visibility mirrors the same matrix, but only for UX.
+ * Enforces the permission list embedded in the caller's session against
+ * whatever a route requires. For staff, that list is resolved dynamically
+ * (Firestore `roleDefinitions` override merged over the static system-role
+ * defaults — see RbacService) once, at login/token-refresh time, and signed
+ * straight into the JWT alongside `role` — so this guard stays synchronous
+ * and does zero I/O per request, same as before this became dynamic. A
+ * token minted before a role's permissions change (or, briefly at rollout,
+ * before this field existed at all) is stale for at most one access-token
+ * TTL; a missing/undefined `permissions` array is treated as empty (fail
+ * closed). Attendants aren't part of the dynamic-roles feature — their
+ * fixed role always resolves against the static default table.
  *
  * @RequirePermissions requires ALL listed permissions; @RequireAnyPermission
  * requires just one (used where a route serves both an "all data" role and
@@ -44,15 +52,17 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Your account is not yet active. Ask an Admin to activate it.');
     }
 
+    const granted = user.kind === 'staff' ? (user.permissions ?? []) : getPermissionsForRole(user.role);
+
     if (requiredAll && requiredAll.length > 0) {
-      const missing = requiredAll.filter((p) => !roleHasPermission(user.role, p));
+      const missing = requiredAll.filter((p) => !granted.includes(p));
       if (missing.length > 0) {
         throw new ForbiddenException(`Missing required permission(s): ${missing.join(', ')}`);
       }
     }
 
     if (requiredAny && requiredAny.length > 0) {
-      const hasOne = requiredAny.some((p) => roleHasPermission(user.role, p));
+      const hasOne = requiredAny.some((p) => granted.includes(p));
       if (!hasOne) {
         throw new ForbiddenException(`Missing at least one of required permission(s): ${requiredAny.join(', ')}`);
       }

@@ -1,9 +1,10 @@
-import type { Station, User } from '@loyalty/shared';
+import type { RoleDefinition, Station, User } from '@loyalty/shared';
 import { Role, UserStatus } from '@loyalty/shared';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApi } from '../data/client';
 import { useUsersCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
+import { useRoles } from '../data/useRoles';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
@@ -22,34 +23,11 @@ import {
   inputStyle,
 } from '../ui/primitives';
 
-const ROLE_LABELS: Record<Role, string> = {
-  [Role.ADMIN]: 'Admin',
-  [Role.CHAIRMAN]: 'Chairman',
-  [Role.FINANCE_APPROVER]: 'Finance Approver',
-  [Role.FINANCE_DISBURSER]: 'Finance Disburser',
-  [Role.RTSM]: 'RTSM',
-  [Role.STATION_SUPERVISOR]: 'Station Supervisor',
-  [Role.ATTENDANT]: 'Attendant',
-  [Role.EXEC_VIEWER]: 'Exec Viewer',
-  [Role.AUDIT]: 'Audit',
-};
-
-const ASSIGNABLE_ROLES = [
-  Role.ADMIN,
-  Role.CHAIRMAN,
-  Role.FINANCE_APPROVER,
-  Role.FINANCE_DISBURSER,
-  Role.RTSM,
-  Role.STATION_SUPERVISOR,
-  Role.EXEC_VIEWER,
-  Role.AUDIT,
-];
-
-function userColumns(stations: Station[]): ExportColumn<User>[] {
+function userColumns(stations: Station[], roleLabel: Map<string, string>): ExportColumn<User>[] {
   return [
     { header: 'Name', value: (u) => u.fullName },
     { header: 'Email', value: (u) => u.email },
-    { header: 'Role', value: (u) => ROLE_LABELS[u.role] },
+    { header: 'Role', value: (u) => roleLabel.get(u.role) ?? u.role },
     {
       header: 'Station',
       value: (u) => stations.find((s) => s.id === u.assignedStationId)?.name ?? '',
@@ -62,6 +40,10 @@ export function Users() {
   const api = useApi();
   const { items: users, refresh: reload } = useUsersCache();
   const { stations } = useStations();
+  const { roles } = useRoles();
+  const roleLabel = useMemo(() => new Map(roles.map((r) => [r.key, r.displayName])), [roles]);
+  // Attendants have no web account — never assignable to a User via this form.
+  const assignableRoles = useMemo(() => roles.filter((r) => r.key !== Role.ATTENDANT), [roles]);
   const { paged, page, pageCount, setPage } = usePagedRows(users);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -111,13 +93,14 @@ export function Users() {
           <ExportButtons
             filename="users"
             title="Users"
-            columns={userColumns(stations)}
+            columns={userColumns(stations, roleLabel)}
             rows={users}
           />
         </div>
         {showForm && (
           <UserForm
             stations={stations}
+            assignableRoles={assignableRoles}
             onDone={() => {
               setShowForm(false);
               reload();
@@ -142,7 +125,7 @@ export function Users() {
                 <Tr key={u.id}>
                   <Td>{u.fullName}</Td>
                   <Td>{u.email}</Td>
-                  <Td>{ROLE_LABELS[u.role]}</Td>
+                  <Td>{roleLabel.get(u.role) ?? u.role}</Td>
                   <Td>{stations.find((s) => s.id === u.assignedStationId)?.name ?? '—'}</Td>
                   <Td>
                     <Badge tone={u.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>
@@ -185,6 +168,7 @@ export function Users() {
         <EditUserModal
           user={editingUser}
           stations={stations}
+          assignableRoles={assignableRoles}
           onClose={() => setEditingUser(null)}
           onSaved={() => {
             setEditingUser(null);
@@ -199,17 +183,19 @@ export function Users() {
 function EditUserModal({
   user,
   stations,
+  assignableRoles,
   onClose,
   onSaved,
 }: {
   user: User;
   stations: Station[];
+  assignableRoles: RoleDefinition[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const api = useApi();
   const [fullName, setFullName] = useState(user.fullName);
-  const [role, setRole] = useState<Role>(user.role);
+  const [role, setRole] = useState(user.role);
   const [assignedStationId, setAssignedStationId] = useState(user.assignedStationId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -252,10 +238,10 @@ function EditUserModal({
       </Field>
       <div style={{ marginTop: 12 }}>
         <Field label="Role" required>
-          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            {ASSIGNABLE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
+          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+            {assignableRoles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.displayName}
               </option>
             ))}
           </select>
@@ -295,11 +281,19 @@ function EditUserModal({
   );
 }
 
-function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => void }) {
+function UserForm({
+  stations,
+  assignableRoles,
+  onDone,
+}: {
+  stations: Station[];
+  assignableRoles: RoleDefinition[];
+  onDone: () => void;
+}) {
   const api = useApi();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<Role>(Role.RTSM);
+  const [role, setRole] = useState<string>(Role.RTSM);
   const [assignedStationId, setAssignedStationId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -355,10 +349,10 @@ function UserForm({ stations, onDone }: { stations: Station[]; onDone: () => voi
           />
         </Field>
         <Field label="Role" required>
-          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            {ASSIGNABLE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
+          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+            {assignableRoles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.displayName}
               </option>
             ))}
           </select>

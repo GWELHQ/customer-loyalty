@@ -3,6 +3,7 @@ import { Role, UserStatus, type User } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { ChangeEventsService } from '../events/change-events.service';
+import { RbacService } from '../rbac/rbac.service';
 
 const COLLECTION = 'users';
 
@@ -11,6 +12,7 @@ export class UsersService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly changeEvents: ChangeEventsService,
+    private readonly rbac: RbacService,
   ) {}
 
   private col() {
@@ -76,9 +78,10 @@ export class UsersService {
   async create(input: {
     fullName: string;
     email: string;
-    role: Role;
+    role: string;
     assignedStationId?: string;
   }): Promise<User> {
+    await this.assertRoleExists(input.role);
     this.assertStationAssignmentRule(input.role, input.assignedStationId);
     const existing = await this.findByEmail(input.email);
     if (existing) throw new BadRequestException('A user with this email already exists');
@@ -106,6 +109,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const nextRole = input.role ?? user.role;
+    if (input.role) await this.assertRoleExists(input.role);
     const nextStation = 'assignedStationId' in input ? input.assignedStationId : user.assignedStationId;
     this.assertStationAssignmentRule(nextRole, nextStation);
 
@@ -132,11 +136,28 @@ export class UsersService {
   }
 
   /**
+   * A user's role must be a real one — a built-in Role or a custom role
+   * created via /rbac/roles — not an arbitrary unknown string. Doubles as
+   * the DTO-level `@IsEnum(Role)` check this replaced, now that role keys
+   * aren't a fixed enum.
+   */
+  private async assertRoleExists(role: string): Promise<void> {
+    try {
+      await this.rbac.getRoleDefinition(role);
+    } catch {
+      throw new BadRequestException(`Unknown role "${role}"`);
+    }
+  }
+
+  /**
    * Enforces the critical station rule: a station_supervisor must have
    * exactly one assigned station; every other role must have none. This is
    * enforced here (the write path) in addition to API-level DTO validation.
+   * Deliberately keyed off the literal built-in Role.STATION_SUPERVISOR —
+   * a custom role doesn't get automatic station-scoping (see the RBAC plan's
+   * documented scope boundary).
    */
-  private assertStationAssignmentRule(role: Role, assignedStationId?: string): void {
+  private assertStationAssignmentRule(role: string, assignedStationId?: string): void {
     if (role === Role.STATION_SUPERVISOR && !assignedStationId) {
       throw new BadRequestException('station_supervisor requires exactly one assignedStationId');
     }

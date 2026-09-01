@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { Product, ReconciliationStatus, Role, UserStatus } from '@loyalty/shared';
+import { getPermissionsForRole, Product, ReconciliationStatus, Role, UserStatus } from '@loyalty/shared';
 import { CustomersService } from '../src/customers/customers.service';
 import { PricesService } from '../src/prices/prices.service';
 import { ReconciliationService } from '../src/reconciliation/reconciliation.service';
@@ -15,6 +15,7 @@ const admin: StaffPrincipal = {
   email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: Role.ADMIN,
+  permissions: getPermissionsForRole(Role.ADMIN),
   status: UserStatus.ACTIVE,
 };
 

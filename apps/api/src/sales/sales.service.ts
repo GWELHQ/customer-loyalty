@@ -5,7 +5,6 @@ import {
   DEFAULT_CASHBACK_RATE_KES,
   NotificationType,
   Permission,
-  roleHasPermission,
   Role,
   SaleApprovalStatus,
   SmsStatus,
@@ -425,7 +424,7 @@ export class SalesService {
 
   /** RTSM/Admin, the station's own supervisor, or a currently-active delegate for that station. */
   private async assertCanApproveStation(actor: StaffPrincipal, stationId: string): Promise<void> {
-    if (roleHasPermission(actor.role, Permission.SALES_APPROVE_ALL)) return;
+    if (actor.permissions.includes(Permission.SALES_APPROVE_ALL)) return;
     if (actor.role === Role.STATION_SUPERVISOR && actor.assignedStationId === stationId) return;
     if (await this.salesDelegations.isActiveDelegate(actor.userId, stationId)) return;
     throw new ForbiddenException('You do not have approval access to this station');
@@ -441,7 +440,7 @@ export class SalesService {
     actor: StaffPrincipal,
     requestedStationId: string | undefined,
   ): Promise<string | undefined | null> {
-    if (roleHasPermission(actor.role, Permission.SALES_APPROVE_ALL)) return requestedStationId;
+    if (actor.permissions.includes(Permission.SALES_APPROVE_ALL)) return requestedStationId;
     if (actor.role === Role.STATION_SUPERVISOR && actor.assignedStationId) return actor.assignedStationId;
     const delegatedStationId = await this.salesDelegations.findActiveDelegationStationForUser(actor.userId);
     return delegatedStationId ?? null;

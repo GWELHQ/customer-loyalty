@@ -101,6 +101,7 @@ async function seed() {
     email: admin.email,
     fullName: admin.fullName,
     role: Role.ADMIN,
+    permissions: [],
     status: UserStatus.ACTIVE,
   };
   for (const stationId of [stations.KIS1!, stations.KIS2!]) {

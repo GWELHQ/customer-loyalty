@@ -6,6 +6,7 @@ import { AuditService } from '../common/audit/audit.service';
 import { TokenService } from '../common/token/token.service';
 import type { AttendantPrincipal, StaffPrincipal } from '../common/types/principal';
 import type { AppConfig } from '../config/configuration';
+import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from '../users/users.service';
 import { MicrosoftOidcService } from './microsoft-oidc.service';
 
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly rbac: RbacService,
   ) {}
 
   getMicrosoftClientConfig() {
@@ -58,12 +60,14 @@ export class AuthService {
     // Admin" screen instead of a real dashboard. This lets an Admin's later
     // activation reach the already-open tab via the same realtime-refresh
     // path as any other role/status change, with no re-login needed.
+    const permissions = await this.rbac.getPermissionsForRole(user.role);
     const principal: StaffPrincipal = {
       kind: 'staff',
       userId: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
+      permissions,
       assignedStationId: user.assignedStationId,
       status: user.status,
     };
@@ -92,12 +96,14 @@ export class AuthService {
       throw new UnauthorizedException('Session no longer valid');
     }
 
+    const permissions = await this.rbac.getPermissionsForRole(user.role);
     const principal: StaffPrincipal = {
       kind: 'staff',
       userId: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
+      permissions,
       assignedStationId: user.assignedStationId,
       status: user.status,
     };

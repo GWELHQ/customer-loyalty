@@ -12,6 +12,7 @@ const admin: StaffPrincipal = {
   email: 'admin@greenwellsenergies.co.ke',
   fullName: 'Admin Person',
   role: 'admin' as never,
+  permissions: [],
   status: UserStatus.ACTIVE,
 };
 

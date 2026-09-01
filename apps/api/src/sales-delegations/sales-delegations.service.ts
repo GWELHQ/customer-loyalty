@@ -106,7 +106,7 @@ export class SalesDelegationsService {
   }
 
   /** Minimal staff directory for the delegate picker — deliberately excludes email/other PII, so it doesn't need Permission.USERS_MANAGE to call. */
-  async listEligibleStaff(): Promise<{ id: string; fullName: string; role: Role }[]> {
+  async listEligibleStaff(): Promise<{ id: string; fullName: string; role: string }[]> {
     const users = await this.users.list();
     return users
       .filter((u) => u.status === UserStatus.ACTIVE)

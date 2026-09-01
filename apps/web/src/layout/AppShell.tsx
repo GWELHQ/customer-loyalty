@@ -1,31 +1,22 @@
-import { CustomerRegistrationStatus, Permission, Role, type Notification } from '@loyalty/shared';
-import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
+import { CustomerRegistrationStatus, Permission, type Notification } from '@loyalty/shared';
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
+import { useRoles } from '../data/useRoles';
 import { formatNairobiDateTime } from '../lib/time';
 import { EmptyState } from '../ui/primitives';
 import { Icon } from '../ui/Icon';
 import { navItemsForRole } from './nav';
-
-const ROLE_LABELS: Record<Role, string> = {
-  [Role.ADMIN]: 'Admin',
-  [Role.CHAIRMAN]: 'Chairman',
-  [Role.FINANCE_APPROVER]: 'Finance Approver',
-  [Role.FINANCE_DISBURSER]: 'Finance Disburser',
-  [Role.RTSM]: 'Retail Sales Manager',
-  [Role.STATION_SUPERVISOR]: 'Station Supervisor',
-  [Role.ATTENDANT]: 'Attendant',
-  [Role.EXEC_VIEWER]: 'Exec Viewer',
-  [Role.AUDIT]: 'Audit',
-};
 
 export function AppShell({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
   const { user, hasPermission, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const api = useApi();
+  const { roles } = useRoles();
+  const roleLabel = useMemo(() => new Map(roles.map((r) => [r.key, r.displayName])), [roles]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingRegistrations, setPendingRegistrations] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -205,7 +196,7 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
             <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user.fullName}
             </div>
-            <div style={{ fontSize: 11.5, color: '#8fa8d0' }}>{ROLE_LABELS[user.role]}</div>
+            <div style={{ fontSize: 11.5, color: '#8fa8d0' }}>{roleLabel.get(user.role) ?? user.role}</div>
           </div>
           <button onClick={signOut} style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }} aria-label="Sign out">
             <Icon name="logout" size={16} color="#8fa8d0" />
