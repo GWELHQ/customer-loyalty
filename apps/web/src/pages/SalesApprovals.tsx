@@ -168,7 +168,7 @@ export function SalesApprovals() {
                     <Th>Date</Th>
                     <Th>Station</Th>
                     <Th>Customer</Th>
-                    <Th>Attendant</Th>
+                    <Th>Service Assistant</Th>
                     <Th align="right">Amount</Th>
                     <Th align="right">Cashback</Th>
                     <Th>Actions</Th>

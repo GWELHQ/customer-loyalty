@@ -143,7 +143,7 @@ function AuditLogTab() {
             <option value="">All actions</option>
             {AUDIT_ENTITY_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {t === 'attendant' ? 'service assistant' : t}
               </option>
             ))}
           </select>

@@ -285,7 +285,7 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
   },
   [Role.ATTENDANT]: {
     key: Role.ATTENDANT,
-    displayName: 'Attendant',
+    displayName: 'Service Assistant',
     description: 'Records sales at the pump via the mobile app. Not assignable to a staff (web) account.',
     permissions: ATTENDANT_PERMISSIONS,
     isSystem: true,

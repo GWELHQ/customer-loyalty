@@ -89,7 +89,7 @@ export function SignIn() {
             )}
             <MicrosoftSignInButton onClick={handleSignIn} busy={busy} />
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-              Attendants record sales in the Android app, not here.
+              Service assistants record sales in the Android app, not here.
             </div>
           </div>
         </div>

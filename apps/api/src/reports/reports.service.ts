@@ -25,7 +25,7 @@ import type { StaffPrincipal } from '../common/types/principal';
 import { salesReportToHtmlTable, salesReportToPdfBuffer, salesReportToXlsxBuffer } from './sales-report-export';
 
 const GROUP_LABEL: Record<SalesReportGroupBy, string> = {
-  attendant: 'Attendant',
+  attendant: 'Service Assistant',
   station: 'Station',
   shift: 'Shift',
   product: 'Product',

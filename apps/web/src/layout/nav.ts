@@ -21,7 +21,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_ALL },
   { label: 'Users', path: '/users', icon: 'users', permission: Permission.USERS_MANAGE },
   { label: 'Roles', path: '/roles', icon: 'key', permission: Permission.RBAC_MANAGE },
-  { label: 'Attendants', path: '/attendants', icon: 'customers', permission: Permission.ATTENDANTS_MANAGE },
+  { label: 'Service Assistants', path: '/attendants', icon: 'customers', permission: Permission.ATTENDANTS_MANAGE },
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },
   { label: 'Logs', path: '/logs', icon: 'audit', permission: Permission.AUDIT_VIEW },
   { label: 'Fraud & Governance', path: '/fraud', icon: 'shield', permission: Permission.FRAUD_VIEW },

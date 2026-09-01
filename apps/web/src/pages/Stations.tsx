@@ -173,7 +173,7 @@ export function Stations() {
       {deleting && (
         <Modal title={`Delete ${deleting.name}?`} onClose={() => !deleteBusy && setDeleting(null)}>
           <div style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-            This permanently deletes <strong>{deleting.name}</strong> ({deleting.code}). Only allowed if no customers, sales, attendants, or users still reference this station — otherwise, deactivate it instead.
+            This permanently deletes <strong>{deleting.name}</strong> ({deleting.code}). Only allowed if no customers, sales, service assistants, or users still reference this station — otherwise, deactivate it instead.
           </div>
           {deleteError && (
             <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>

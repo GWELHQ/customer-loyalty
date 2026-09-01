@@ -18,7 +18,7 @@ const PAGE_SIZE = 25;
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Date', value: (s) => formatNairobiDateTime(s.saleDate) },
   { header: 'Station', value: (s) => s.stationNameAtSale },
-  { header: 'Attendant', value: (s) => s.attendantNameAtSale },
+  { header: 'Service Assistant', value: (s) => s.attendantNameAtSale },
   { header: 'Product', value: (s) => s.product },
   { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
   { header: 'Litres', value: (s) => s.snapshot.litres },
@@ -136,7 +136,7 @@ export function SalesList() {
                   <Th>Date</Th>
                   <Th>Station</Th>
                   <Th>Customer</Th>
-                  <Th>Attendant</Th>
+                  <Th>Service Assistant</Th>
                   <Th>Product</Th>
                   <Th align="right">Amount</Th>
                   <Th align="right">Cashback</Th>
@@ -187,7 +187,7 @@ export function SalesList() {
             <DetailRow label="Customer" value={customerName(selected)} />
             <DetailRow label="Customer phone" value={selected.customerPhoneAtSale} />
             <DetailRow label="Station" value={selected.stationNameAtSale} />
-            <DetailRow label="Attendant" value={selected.attendantNameAtSale} />
+            <DetailRow label="Service Assistant" value={selected.attendantNameAtSale} />
             <DetailRow label="Product" value={selected.product} />
             <DetailRow label="Amount paid" value={`KSh ${selected.amountPaid}`} />
             <DetailRow label="Price per litre (snapshot)" value={`KSh ${selected.snapshot.pricePerLitre}`} />

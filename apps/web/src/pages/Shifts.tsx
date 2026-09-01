@@ -94,7 +94,7 @@ export function Shifts() {
                 <tr>
                   <Th>Station</Th>
                   <Th>Shift</Th>
-                  <Th>Attendants on duty</Th>
+                  <Th>Service assistants on duty</Th>
                 </tr>
               </thead>
               <tbody>
@@ -198,11 +198,11 @@ function RosterForm({
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <Field label="Attendants on duty">
+        <Field label="Service assistants on duty">
           {!stationId ? (
-            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Choose a station to list its attendants.</div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Choose a station to list its service assistants.</div>
           ) : stationAttendants.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No attendants assigned to this station.</div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No service assistants assigned to this station.</div>
           ) : (
             <div
               style={{

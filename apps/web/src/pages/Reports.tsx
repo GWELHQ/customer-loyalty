@@ -15,7 +15,7 @@ import { SendReportEmailModal } from '../ui/SendReportEmailModal';
 type RangePreset = 'this_month' | 'this_quarter' | 'ytd' | 'custom';
 
 const GROUP_LABEL: Record<SalesReportGroupBy, string> = {
-  attendant: 'Attendant',
+  attendant: 'Service Assistant',
   station: 'Station',
   shift: 'Shift',
   product: 'Product',
@@ -69,7 +69,7 @@ export function Reports() {
   const maxAmount = Math.max(1, ...groups.map((g) => g.amount));
 
   return (
-    <AppShell title="Reports" subtitle="Sales broken down by attendant, station, shift, or product, over any date range">
+    <AppShell title="Reports" subtitle="Sales broken down by service assistant, station, shift, or product, over any date range">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {dashboard && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
