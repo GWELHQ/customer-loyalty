@@ -62,31 +62,6 @@ export function Dashboard() {
       ]
     : [];
 
-  const attention = data
-    ? [
-        ...(data.pendingSpecialRateRequests !== null && data.pendingSpecialRateRequests > 0
-          ? [
-              {
-                title: `${data.pendingSpecialRateRequests} special rate request(s) waiting`,
-                body: 'Awaiting a decision from the Chairman.',
-                dot: 'var(--gw-amber-500)',
-                go: '/special-rates',
-              },
-            ]
-          : []),
-        ...(data.reconciliationRecordsNeedingAttention > 0
-          ? [
-              {
-                title: `${data.reconciliationRecordsNeedingAttention} station/product day(s) need review`,
-                body: 'Near or over their loyalty-sales limit.',
-                dot: 'var(--color-danger)',
-                go: '/reconciliation',
-              },
-            ]
-          : []),
-      ]
-    : [];
-
   return (
     <AppShell title="Dashboard" subtitle={`Welcome back, ${user?.fullName ?? ''}`}>
       {!data && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
@@ -121,85 +96,10 @@ export function Dashboard() {
           >
             <TrendCard trend={data.trend} stationTotals={data.stationTotals} />
 
-            <Card padding={0}>
-              <div
-                style={{
-                  padding: '14px 16px',
-                  borderBottom: '1px solid var(--color-border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                }}
-              >
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>
-                  What needs your attention
-                </div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                  {attention.length} item(s)
-                </span>
-              </div>
-              {attention.length === 0 && (
-                <div style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                  Nothing needs attention right now.
-                </div>
-              )}
-              {attention.map((a) => (
-                <button
-                  key={a.title}
-                  onClick={() => navigate(a.go)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
-                    borderBottom: '1px solid var(--color-border)',
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    gap: 11,
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 999,
-                      background: a.dot,
-                      marginTop: 6,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: 'block',
-                        fontSize: 13.5,
-                        fontWeight: 700,
-                        color: 'var(--color-text)',
-                      }}
-                    >
-                      {a.title}
-                    </span>
-                    <span
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        color: 'var(--color-text-secondary)',
-                        marginTop: 2,
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {a.body}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </Card>
+            <TopAttendantsCard />
           </div>
 
           <RecentSalesCard />
-          <TopAttendantsCard />
         </div>
       )}
     </AppShell>
