@@ -26,7 +26,6 @@ const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Cashback earned (KSh)', value: (s) => s.snapshot.cashbackEarned },
   { header: 'SMS status', value: (s) => s.smsStatus },
   { header: 'Source', value: (s) => s.source },
-  { header: 'Approval', value: (s) => approvalLabel(s.approvalStatus) },
 ];
 
 export function SalesList() {
@@ -142,7 +141,6 @@ export function SalesList() {
                   <Th align="right">Amount</Th>
                   <Th align="right">Cashback</Th>
                   <Th>SMS</Th>
-                  <Th>Approval</Th>
                 </tr>
               </thead>
               <tbody>
@@ -167,9 +165,6 @@ export function SalesList() {
                       <Badge tone={s.smsStatus === 'sent' ? 'success' : s.smsStatus === 'failed' ? 'danger' : 'neutral'}>
                         {smsStatusLabel(s.smsStatus)}
                       </Badge>
-                    </Td>
-                    <Td>
-                      <Badge tone={approvalTone(s.approvalStatus)}>{approvalLabel(s.approvalStatus)}</Badge>
                     </Td>
                   </Tr>
                 ))}
@@ -249,12 +244,6 @@ function approvalLabel(status: Sale['approvalStatus']): string {
   if (!status || status === 'approved') return 'Approved';
   if (status === 'pending_approval') return 'Pending approval';
   return 'Rejected';
-}
-
-function approvalTone(status: Sale['approvalStatus']): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
-  if (!status || status === 'approved') return 'success';
-  if (status === 'pending_approval') return 'warning';
-  return 'danger';
 }
 
 function DetailRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

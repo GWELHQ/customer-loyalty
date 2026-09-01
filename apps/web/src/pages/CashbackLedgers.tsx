@@ -151,24 +151,37 @@ export function CashbackLedgers() {
 
         {ledger && (
           <Card>
-            <StepIndicator steps={ledgerSteps(ledger)} />
-            {ledger.status === LedgerStatus.REJECTED && ledger.rejectionReason && (
-              <div style={{ marginTop: 14, fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
-                <strong>Rejection reason:</strong> {ledger.rejectionReason}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 24, marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
-              <div>
-                <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Total cashback</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>
-                  KSh {ledger.totalCashback.toLocaleString('en-KE')}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Customers</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>{ledger.entries.length}</div>
-              </div>
-            </div>
+            {(() => {
+              const released = ledger.status !== LedgerStatus.OPEN_ACCRUING && ledger.status !== LedgerStatus.READY_FOR_REVIEW;
+              return (
+                <>
+                  {released && <StepIndicator steps={ledgerSteps(ledger)} />}
+                  {ledger.status === LedgerStatus.REJECTED && ledger.rejectionReason && (
+                    <div style={{ marginTop: 14, fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+                      <strong>Rejection reason:</strong> {ledger.rejectionReason}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 24,
+                      ...(released ? { marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--color-border)' } : {}),
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Total cashback</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>
+                        KSh {ledger.totalCashback.toLocaleString('en-KE')}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Customers</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>{ledger.entries.length}</div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </Card>
         )}
 
