@@ -39,6 +39,8 @@ export function SalesList() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sale | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const { customers } = useCustomersCache();
   const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.fullName])), [customers]);
 
@@ -73,7 +75,18 @@ export function SalesList() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   async function retrySms(sale: Sale) {
-    await api.sales.retrySms(sale.id);
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await api.sales.retrySms(sale.id);
+      const fresh = await api.sales.get(sale.id);
+      setSelected(fresh);
+      reload();
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : 'Could not retry SMS');
+    } finally {
+      setRetrying(false);
+    }
   }
 
   return (
@@ -114,7 +127,13 @@ export function SalesList() {
               </thead>
               <tbody>
                 {sales.map((s) => (
-                  <Tr key={s.id} onClick={() => setSelected(s)}>
+                  <Tr
+                    key={s.id}
+                    onClick={() => {
+                      setSelected(s);
+                      setRetryError(null);
+                    }}
+                  >
                     <Td>{formatNairobiDateTime(s.saleDate)}</Td>
                     <Td>{s.stationNameAtSale}</Td>
                     <Td>{customerName(s)}</Td>
@@ -184,10 +203,15 @@ export function SalesList() {
               </div>
             )}
 
-            {selected.smsStatus === 'failed' && (
-              <Button variant="secondary" size="sm" onClick={() => retrySms(selected)} style={{ marginTop: 12 }}>
-                Retry SMS
-              </Button>
+            {(selected.smsStatus === 'failed' || selected.smsStatus === 'pending') && (
+              <>
+                {retryError && (
+                  <div style={{ fontSize: 12.5, color: 'var(--color-danger)', marginTop: 10 }}>{retryError}</div>
+                )}
+                <Button variant="secondary" size="sm" onClick={() => retrySms(selected)} disabled={retrying} style={{ marginTop: 12 }}>
+                  {retrying ? 'Retrying…' : 'Retry SMS'}
+                </Button>
+              </>
             )}
           </Card>
         )}
