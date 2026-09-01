@@ -1,6 +1,7 @@
 import type { Attendant, Station } from '@loyalty/shared';
-import { UserStatus } from '@loyalty/shared';
+import { Role, UserStatus } from '@loyalty/shared';
 import { useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useAttendantsCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
@@ -23,8 +24,14 @@ function attendantColumns(stations: Station[]): ExportColumn<Attendant>[] {
 
 export function Attendants() {
   const api = useApi();
+  const { user } = useAuth();
   const { items: attendants, refresh: reload } = useAttendantsCache();
   const { stations } = useStations();
+  // A Station Supervisor only ever sees/manages attendants at their own
+  // station — the API already enforces this server-side, but locking the
+  // station picker here too avoids a confusing "choose any station, then
+  // get a 403" round trip.
+  const lockedStationId = user?.role === Role.STATION_SUPERVISOR ? (user.assignedStationId ?? undefined) : undefined;
   const { paged, page, pageCount, setPage } = usePagedRows(attendants);
   const [showForm, setShowForm] = useState(false);
   const [pinModalFor, setPinModalFor] = useState<Attendant | null>(null);
@@ -81,6 +88,7 @@ export function Attendants() {
         {showForm && (
           <AttendantForm
             stations={stations}
+            lockedStationId={lockedStationId}
             onDone={() => {
               setShowForm(false);
               reload();
@@ -150,6 +158,7 @@ export function Attendants() {
           <EditAttendantForm
             attendant={editing}
             stations={stations}
+            lockedStationId={lockedStationId}
             onDone={() => {
               setEditing(null);
               reload();
@@ -185,10 +194,12 @@ export function Attendants() {
 function EditAttendantForm({
   attendant,
   stations,
+  lockedStationId,
   onDone,
 }: {
   attendant: Attendant;
   stations: Station[];
+  lockedStationId?: string;
   onDone: () => void;
 }) {
   const api = useApi();
@@ -233,13 +244,17 @@ function EditAttendantForm({
           <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
         </Field>
         <Field label="Assigned station" required>
-          <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
-            {stations.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          {lockedStationId ? (
+            <input style={inputStyle} value={stations.find((s) => s.id === lockedStationId)?.name ?? 'Your station'} disabled />
+          ) : (
+            <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="RFID/NFC badge UID">
           <input
@@ -326,11 +341,19 @@ function ResetPinModal({ attendant, onClose }: { attendant: Attendant; onClose: 
   );
 }
 
-function AttendantForm({ stations, onDone }: { stations: Station[]; onDone: () => void }) {
+function AttendantForm({
+  stations,
+  lockedStationId,
+  onDone,
+}: {
+  stations: Station[];
+  lockedStationId?: string;
+  onDone: () => void;
+}) {
   const api = useApi();
   const [fullName, setFullName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
-  const [assignedStationId, setAssignedStationId] = useState('');
+  const [assignedStationId, setAssignedStationId] = useState(lockedStationId ?? '');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -363,14 +386,18 @@ function AttendantForm({ stations, onDone }: { stations: Station[]; onDone: () =
           <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="KIS1-003" />
         </Field>
         <Field label="Assigned station (exactly one)" required>
-          <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
-            <option value="">Choose station</option>
-            {stations.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          {lockedStationId ? (
+            <input style={inputStyle} value={stations.find((s) => s.id === lockedStationId)?.name ?? 'Your station'} disabled />
+          ) : (
+            <select style={inputStyle} value={assignedStationId} onChange={(e) => setAssignedStationId(e.target.value)}>
+              <option value="">Choose station</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Initial PIN (4–6 digits)" required>
           <input style={inputStyle} value={pin} onChange={(e) => setPin(e.target.value)} placeholder="1234" />

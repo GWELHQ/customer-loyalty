@@ -182,6 +182,11 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   // supervisor's own station, but still list every station).
   Permission.STATIONS_VIEW,
   Permission.PRICES_VIEW,
+  // Scoped to their own station server-side (see resolveStationScope /
+  // assertStationAccessible in attendants.controller.ts) — a supervisor
+  // can list/create/edit/delete attendants only at the station they're
+  // assigned to, never system-wide like Admin.
+  Permission.ATTENDANTS_MANAGE,
   Permission.SALES_VIEW_OWN_STATION,
   Permission.RECONCILIATION_VIEW_OWN_STATION,
   Permission.RECONCILIATION_MANAGE,
