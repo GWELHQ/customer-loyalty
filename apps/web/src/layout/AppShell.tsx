@@ -209,7 +209,7 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
         </div>
       </div>
 
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div className="app-shell-content" style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div
           style={{
             background: 'var(--color-surface)',

@@ -192,14 +192,27 @@ button {
   --breakpoint-md: 900px;
 }
 
+/* Sidebar is always position:fixed (never sticky — sticky can detach from
+   the viewport if any ancestor picks up an implicit scroll container, e.g.
+   overflow-x:hidden above computing overflow-y:auto). It's out of normal
+   flow, so .app-shell-grid doesn't need a column reserved for it —
+   .app-shell-content carries a matching margin-left instead so it never
+   renders under the fixed sidebar. */
 .app-shell-grid {
-  grid-template-columns: 244px 1fr;
+  grid-template-columns: 1fr;
 }
 
 .app-shell-sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  width: 244px;
   height: 100vh;
+  z-index: 40;
+}
+
+.app-shell-content {
+  margin-left: 244px;
 }
 
 .app-shell-hamburger {
@@ -215,18 +228,16 @@ button {
     grid-template-columns: 1fr;
   }
   .app-shell-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 244px;
     max-width: 84vw;
-    height: 100vh;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     z-index: 60;
   }
   .app-shell-sidebar.open {
     transform: translateX(0);
+  }
+  .app-shell-content {
+    margin-left: 0 !important;
   }
   .app-shell-hamburger {
     display: inline-flex;
