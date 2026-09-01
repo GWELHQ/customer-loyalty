@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../config/configuration';
-import type { EmailProvider, EmailSendResult } from './email-provider.interface';
+import type { EmailProvider, SendEmailInput, EmailSendResult } from './email-provider.interface';
 
 interface GraphTokenResponse {
   access_token?: string;
@@ -49,7 +49,7 @@ export class MicrosoftGraphEmailProvider implements EmailProvider {
     return json.access_token;
   }
 
-  async send(to: string[], subject: string, body: string): Promise<EmailSendResult> {
+  async send({ to, cc, replyTo, subject, body, attachments }: SendEmailInput): Promise<EmailSendResult> {
     try {
       const token = await this.getAccessToken();
       const res = await fetch(
@@ -62,6 +62,18 @@ export class MicrosoftGraphEmailProvider implements EmailProvider {
               subject,
               body: { contentType: 'HTML', content: body },
               toRecipients: to.map((address) => ({ emailAddress: { address } })),
+              ...(cc?.length ? { ccRecipients: cc.map((address) => ({ emailAddress: { address } })) } : {}),
+              ...(replyTo ? { replyTo: [{ emailAddress: { address: replyTo } }] } : {}),
+              ...(attachments?.length
+                ? {
+                    attachments: attachments.map((a) => ({
+                      '@odata.type': '#microsoft.graph.fileAttachment',
+                      name: a.filename,
+                      contentType: a.contentType,
+                      contentBytes: a.contentBytes.toString('base64'),
+                    })),
+                  }
+                : {}),
             },
             saveToSentItems: false,
           }),

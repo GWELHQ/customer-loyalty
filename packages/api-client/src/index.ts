@@ -298,6 +298,17 @@ export class LoyaltyApiClient {
         groupBy: SalesReportGroupBy;
         groups: SalesReportGroup[];
       }>(`/reports/sales${toQueryString(params)}`),
+    emailSales: (input: {
+      stationId?: string;
+      preset?: string;
+      from?: string;
+      to?: string;
+      groupBy?: SalesReportGroupBy;
+      recipients: string[];
+      cc?: string[];
+      subject?: string;
+      body?: string;
+    }) => this.http.post<{ success: boolean; errorReason?: string }>('/reports/sales/email', input),
     reconciliation: (params: { stationId?: string; date?: string } = {}) =>
       this.http.get(`/reports/reconciliation${toQueryString(params)}`),
     disbursements: (month?: string) => this.http.get(`/reports/disbursements${toQueryString({ month })}`),

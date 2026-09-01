@@ -9,7 +9,8 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { nairobiToday } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
-import { Card, KpiTile, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
+import { Card, KpiTile, Table, Td, Th, Tr, inputStyle, Button } from '../ui/primitives';
+import { SendReportEmailModal } from '../ui/SendReportEmailModal';
 
 type RangePreset = 'this_month' | 'this_quarter' | 'ytd' | 'custom';
 
@@ -50,6 +51,7 @@ export function Reports() {
   const [to, setTo] = useState(nairobiToday);
   const [groups, setGroups] = useState<SalesReportGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   function reload() {
     setLoading(true);
@@ -112,6 +114,9 @@ export function Reports() {
             )}
             <div style={{ flex: 1 }} />
             <ExportButtons filename={`sales-by-${groupBy}`} title={`Sales by ${GROUP_LABEL[groupBy]}`} columns={groupColumns(groupBy)} rows={groups} />
+            <Button variant="secondary" size="sm" onClick={() => setShowEmailModal(true)}>
+              Send email
+            </Button>
           </div>
 
           {!loading && groups.length === 0 && (
@@ -155,6 +160,17 @@ export function Reports() {
           )}
         </Card>
       </div>
+
+      {showEmailModal && (
+        <SendReportEmailModal
+          reportParams={{
+            stationId: stationId || undefined,
+            groupBy,
+            ...(range === 'custom' ? { from, to } : { preset: range }),
+          }}
+          onClose={() => setShowEmailModal(false)}
+        />
+      )}
     </AppShell>
   );
 }

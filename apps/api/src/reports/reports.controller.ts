@@ -1,7 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission, type SalesReportGroupBy } from '@loyalty/shared';
 import { resolveStationScope } from '../common/access/station-scope';
+import { AuditService } from '../common/audit/audit.service';
 import { RequireAnyPermission } from '../common/decorators/any-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
@@ -13,6 +14,7 @@ import {
   nairobiYearBoundsUtc,
 } from '../common/time/nairobi';
 import type { StaffPrincipal } from '../common/types/principal';
+import { EmailSalesReportDto } from './dto/email-sales-report.dto';
 import { ReportsService } from './reports.service';
 
 type SalesReportPreset = 'this_month' | 'this_quarter' | 'ytd';
@@ -42,7 +44,10 @@ function resolveReportRange(preset: string | undefined, from?: string, to?: stri
 @StaffOnly()
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get('dashboard')
   @RequireAnyPermission(Permission.REPORTS_VIEW_ALL, Permission.REPORTS_VIEW_OWN_STATION)
@@ -62,6 +67,35 @@ export class ReportsController {
   ) {
     const range = resolveReportRange(preset, from, to);
     return this.reports.salesReport({ stationId: resolveStationScope(user, stationId), ...range, groupBy });
+  }
+
+  @Post('sales/email')
+  @RequireAnyPermission(Permission.REPORTS_VIEW_ALL, Permission.REPORTS_VIEW_OWN_STATION)
+  async emailSales(@Body() dto: EmailSalesReportDto, @CurrentUser() actor: StaffPrincipal) {
+    const range = resolveReportRange(dto.preset, dto.from, dto.to);
+    const stationId = resolveStationScope(actor, dto.stationId);
+    const result = await this.reports.emailSalesReport(
+      { stationId, ...range, groupBy: dto.groupBy },
+      { recipients: dto.recipients, cc: dto.cc, subject: dto.subject, body: dto.body },
+      actor,
+    );
+    await this.audit.record({
+      actor,
+      action: 'report.email_sent',
+      entityType: 'salesReport',
+      entityId: `${dto.groupBy ?? 'product'}:${range.from ?? ''}:${range.to ?? ''}:${stationId ?? 'all'}`,
+      entityLabel: `Sales report emailed to ${dto.recipients.join(', ')}`,
+      metadata: {
+        recipients: dto.recipients,
+        cc: dto.cc,
+        groupBy: dto.groupBy,
+        stationId,
+        from: range.from,
+        to: range.to,
+        success: result.success,
+      },
+    });
+    return result;
   }
 
   @Get('reconciliation')

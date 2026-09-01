@@ -18,11 +18,13 @@ const FONT_STACK = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 export interface RenderEmailOptions {
   title: string;
   bodyLines: string[];
+  /** Trusted, unescaped HTML rendered after bodyLines and before the CTA — e.g. an inline report table. Caller is responsible for escaping any untrusted data within it. */
+  bodyHtml?: string;
   ctaLabel?: string;
   ctaHref?: string;
 }
 
-export function renderEmailHtml({ title, bodyLines, ctaLabel, ctaHref }: RenderEmailOptions): string {
+export function renderEmailHtml({ title, bodyLines, bodyHtml, ctaLabel, ctaHref }: RenderEmailOptions): string {
   const paragraphs = bodyLines
     .map(
       (line) =>
@@ -68,6 +70,7 @@ export function renderEmailHtml({ title, bodyLines, ctaLabel, ctaHref }: RenderE
               <td style="background:${COLOR_SURFACE};padding:28px 24px;">
                 <h1 style="margin:0 0 16px;font-family:${FONT_STACK};font-weight:800;font-size:19px;color:${COLOR_TEXT};">${escapeHtml(title)}</h1>
                 ${paragraphs}
+                ${bodyHtml ?? ''}
                 ${cta}
               </td>
             </tr>

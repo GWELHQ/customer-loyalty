@@ -8,6 +8,9 @@ import {
   type SalesReportGroupBy,
   type Station,
 } from '@loyalty/shared';
+import type { EmailSendResult } from '../common/email/email-provider.interface';
+import { EmailService } from '../common/email/email.service';
+import { formatEmailDate } from '../common/email/render-email';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
 import {
@@ -18,6 +21,15 @@ import {
   nairobiShiftBucket,
   nairobiToday,
 } from '../common/time/nairobi';
+import type { StaffPrincipal } from '../common/types/principal';
+import { salesReportToHtmlTable, salesReportToPdfBuffer, salesReportToXlsxBuffer } from './sales-report-export';
+
+const GROUP_LABEL: Record<SalesReportGroupBy, string> = {
+  attendant: 'Attendant',
+  station: 'Station',
+  shift: 'Shift',
+  product: 'Product',
+};
 
 // A full year for a busy business can exceed the previous 1000-row cap
 // (originally sized for a single month's "sales by product" view) — this
@@ -28,7 +40,10 @@ const SALES_REPORT_LIMIT = 5000;
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly email: EmailService,
+  ) {}
 
   async dashboard(stationId?: string) {
     const today = nairobiToday();
@@ -157,6 +172,42 @@ export class ReportsService {
     return { sales, byProduct, groupBy, groups };
   }
 
+  /** Re-runs salesReport() server-side (never trusts a client-submitted rows/columns blob) and emails the result. */
+  async emailSalesReport(
+    filters: { stationId?: string; from?: string; to?: string; groupBy?: SalesReportGroupBy },
+    email: { recipients: string[]; cc?: string[]; subject?: string; body?: string },
+    actor: StaffPrincipal,
+  ): Promise<EmailSendResult> {
+    const { groupBy, groups } = await this.salesReport(filters);
+    const groupLabel = GROUP_LABEL[groupBy];
+    const rangeLabel = describeRange(filters.from, filters.to);
+    const subject = email.subject?.trim() || `Sales by ${groupLabel} — ${rangeLabel}`;
+    const introLine =
+      email.body?.trim() || `Attached is the sales report grouped by ${groupLabel.toLowerCase()} for ${rangeLabel}.`;
+
+    return this.email.send(
+      email.recipients,
+      subject,
+      { title: subject, bodyLines: [introLine], bodyHtml: salesReportToHtmlTable(groupLabel, groups) },
+      {
+        cc: email.cc,
+        replyTo: actor.email,
+        attachments: [
+          {
+            filename: 'sales-report.xlsx',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            contentBytes: salesReportToXlsxBuffer(groupLabel, groups),
+          },
+          {
+            filename: 'sales-report.pdf',
+            contentType: 'application/pdf',
+            contentBytes: salesReportToPdfBuffer(subject, groupLabel, groups),
+          },
+        ],
+      },
+    );
+  }
+
   async reconciliationReport(filters: { stationId?: string; date?: string }) {
     let query = this.firestore.collection('reconciliationDaily').orderBy('date', 'desc') as FirebaseFirestore.Query;
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);
@@ -211,4 +262,11 @@ function groupSales(sales: Sale[], groupBy: SalesReportGroupBy): SalesReportGrou
 function shiftKeyAndLabel(saleDateIso: string): [string, string] {
   const { shift } = nairobiShiftBucket(saleDateIso);
   return [shift, shift === 'day' ? 'Day' : 'Night'];
+}
+
+function describeRange(from?: string, to?: string): string {
+  if (!from && !to) return 'all time';
+  if (from && to) return `${formatEmailDate(from)} – ${formatEmailDate(to)}`;
+  if (from) return `since ${formatEmailDate(from)}`;
+  return `through ${formatEmailDate(to!)}`;
 }
