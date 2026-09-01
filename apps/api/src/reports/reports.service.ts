@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   Product,
   ReconciliationStatus,
@@ -8,7 +8,7 @@ import {
   type SalesReportGroupBy,
   type Station,
 } from '@loyalty/shared';
-import type { EmailSendResult } from '../common/email/email-provider.interface';
+import type { EmailAttachment, EmailSendResult } from '../common/email/email-provider.interface';
 import { EmailService } from '../common/email/email.service';
 import { formatEmailDate } from '../common/email/render-email';
 import { FirestoreService } from '../common/firestore/firestore.service';
@@ -40,6 +40,8 @@ const SALES_REPORT_LIMIT = 5000;
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger('ReportsService');
+
   constructor(
     private readonly firestore: FirestoreService,
     private readonly email: EmailService,
@@ -181,9 +183,30 @@ export class ReportsService {
     const { groupBy, groups } = await this.salesReport(filters);
     const groupLabel = GROUP_LABEL[groupBy];
     const rangeLabel = describeRange(filters.from, filters.to);
-    const subject = email.subject?.trim() || `Sales by ${groupLabel} — ${rangeLabel}`;
+    const subject = email.subject?.trim() || `Loyalty Sales By ${groupLabel} — ${rangeLabel}`;
     const introLine =
-      email.body?.trim() || `Attached is the sales report grouped by ${groupLabel.toLowerCase()} for ${rangeLabel}.`;
+      email.body?.trim() || `Loyalty sales by ${groupLabel.toLowerCase()} for ${rangeLabel}, attached as XLSX and PDF.`;
+
+    const attachments: EmailAttachment[] = [
+      {
+        filename: 'sales-report.xlsx',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        contentBytes: salesReportToXlsxBuffer(groupLabel, groups),
+      },
+    ];
+    // A malformed PDF is worse than no PDF — the recipient still gets the
+    // XLSX and the inline table either way, so a generation failure here
+    // degrades gracefully instead of failing (or silently corrupting) the
+    // whole send.
+    try {
+      attachments.push({
+        filename: 'sales-report.pdf',
+        contentType: 'application/pdf',
+        contentBytes: salesReportToPdfBuffer(subject, groupLabel, groups),
+      });
+    } catch (err) {
+      this.logger.error('PDF report generation failed — sending without it', err instanceof Error ? err.stack : err);
+    }
 
     return this.email.send(
       email.recipients,
@@ -192,18 +215,7 @@ export class ReportsService {
       {
         cc: email.cc,
         replyTo: actor.email,
-        attachments: [
-          {
-            filename: 'sales-report.xlsx',
-            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            contentBytes: salesReportToXlsxBuffer(groupLabel, groups),
-          },
-          {
-            filename: 'sales-report.pdf',
-            contentType: 'application/pdf',
-            contentBytes: salesReportToPdfBuffer(subject, groupLabel, groups),
-          },
-        ],
+        attachments,
       },
     );
   }

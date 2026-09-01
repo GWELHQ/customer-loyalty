@@ -51,7 +51,24 @@ export function salesReportToPdfBuffer(title: string, groupLabel: string, groups
     alternateRowStyles: { fillColor: [245, 247, 250] },
   });
 
-  return Buffer.from(doc.output('arraybuffer'));
+  // doc.output() returns jsPDF's raw "binary string" (one char per byte) —
+  // converting via Node's own latin1 decoding is the standard, well-worn
+  // path for this, rather than routing through jsPDF's own internal
+  // ArrayBuffer helper (`.output('arraybuffer')`). Verified byte-identical
+  // to that helper's output in testing; kept as the more defensible of the
+  // two since it relies on one fewer internal jsPDF code path.
+  const buffer = Buffer.from(doc.output(), 'latin1');
+  if (!looksLikeValidPdf(buffer)) {
+    throw new Error('Generated PDF failed basic integrity validation (missing %PDF header or %%EOF trailer)');
+  }
+  return buffer;
+}
+
+/** Cheap sanity check — not a full parse, just enough to catch an obviously truncated/corrupt buffer before it's emailed out. */
+function looksLikeValidPdf(buffer: Buffer): boolean {
+  const head = buffer.subarray(0, 5).toString('latin1');
+  const tail = buffer.subarray(-32).toString('latin1');
+  return head === '%PDF-' && tail.includes('%%EOF');
 }
 
 /** Inline-styled HTML <table> for embedding directly in an email body (values pre-formatted, not escaped — group labels come from this app's own denormalized sale data, not free-form user input). */
