@@ -1,5 +1,6 @@
 import type { Customer, Sale, Station } from '@loyalty/shared';
 import { Permission, Product } from '@loyalty/shared';
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -93,7 +94,7 @@ export function CustomerProfile() {
 
   return (
     <AppShell title={customer.fullName} subtitle={customer.phoneNumber}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
+      <div className="detail-grid has-detail" style={{ '--detail-width': '320px' } as CSSProperties}>
         <Card>
           <CardHeader
             title="Sales history"

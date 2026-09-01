@@ -20,6 +20,7 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingRegistrations, setPendingRegistrations] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsPanelRef = useRef<HTMLDivElement>(null);
   const canViewRegistrations = !!user && hasPermission(Permission.CUSTOMER_REGISTRATIONS_VIEW);
@@ -55,6 +56,8 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
   });
   useEffect(reloadPendingRegistrations, [reloadPendingRegistrations, location.pathname]);
   useRealtimeRefresh(['customerRegistrationRequests'], reloadPendingRegistrations);
+
+  useEffect(() => setSidebarOpen(false), [location.pathname]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -106,16 +109,18 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
     .toUpperCase();
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '244px 1fr', minHeight: '100vh', alignItems: 'stretch' }}>
+    <div className="app-shell-grid" style={{ display: 'grid', minHeight: '100vh', alignItems: 'stretch' }}>
       <div
+        className={sidebarOpen ? 'app-shell-overlay open' : 'app-shell-overlay'}
+        onClick={() => setSidebarOpen(false)}
+      />
+      <div
+        className={sidebarOpen ? 'app-shell-sidebar open' : 'app-shell-sidebar'}
         style={{
           background: 'var(--gw-blue-500)',
           color: '#fff',
           display: 'flex',
           flexDirection: 'column',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
         }}
       >
         <div style={{ padding: '20px 18px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -219,6 +224,24 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
             zIndex: 5,
           }}
         >
+          <button
+            className="app-shell-hamburger"
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flex: 'none',
+            }}
+            aria-label="Open menu"
+          >
+            <Icon name="menu" size={17} color="var(--color-text-secondary)" />
+          </button>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em' }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 1 }}>{subtitle}</div>}
@@ -269,7 +292,7 @@ export function AppShell({ title, subtitle, children }: PropsWithChildren<{ titl
                   position: 'absolute',
                   top: 42,
                   right: 0,
-                  width: 360,
+                  width: 'min(360px, calc(100vw - 32px))',
                   maxHeight: 420,
                   overflow: 'auto',
                   background: 'var(--color-surface)',

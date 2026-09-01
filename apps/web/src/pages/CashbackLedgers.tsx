@@ -126,7 +126,7 @@ export function CashbackLedgers() {
   return (
     <AppShell title="Monthly cashback ledger" subtitle="RTSM releases, Finance Approver checks and approves, Finance Disburser pays out">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1000 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <Field label="Month" required>
             <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
           </Field>
@@ -186,7 +186,7 @@ export function CashbackLedgers() {
         )}
 
         {ledger && ledger.entries.length > 0 && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               placeholder="Search by customer or phone…"
               value={search}
@@ -203,7 +203,7 @@ export function CashbackLedgers() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
+        <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
           <Card padding={0}>
             {!ledger || filtered.length === 0 ? (
               <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No eligible sales for this month yet.</div>

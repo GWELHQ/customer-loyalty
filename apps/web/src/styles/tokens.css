@@ -145,6 +145,14 @@
 * {
   box-sizing: border-box;
 }
+html,
+body {
+  /* Backstop: every page's own scrollable content (tables, wide grids)
+     is expected to contain its own horizontal overflow — see .table-scroll
+     and .detail-grid below — so the document itself should never need a
+     horizontal scrollbar. This guards against anything that slips past. */
+  overflow-x: hidden;
+}
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -170,4 +178,98 @@ a:hover {
 }
 button {
   font-family: inherit;
+}
+
+/* ---------------------------------------------------------------------
+ * Responsive layout — AppShell (main nav sidebar) and the "list + detail
+ * panel" grid several pages use (SalesList, Disbursements, CashbackLedgers,
+ * FraudGovernance, SalesApprovals, CustomerProfile). Below --breakpoint-md,
+ * the sidebar becomes an off-canvas drawer and any list+detail split
+ * collapses to a single column, so nothing on the page ever needs a fixed
+ * track wider than the viewport.
+ * --------------------------------------------------------------------- */
+:root {
+  --breakpoint-md: 900px;
+}
+
+.app-shell-grid {
+  grid-template-columns: 244px 1fr;
+}
+
+.app-shell-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.app-shell-hamburger {
+  display: none;
+}
+
+.app-shell-overlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-shell-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-shell-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 244px;
+    max-width: 84vw;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 60;
+  }
+  .app-shell-sidebar.open {
+    transform: translateX(0);
+  }
+  .app-shell-hamburger {
+    display: inline-flex;
+  }
+  .app-shell-overlay.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 55;
+  }
+}
+
+.detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+.detail-grid.has-detail {
+  grid-template-columns: 1fr var(--detail-width, 380px);
+}
+@media (max-width: 900px) {
+  .detail-grid.has-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.signin-grid {
+  grid-template-columns: 1.1fr 1fr;
+}
+@media (max-width: 720px) {
+  .signin-grid {
+    grid-template-columns: 1fr;
+  }
+  .signin-grid > div:first-child {
+    padding: 32px 24px !important;
+  }
+  .signin-grid > div:last-child {
+    padding: 32px 24px !important;
+  }
+  .signin-grid h1,
+  .signin-grid .signin-headline {
+    font-size: 28px !important;
+  }
 }

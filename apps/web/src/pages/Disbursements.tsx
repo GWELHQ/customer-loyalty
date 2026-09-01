@@ -155,7 +155,7 @@ export function Disbursements() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
+        <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
           <Card padding={0}>
             {filtered.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No disbursement batches found.</div>}
             {filtered.length > 0 && (
