@@ -52,7 +52,7 @@ export function Reconciliation() {
   useRealtimeRefresh(['reconciliationDaily'], reload);
 
   return (
-    <AppShell title="Daily reconciliation" subtitle="Loyalty sales must never exceed a service assistant's total sales for the day">
+    <AppShell title="Daily reconciliation" subtitle="Loyalty sales must never exceed a sales assistant's total sales for the day">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="date" style={{ ...inputStyle, maxWidth: 180 }} value={date} onChange={(e) => setDate(e.target.value)} />

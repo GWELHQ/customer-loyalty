@@ -1,4 +1,5 @@
 import { Role, type Sale, type SaleApprovalDelegation } from '@loyalty/shared';
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
@@ -119,7 +120,10 @@ export function SalesApprovals() {
 
   return (
     <AppShell title="Sale approvals" subtitle="Cashback is only credited once a sale here is approved">
-      <div style={{ display: 'grid', gridTemplateColumns: canManageDelegation ? '1fr 320px' : '1fr', gap: 16, alignItems: 'start' }}>
+      <div
+        className={canManageDelegation ? 'detail-grid has-detail' : 'detail-grid'}
+        style={{ '--detail-width': '320px' } as CSSProperties}
+      >
         <div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
@@ -168,7 +172,7 @@ export function SalesApprovals() {
                     <Th>Date</Th>
                     <Th>Station</Th>
                     <Th>Customer</Th>
-                    <Th>Service Assistant</Th>
+                    <Th>Sales Assistant</Th>
                     <Th align="right">Amount</Th>
                     <Th align="right">Cashback</Th>
                     <Th>Actions</Th>

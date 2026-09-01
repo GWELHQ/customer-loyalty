@@ -39,7 +39,7 @@ export function CustomerRegistrations() {
   return (
     <AppShell
       title="Customer registrations"
-      subtitle="New customers registered by service assistants during a sale — approving creates the customer and records the sale"
+      subtitle="New customers registered by sales assistants during a sale — approving creates the customer and records the sale"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

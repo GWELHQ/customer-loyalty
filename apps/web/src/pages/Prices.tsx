@@ -91,7 +91,7 @@ export function Prices() {
             <div>
               <div style={{ fontWeight: 700, fontSize: 14.5 }}>{missingByStation.join(', ')}</div>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                Service assistants cannot record a sale for a product with no active price at their station — every sale for it is blocked at the pump.
+                Sales assistants cannot record a sale for a product with no active price at their station — every sale for it is blocked at the pump.
               </div>
             </div>
           </div>

@@ -28,7 +28,7 @@ export function SignIn() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1.1fr 1fr' }}>
+    <div className="signin-grid" style={{ minHeight: '100vh', display: 'grid' }}>
       <div
         style={{
           background: 'var(--gw-blue-500)',
@@ -47,6 +47,7 @@ export function SignIn() {
         </div>
         <div>
           <div
+            className="signin-headline"
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 800,
@@ -89,7 +90,7 @@ export function SignIn() {
             )}
             <MicrosoftSignInButton onClick={handleSignIn} busy={busy} />
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-              Service assistants record sales in the Android app, not here.
+              Sales assistants record sales in the Android app, not here.
             </div>
           </div>
         </div>

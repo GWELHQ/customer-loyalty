@@ -75,14 +75,14 @@ export function Attendants() {
       setDeleting(null);
       reload();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete this service assistant');
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this sales assistant');
     } finally {
       setDeleteBusy(false);
     }
   }
 
   return (
-    <AppShell title="Service Assistants" subtitle="Android pump service-assistant accounts — PIN login, one station each">
+    <AppShell title="Sales Assistants" subtitle="Android pump service-assistant accounts — PIN login, one station each">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (
           <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
@@ -91,7 +91,7 @@ export function Attendants() {
         )}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? 'Cancel' : 'Add service assistant'}
+            {showForm ? 'Cancel' : 'Add sales assistant'}
           </Button>
           <input
             placeholder="Search by name or employee ID…"
@@ -115,7 +115,7 @@ export function Attendants() {
             <option value={UserStatus.INACTIVE}>Inactive</option>
           </select>
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="attendants" title="Service Assistants" columns={attendantColumns(stations)} rows={filtered} />
+          <ExportButtons filename="attendants" title="Sales Assistants" columns={attendantColumns(stations)} rows={filtered} />
         </div>
         {showForm && (
           <AttendantForm
@@ -179,7 +179,7 @@ export function Attendants() {
               ))}
             </tbody>
           </Table>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} service assistant(s)`} />
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} sales assistant(s)`} />
         </Card>
       </div>
 
@@ -397,7 +397,7 @@ function AttendantForm({
       await api.attendants.create({ fullName, employeeId, assignedStationId, pin });
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create service assistant');
+      setError(err instanceof Error ? err.message : 'Could not create sales assistant');
     } finally {
       setBusy(false);
     }
@@ -436,7 +436,7 @@ function AttendantForm({
         </Field>
       </div>
       <Button variant="primary" onClick={submit} disabled={busy || !fullName || !employeeId || !assignedStationId || !pin} style={{ marginTop: 14 }}>
-        {busy ? 'Creating…' : 'Create service assistant'}
+        {busy ? 'Creating…' : 'Create sales assistant'}
       </Button>
     </Card>
   );

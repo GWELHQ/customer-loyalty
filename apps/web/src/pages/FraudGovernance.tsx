@@ -16,15 +16,15 @@ import { Badge, Button, Card, EmptyState, Modal, Table, Td, Th, Tr, inputStyle }
 const TYPE_LABELS: Record<FraudFlagType, string> = {
   [FraudFlagType.VOLUME_SPIKE_VS_BASELINE]: 'Volume spike vs. baseline',
   [FraudFlagType.MULTI_LOCATION_SAME_DAY]: 'Multiple locations, same day',
-  [FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION]: 'Service Assistant-customer concentration',
-  [FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST]: 'Many service assistants, one customer',
+  [FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION]: 'Sales Assistant-customer concentration',
+  [FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST]: 'Many sales assistants, one customer',
   [FraudFlagType.REPEATED_EXACT_LITRES]: 'Repeated exact litres',
   [FraudFlagType.HIGH_FREQUENCY_REFUEL]: 'High-frequency refuel',
   [FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME]: 'New customer, high volume',
-  [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: 'Service Assistant volume outlier',
+  [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: 'Sales Assistant volume outlier',
   [FraudFlagType.ADMIN_MANUAL_BURST]: 'Manual-entry burst',
   [FraudFlagType.LICENSE_PLATE_MISMATCH]: 'License plate mismatch',
-  [FraudFlagType.ATTENDANT_OUTSIDE_SHIFT]: 'Service Assistant outside shift',
+  [FraudFlagType.ATTENDANT_OUTSIDE_SHIFT]: 'Sales Assistant outside shift',
 };
 
 interface RuleInfo {
@@ -41,7 +41,7 @@ const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
   [FraudFlagType.LICENSE_PLATE_MISMATCH]: {
     mode: 'Real-time',
     description:
-      "The service assistant photographed the vehicle's plate before the sale, and the plate detected by OCR doesn't match the plate on file for that customer (or the customer has none on file). Never blocks the sale — only raises this flag.",
+      "The sales assistant photographed the vehicle's plate before the sale, and the plate detected by OCR doesn't match the plate on file for that customer (or the customer has none on file). Never blocks the sale — only raises this flag.",
   },
   [FraudFlagType.VOLUME_SPIKE_VS_BASELINE]: {
     mode: 'Nightly batch',
@@ -56,12 +56,12 @@ const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
   [FraudFlagType.ATTENDANT_CUSTOMER_CONCENTRATION]: {
     mode: 'Nightly batch',
     description:
-      "One service assistant processes more than 80% of a specific customer's sales over a 30-day window (minimum 5 sales) — a possible sign of service assistant/customer collusion.",
+      "One sales assistant processes more than 80% of a specific customer's sales over a 30-day window (minimum 5 sales) — a possible sign of sales assistant/customer collusion.",
   },
   [FraudFlagType.CUSTOMER_MULTI_ATTENDANT_BURST]: {
     mode: 'Nightly batch',
     description:
-      'One customer is served by 4 or more distinct service assistants within 7 days (minimum 4 sales) — the inverse pattern, which can indicate a shared or passed-around loyalty account.',
+      'One customer is served by 4 or more distinct sales assistants within 7 days (minimum 4 sales) — the inverse pattern, which can indicate a shared or passed-around loyalty account.',
   },
   [FraudFlagType.HIGH_FREQUENCY_REFUEL]: {
     mode: 'Real-time',
@@ -71,12 +71,12 @@ const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
   [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: {
     mode: 'Nightly batch',
     description:
-      "A service assistant's 7-day total litres sold is a statistical outlier (more than 2.5 standard deviations above the mean) compared to peers at the same station (station needs 3+ service assistants to compare against).",
+      "A sales assistant's 7-day total litres sold is a statistical outlier (more than 2.5 standard deviations above the mean) compared to peers at the same station (station needs 3+ sales assistants to compare against).",
   },
   [FraudFlagType.ADMIN_MANUAL_BURST]: {
     mode: 'Nightly batch',
     description:
-      "A staff user's 7-day count of manually-entered sales (recorded from the admin web app rather than the field app) exceeds 3× their own 30-day baseline (minimum 5 in the week) — a burst of manual entries bypassing the normal service assistant flow.",
+      "A staff user's 7-day count of manually-entered sales (recorded from the admin web app rather than the field app) exceeds 3× their own 30-day baseline (minimum 5 in the week) — a burst of manual entries bypassing the normal sales assistant flow.",
   },
   [FraudFlagType.NEW_CUSTOMER_HIGH_VOLUME]: {
     mode: 'Nightly batch',
@@ -86,7 +86,7 @@ const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
   [FraudFlagType.ATTENDANT_OUTSIDE_SHIFT]: {
     mode: 'Real-time',
     description:
-      "The selling service assistant isn't on the shift roster recorded for that station/date/shift (day 07:30-16:30, night 16:30-07:30). Only fires when a roster was actually recorded — a station with no roster for that day doesn't get flagged.",
+      "The selling sales assistant isn't on the shift roster recorded for that station/date/shift (day 07:30-16:30, night 16:30-07:30). Only fires when a roster was actually recorded — a station with no roster for that day doesn't get flagged.",
   },
 };
 
@@ -104,7 +104,7 @@ const FLAG_COLUMNS: ExportColumn<FraudFlag>[] = [
   { header: 'Status', value: (f) => f.status },
   { header: 'Customer', value: (f) => f.customerNameAtFlag ?? '' },
   { header: 'Station', value: (f) => f.stationNameAtFlag ?? '' },
-  { header: 'Service Assistant', value: (f) => f.attendantNameAtFlag ?? '' },
+  { header: 'Sales Assistant', value: (f) => f.attendantNameAtFlag ?? '' },
   { header: 'Detection mode', value: (f) => f.detectionMode },
 ];
 
@@ -222,7 +222,7 @@ export function FraudGovernance() {
     <AppShell title="Fraud & Governance" subtitle="Irregular fueling activity flagged automatically for review">
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
-          placeholder="Search this page by customer or service assistant…"
+          placeholder="Search this page by customer or sales assistant…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...inputStyle, maxWidth: 260 }}
@@ -290,7 +290,7 @@ export function FraudGovernance() {
         </Modal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
+      <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
         <Card padding={0}>
           {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
           {!loading && filteredFlags.length === 0 && <EmptyState title="No irregularities flagged" body="Nothing to review right now." />}
@@ -369,7 +369,7 @@ export function FraudGovernance() {
             <DetailRow label="Detected" value={formatNairobiDateTime(selected.createdAt)} />
             {selected.customerNameAtFlag && <DetailRow label="Customer" value={selected.customerNameAtFlag} />}
             {selected.stationNameAtFlag && <DetailRow label="Station" value={selected.stationNameAtFlag} />}
-            {selected.attendantNameAtFlag && <DetailRow label="Service Assistant" value={selected.attendantNameAtFlag} />}
+            {selected.attendantNameAtFlag && <DetailRow label="Sales Assistant" value={selected.attendantNameAtFlag} />}
             <DetailRow label="Detection mode" value={selected.detectionMode} />
             <DetailRow label="Related sales" value={`${selected.relatedSaleIds.length}`} />
 

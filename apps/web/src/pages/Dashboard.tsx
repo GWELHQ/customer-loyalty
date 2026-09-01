@@ -204,7 +204,7 @@ function TopAttendantsCard() {
           alignItems: 'center',
         }}
       >
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Top service assistants this month</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>Top sales assistants this month</div>
         <Button variant="secondary" size="sm" onClick={() => navigate('/reports')}>
           View full report
         </Button>
@@ -216,7 +216,7 @@ function TopAttendantsCard() {
         <Table>
           <thead>
             <tr>
-              <Th>Service Assistant</Th>
+              <Th>Sales Assistant</Th>
               <Th align="right">Sales</Th>
               <Th align="right">Amount (KSh)</Th>
               <Th align="right">Cashback (KSh)</Th>

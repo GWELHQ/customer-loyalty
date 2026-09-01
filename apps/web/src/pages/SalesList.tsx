@@ -18,7 +18,7 @@ const PAGE_SIZE = 25;
 const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Date', value: (s) => formatNairobiDateTime(s.saleDate) },
   { header: 'Station', value: (s) => s.stationNameAtSale },
-  { header: 'Service Assistant', value: (s) => s.attendantNameAtSale },
+  { header: 'Sales Assistant', value: (s) => s.attendantNameAtSale },
   { header: 'Product', value: (s) => s.product },
   { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
   { header: 'Litres', value: (s) => s.snapshot.litres },
@@ -125,7 +125,7 @@ export function SalesList() {
         <ExportButtons filename="sales" title="Sales activity" columns={SALE_COLUMNS} rows={fetchAllForExport} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
+      <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
         <Card padding={0}>
           {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
           {!loading && filteredSales.length === 0 && <EmptyState title="No sales found" />}
@@ -136,7 +136,7 @@ export function SalesList() {
                   <Th>Date</Th>
                   <Th>Station</Th>
                   <Th>Customer</Th>
-                  <Th>Service Assistant</Th>
+                  <Th>Sales Assistant</Th>
                   <Th>Product</Th>
                   <Th align="right">Amount</Th>
                   <Th align="right">Cashback</Th>
@@ -187,7 +187,7 @@ export function SalesList() {
             <DetailRow label="Customer" value={customerName(selected)} />
             <DetailRow label="Customer phone" value={selected.customerPhoneAtSale} />
             <DetailRow label="Station" value={selected.stationNameAtSale} />
-            <DetailRow label="Service Assistant" value={selected.attendantNameAtSale} />
+            <DetailRow label="Sales Assistant" value={selected.attendantNameAtSale} />
             <DetailRow label="Product" value={selected.product} />
             <DetailRow label="Amount paid" value={`KSh ${selected.amountPaid}`} />
             <DetailRow label="Price per litre (snapshot)" value={`KSh ${selected.snapshot.pricePerLitre}`} />
