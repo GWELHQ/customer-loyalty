@@ -11,7 +11,15 @@ const COLLECTION = 'roleDefinitions';
 interface RoleDefinitionRecord {
   displayName: string;
   description: string;
-  permissions: Permission[];
+  /**
+   * Stored as a DIFF against the live `SYSTEM_ROLE_DEFINITIONS[key]`
+   * default, not a frozen snapshot — see `effectivePermissions()` below
+   * for why. For a custom (non-system) role there is no code default to
+   * diff against, so `addedPermissions` is simply its whole permission
+   * set and `removedPermissions` is always empty.
+   */
+  addedPermissions: Permission[];
+  removedPermissions: Permission[];
   isSystem: boolean;
   updatedBy: string;
   updatedAt: string;
@@ -26,6 +34,20 @@ interface RoleDefinitionRecord {
  * identically with zero Firestore docs present. This is the single source
  * both `AuthService` (embeds the resolved permission list into the JWT at
  * session-mint time) and the web app's roles catalogue read from.
+ *
+ * The override is stored as an added/removed DIFF against the *current*
+ * code default, recomputed on every read — not a frozen permissions
+ * snapshot. A snapshot would silently stop tracking new permissions a
+ * later code change grants that role: once any admin saved an edit to a
+ * system role (even an unrelated field), the snapshot would freeze that
+ * role's permissions at whatever the code defaults were that moment, and
+ * every subsequent code-level grant to that role would never reach it —
+ * exactly the bug that hit Station Supervisor and RTSM when the shift-
+ * management permissions shipped after their roles had been edited once.
+ * Diffing against the live default instead means a new code-level grant
+ * always flows through automatically (it's simply not in `removed`),
+ * while an admin's intentional customizations (added extras, removed
+ * defaults) are preserved exactly.
  */
 @Injectable()
 export class RbacService {
@@ -38,17 +60,31 @@ export class RbacService {
     return this.firestore.collection(COLLECTION);
   }
 
+  private codeDefaultPermissions(key: string): Permission[] {
+    return SYSTEM_ROLE_DEFINITIONS[key as Role]?.permissions ?? [];
+  }
+
+  private effectivePermissions(key: string, record: RoleDefinitionRecord): Permission[] {
+    const removed = new Set(record.removedPermissions);
+    const kept = this.codeDefaultPermissions(key).filter((p) => !removed.has(p));
+    const extra = record.addedPermissions.filter((p) => !kept.includes(p));
+    return [...kept, ...extra];
+  }
+
+  private toRoleDefinition(key: string, data: RoleDefinitionRecord): RoleDefinition {
+    return {
+      key,
+      displayName: data.displayName,
+      description: data.description,
+      permissions: this.effectivePermissions(key, data),
+      isSystem: data.isSystem,
+    };
+  }
+
   async getRoleDefinition(key: string): Promise<RoleDefinition> {
     const snap = await this.col().doc(key).get();
     if (snap.exists) {
-      const data = snap.data() as RoleDefinitionRecord;
-      return {
-        key,
-        displayName: data.displayName,
-        description: data.description,
-        permissions: data.permissions,
-        isSystem: data.isSystem,
-      };
+      return this.toRoleDefinition(key, snap.data() as RoleDefinitionRecord);
     }
     const staticDefinition = SYSTEM_ROLE_DEFINITIONS[key as Role];
     if (!staticDefinition) throw new NotFoundException(`Unknown role "${key}"`);
@@ -59,14 +95,7 @@ export class RbacService {
     const snap = await this.col().get();
     const overrides = new Map<string, RoleDefinition>();
     for (const doc of snap.docs) {
-      const data = doc.data() as RoleDefinitionRecord;
-      overrides.set(doc.id, {
-        key: doc.id,
-        displayName: data.displayName,
-        description: data.description,
-        permissions: data.permissions,
-        isSystem: data.isSystem,
-      });
+      overrides.set(doc.id, this.toRoleDefinition(doc.id, doc.data() as RoleDefinitionRecord));
     }
     const merged = new Map<string, RoleDefinition>();
     for (const [key, definition] of Object.entries(SYSTEM_ROLE_DEFINITIONS)) {
@@ -108,10 +137,15 @@ export class RbacService {
       throw new ConflictException(`A role with key "${dto.key}" already exists`);
     }
     const now = nowIso();
+    // A brand-new custom role has no code default to diff against, so its
+    // whole submitted permission set is "added" — diffPermissions([], ...)
+    // degenerates to exactly that.
+    const { addedPermissions, removedPermissions } = diffPermissions([], dto.permissions);
     const record: RoleDefinitionRecord = {
       displayName: dto.displayName,
       description: dto.description,
-      permissions: dto.permissions,
+      addedPermissions,
+      removedPermissions,
       isSystem: false,
       createdBy: actorUserId,
       createdAt: now,
@@ -139,10 +173,17 @@ export class RbacService {
 
     const existingSnap = await this.col().doc(key).get();
     const now = nowIso();
+    // Re-diff against the *code* default (empty set for a custom role),
+    // never against the previous override — so a permission this session
+    // grants in code, on a role nobody has touched since, is never
+    // recorded as "removed" just because it wasn't in the admin's
+    // previously-submitted list.
+    const { addedPermissions, removedPermissions } = diffPermissions(this.codeDefaultPermissions(key), nextPermissions);
     const record: RoleDefinitionRecord = {
       displayName: dto.displayName ?? current.displayName,
       description: dto.description ?? current.description,
-      permissions: nextPermissions,
+      addedPermissions,
+      removedPermissions,
       isSystem: current.isSystem,
       createdBy: existingSnap.exists ? (existingSnap.data() as RoleDefinitionRecord).createdBy : actorUserId,
       createdAt: existingSnap.exists ? (existingSnap.data() as RoleDefinitionRecord).createdAt : now,
@@ -169,4 +210,15 @@ export class RbacService {
     await this.col().doc(key).delete();
     this.changeEvents.emit(COLLECTION, key);
   }
+}
+
+/** Splits a desired permission set into what it adds/removes relative to a base set. */
+function diffPermissions(
+  base: Permission[],
+  desired: Permission[],
+): { addedPermissions: Permission[]; removedPermissions: Permission[] } {
+  return {
+    addedPermissions: desired.filter((p) => !base.includes(p)),
+    removedPermissions: base.filter((p) => !desired.includes(p)),
+  };
 }
