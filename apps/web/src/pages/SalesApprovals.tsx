@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useCustomersCache } from '../data/useCustomersCache';
+import { useTextFilter } from '../data/useTextFilter';
 import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
@@ -82,7 +83,7 @@ export function SalesApprovals() {
     });
   }
   function toggleAll() {
-    setSelected((prev) => (prev.size === sales.length ? new Set() : new Set(sales.map((s) => s.id))));
+    setSelected((prev) => (prev.size === filteredSales.length ? new Set() : new Set(filteredSales.map((s) => s.id))));
   }
 
   async function approveSelected() {
@@ -113,11 +114,20 @@ export function SalesApprovals() {
     return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
   }
 
+  // Filters this page only — pending-approval sales have no backend search endpoint.
+  const { search, setSearch, filtered: filteredSales } = useTextFilter(sales, (s) => `${customerName(s)} ${s.attendantNameAtSale}`);
+
   return (
     <AppShell title="Sale approvals" subtitle="Cashback is only credited once a sale here is approved">
       <div style={{ display: 'grid', gridTemplateColumns: canManageDelegation ? '1fr 320px' : '1fr', gap: 16, alignItems: 'start' }}>
         <div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              placeholder="Search this page by customer or attendant…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 260 }}
+            />
             {canPickStation && stations.length > 0 && (
               <select style={{ ...inputStyle, maxWidth: 220 }} value={stationId} onChange={(e) => setStationId(e.target.value)}>
                 <option value="">All stations</option>
@@ -145,12 +155,15 @@ export function SalesApprovals() {
             {!loading && !loadError && sales.length === 0 && (
               <EmptyState title="Nothing awaiting approval" body="Every sale here has already been approved or rejected." />
             )}
-            {!loading && !loadError && sales.length > 0 && (
+            {!loading && !loadError && sales.length > 0 && filteredSales.length === 0 && (
+              <EmptyState title="No sales match this search" />
+            )}
+            {!loading && !loadError && filteredSales.length > 0 && (
               <Table>
                 <thead>
                   <tr>
                     <Th>
-                      <input type="checkbox" checked={selected.size === sales.length} onChange={toggleAll} />
+                      <input type="checkbox" checked={selected.size === filteredSales.length} onChange={toggleAll} />
                     </Th>
                     <Th>Date</Th>
                     <Th>Station</Th>
@@ -162,7 +175,7 @@ export function SalesApprovals() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s) => (
+                  {filteredSales.map((s) => (
                     <Tr key={s.id}>
                       <Td>
                         <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleOne(s.id)} />

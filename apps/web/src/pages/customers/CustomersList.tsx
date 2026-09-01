@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { usePagedRows } from '../../data/usePagedRows';
+import { useTextFilter } from '../../data/useTextFilter';
 import { useCustomersCache } from '../../data/useCustomersCache';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
@@ -29,16 +30,12 @@ export function CustomersList() {
   // Loaded once and kept fresh silently via realtime updates — search below
   // filters this in-memory list instead of hitting the API per keystroke.
   const { customers, loading } = useCustomersCache();
-  const [search, setSearch] = useState('');
-
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return customers;
-    return customers.filter(
-      (c) => c.fullName.toLowerCase().includes(needle) || c.phoneNumber.toLowerCase().includes(needle),
-    );
-  }, [customers, search]);
-
+  const [stationId, setStationId] = useState('');
+  const byStation = useMemo(
+    () => (stationId ? customers.filter((c) => c.homeStationId === stationId) : customers),
+    [customers, stationId],
+  );
+  const { search, setSearch, filtered } = useTextFilter(byStation, (c) => `${c.fullName} ${c.phoneNumber}`);
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   return (
@@ -50,6 +47,16 @@ export function CustomersList() {
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...inputStyle, maxWidth: 280 }}
         />
+        {stations.length > 0 && (
+          <select style={{ ...inputStyle, maxWidth: 200 }} value={stationId} onChange={(e) => setStationId(e.target.value)}>
+            <option value="">All home stations</option>
+            {stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
         <div style={{ flex: 1 }} />
         <ExportButtons filename="customers" title="Customers" columns={customerColumns(stations)} rows={filtered} />
         {hasPermission(Permission.CUSTOMERS_IMPORT) && (

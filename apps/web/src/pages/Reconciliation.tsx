@@ -41,7 +41,9 @@ export function Reconciliation() {
   const [records, setRecords] = useState<ReconciliationDaily[]>([]);
   const [date, setDate] = useState(nairobiToday);
   const [showIngest, setShowIngest] = useState(false);
-  const { paged, page, pageCount, setPage } = usePagedRows(records);
+  const [stationFilter, setStationFilter] = useState('');
+  const filtered = records.filter((r) => !stationFilter || r.stationId === stationFilter);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   function reload() {
     api.reconciliation.daily({ date }).then(setRecords);
@@ -54,8 +56,18 @@ export function Reconciliation() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="date" style={{ ...inputStyle, maxWidth: 180 }} value={date} onChange={(e) => setDate(e.target.value)} />
+          {!lockedStationId && stations.length > 0 && (
+            <select style={{ ...inputStyle, maxWidth: 200 }} value={stationFilter} onChange={(e) => setStationFilter(e.target.value)}>
+              <option value="">All stations</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
           <div style={{ flex: 1 }} />
-          <ExportButtons filename={`reconciliation-${date}`} title={`Reconciliation — ${date}`} columns={reconciliationColumns(stations)} rows={records} />
+          <ExportButtons filename={`reconciliation-${date}`} title={`Reconciliation — ${date}`} columns={reconciliationColumns(stations)} rows={filtered} />
           {canManage && (
             <Button variant="primary" onClick={() => setShowIngest((v) => !v)}>
               {showIngest ? 'Cancel' : 'Record daily totals'}
@@ -76,8 +88,8 @@ export function Reconciliation() {
         )}
 
         <Card padding={0}>
-          {records.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No reconciliation records for this date yet.</div>}
-          {records.length > 0 && (
+          {filtered.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No reconciliation records found.</div>}
+          {filtered.length > 0 && (
             <Table>
               <thead>
                 <tr>
@@ -107,7 +119,7 @@ export function Reconciliation() {
               </tbody>
             </Table>
           )}
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${records.length} record(s)`} />
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} record(s)`} />
         </Card>
       </div>
     </AppShell>

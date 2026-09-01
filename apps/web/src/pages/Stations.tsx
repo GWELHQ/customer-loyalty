@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
@@ -23,7 +24,15 @@ export function Stations() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.STATIONS_MANAGE);
   const { stations, refresh } = useStations();
-  const { paged, page, pageCount, setPage } = usePagedRows(stations);
+  const [statusFilter, setStatusFilter] = useState('');
+  const filteredByStatus = stations.filter(
+    (s) => !statusFilter || (statusFilter === 'active' ? s.active : !s.active),
+  );
+  const { search, setSearch, filtered } = useTextFilter(
+    filteredByStatus,
+    (s) => `${s.name} ${s.code} ${s.location ?? ''}`,
+  );
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -68,14 +77,25 @@ export function Stations() {
             {error}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {canManage && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
               {showForm ? 'Cancel' : 'Add station'}
             </Button>
           )}
+          <input
+            placeholder="Search by name, code, or location…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 260 }}
+          />
+          <select style={{ ...inputStyle, maxWidth: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="stations" title="Stations" columns={STATION_COLUMNS} rows={stations} />
+          <ExportButtons filename="stations" title="Stations" columns={STATION_COLUMNS} rows={filtered} />
         </div>
         {showForm && (
           <StationForm
@@ -134,7 +154,7 @@ export function Stations() {
               ))}
             </tbody>
           </Table>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${stations.length} station(s)`} />
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} station(s)`} />
         </Card>
       </div>
 

@@ -1,10 +1,11 @@
 import type { Attendant, Station } from '@loyalty/shared';
 import { Role, UserStatus } from '@loyalty/shared';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useAttendantsCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
@@ -32,7 +33,17 @@ export function Attendants() {
   // station picker here too avoids a confusing "choose any station, then
   // get a 403" round trip.
   const lockedStationId = user?.role === Role.STATION_SUPERVISOR ? (user.assignedStationId ?? undefined) : undefined;
-  const { paged, page, pageCount, setPage } = usePagedRows(attendants);
+  const [stationFilter, setStationFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const filteredByColumns = useMemo(
+    () =>
+      attendants.filter(
+        (a) => (!stationFilter || a.assignedStationId === stationFilter) && (!statusFilter || a.status === statusFilter),
+      ),
+    [attendants, stationFilter, statusFilter],
+  );
+  const { search, setSearch, filtered } = useTextFilter(filteredByColumns, (a) => `${a.fullName} ${a.employeeId}`);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
   const [showForm, setShowForm] = useState(false);
   const [pinModalFor, setPinModalFor] = useState<Attendant | null>(null);
   const [editing, setEditing] = useState<Attendant | null>(null);
@@ -78,12 +89,33 @@ export function Attendants() {
             {error}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'Cancel' : 'Add attendant'}
           </Button>
+          <input
+            placeholder="Search by name or employee ID…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 240 }}
+          />
+          {!lockedStationId && stations.length > 0 && (
+            <select style={{ ...inputStyle, maxWidth: 180 }} value={stationFilter} onChange={(e) => setStationFilter(e.target.value)}>
+              <option value="">All stations</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <select style={{ ...inputStyle, maxWidth: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value={UserStatus.ACTIVE}>Active</option>
+            <option value={UserStatus.INACTIVE}>Inactive</option>
+          </select>
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="attendants" title="Attendants" columns={attendantColumns(stations)} rows={attendants} />
+          <ExportButtons filename="attendants" title="Attendants" columns={attendantColumns(stations)} rows={filtered} />
         </div>
         {showForm && (
           <AttendantForm
@@ -147,7 +179,7 @@ export function Attendants() {
               ))}
             </tbody>
           </Table>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${attendants.length} attendant(s)`} />
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} attendant(s)`} />
         </Card>
       </div>
 

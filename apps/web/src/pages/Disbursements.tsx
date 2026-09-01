@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useDisbursementBatchesCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { nairobiThisMonth } from '../lib/time';
@@ -39,7 +40,10 @@ export function Disbursements() {
   const [busy, setBusy] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
-  const { paged, page, pageCount, setPage } = usePagedRows(batches);
+  const [statusFilter, setStatusFilter] = useState('');
+  const filteredByStatus = batches.filter((b) => !statusFilter || b.status === statusFilter);
+  const { search, setSearch, filtered } = useTextFilter(filteredByStatus, (b) => b.month);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   async function downloadBankFile(batch: DisbursementBatch) {
     setDownloadError(null);
@@ -127,8 +131,22 @@ export function Disbursements() {
               </Button>
             </>
           )}
+          <input
+            placeholder="Search by month…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 200 }}
+          />
+          <select style={{ ...inputStyle, maxWidth: 180 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            {Object.values(DisbursementBatchStatus).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <div style={{ flex: 1 }} />
-          <ExportButtons filename="disbursement-batches" title="Disbursement batches" columns={BATCH_COLUMNS} rows={batches} />
+          <ExportButtons filename="disbursement-batches" title="Disbursement batches" columns={BATCH_COLUMNS} rows={filtered} />
         </div>
 
         {createError && (
@@ -139,8 +157,8 @@ export function Disbursements() {
 
         <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
           <Card padding={0}>
-            {batches.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No disbursement batches yet.</div>}
-            {batches.length > 0 && (
+            {filtered.length === 0 && <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No disbursement batches found.</div>}
+            {filtered.length > 0 && (
               <Table>
                 <thead>
                   <tr>
@@ -164,7 +182,7 @@ export function Disbursements() {
                 </tbody>
               </Table>
             )}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${batches.length} batch(es)`} />
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} batch(es)`} />
           </Card>
 
           {selected && (

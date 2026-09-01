@@ -7,6 +7,7 @@ import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { ExportButtons } from '../ui/ExportButtons';
+import { useTextFilter } from '../data/useTextFilter';
 
 // Every entityType value any audit.record() call in apps/api/src currently
 // uses — kept as a flat allow-list rather than derived from live data so the
@@ -72,6 +73,12 @@ function AuditLogTab() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Filters this page only — there's no backend search endpoint for audit
+  // events, so this narrows the currently-loaded page, not the whole log.
+  const { search, setSearch, filtered: filteredEvents } = useTextFilter(
+    events,
+    (e) => `${e.actorName} ${e.action} ${e.entityLabel ?? ''} ${e.entityType}`,
+  );
 
   function reload() {
     setLoading(true);
@@ -119,27 +126,35 @@ function AuditLogTab() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10 }}>
-        <select
-          style={{ ...inputStyle, maxWidth: 220 }}
-          value={entityType}
-          onChange={(e) => changeEntityType(e.target.value)}
-          aria-label="Filter by action type"
-        >
-          <option value="">All actions</option>
-          {AUDIT_ENTITY_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            placeholder="Search this page…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 220 }}
+          />
+          <select
+            style={{ ...inputStyle, maxWidth: 220 }}
+            value={entityType}
+            onChange={(e) => changeEntityType(e.target.value)}
+            aria-label="Filter by action type"
+          >
+            <option value="">All actions</option>
+            {AUDIT_ENTITY_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
         <ExportButtons filename="audit-log" title="Audit log" columns={AUDIT_COLUMNS} rows={fetchAllForExport} />
       </div>
       <Card padding={0}>
-        {!loading && events.length === 0 && (
+        {!loading && filteredEvents.length === 0 && (
           <EmptyState title={entityType ? `No "${entityType}" events yet` : 'No audit events yet'} />
         )}
-        {events.length > 0 && (
+        {filteredEvents.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -152,7 +167,7 @@ function AuditLogTab() {
               </tr>
             </thead>
             <tbody>
-              {events.map((e) => (
+              {filteredEvents.map((e) => (
                 <Tr
                   key={e.id}
                   style={e.hasFraudFlag ? { background: 'var(--color-danger-tint)' } : undefined}
@@ -247,6 +262,9 @@ function SmsLogTab() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const byStatus = deliveries.filter((d) => !statusFilter || d.status === statusFilter);
+  const { search, setSearch, filtered: filteredDeliveries } = useTextFilter(byStatus, (d) => `${d.customerPhone} ${d.message}`);
 
   function reload() {
     setLoading(true);
@@ -288,12 +306,26 @@ function SmsLogTab() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            placeholder="Search this page by phone or message…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 260 }}
+          />
+          <select style={{ ...inputStyle, maxWidth: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="sent">Sent</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
         <ExportButtons filename="sms-log" title="SMS log" columns={SMS_COLUMNS} rows={fetchAllForExport} />
       </div>
       <Card padding={0}>
-        {!loading && deliveries.length === 0 && <EmptyState title="No SMS sent yet" />}
-        {deliveries.length > 0 && (
+        {!loading && filteredDeliveries.length === 0 && <EmptyState title="No SMS found" />}
+        {filteredDeliveries.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -305,7 +337,7 @@ function SmsLogTab() {
               </tr>
             </thead>
             <tbody>
-              {deliveries.map((d) => (
+              {filteredDeliveries.map((d) => (
                 <Tr key={d.id}>
                   <Td>{formatNairobiDateTime(d.createdAt)}</Td>
                   <Td>{d.customerPhone}</Td>

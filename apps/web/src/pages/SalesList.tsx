@@ -1,7 +1,8 @@
-import { Permission, type Sale } from '@loyalty/shared';
+import { Permission, Product, type Sale } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
+import { useTextFilter } from '../data/useTextFilter';
 import { useCustomersCache } from '../data/useCustomersCache';
 import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
@@ -36,6 +37,7 @@ export function SalesList() {
   const [total, setTotal] = useState(0);
   const { stations } = useStations();
   const [stationId, setStationId] = useState('');
+  const [product, setProduct] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sale | null>(null);
@@ -44,28 +46,32 @@ export function SalesList() {
   const { customers } = useCustomersCache();
   const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.fullName])), [customers]);
 
+  function customerName(s: Sale): string {
+    return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
+  }
+
+  // Free-text search only narrows the already-loaded page — sales list has
+  // no backend search endpoint, so this isn't a whole-dataset search.
+  const { search, setSearch, filtered: filteredSales } = useTextFilter(sales, (s) => `${customerName(s)} ${s.customerPhoneAtSale}`);
+
   function reload() {
     setLoading(true);
     api.sales
-      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined })
+      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined, product: (product as Product) || undefined })
       .then((res) => {
         setSales(res.items);
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, stationId, page]);
+  useEffect(reload, [api, stationId, product, page]);
   useRealtimeRefresh(['sales'], reload);
-  useEffect(() => setPage(1), [stationId]);
-
-  function customerName(s: Sale): string {
-    return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
-  }
+  useEffect(() => setPage(1), [stationId, product]);
 
   async function fetchAllForExport(): Promise<Sale[]> {
     const all: Sale[] = [];
     for (let p = 1; ; p++) {
-      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined });
+      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined });
       all.push(...res.items);
       if (res.items.length < 100 || all.length >= res.total) break;
     }
@@ -91,7 +97,13 @@ export function SalesList() {
 
   return (
     <AppShell title="Sales activity" subtitle="Every sale keeps an immutable snapshot of how its cashback was calculated">
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          placeholder="Search this page by customer or phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...inputStyle, maxWidth: 260 }}
+        />
         {stations.length > 0 && (
           <select style={{ ...inputStyle, maxWidth: 220 }} value={stationId} onChange={(e) => setStationId(e.target.value)}>
             <option value="">All stations</option>
@@ -102,6 +114,14 @@ export function SalesList() {
             ))}
           </select>
         )}
+        <select style={{ ...inputStyle, maxWidth: 160 }} value={product} onChange={(e) => setProduct(e.target.value)}>
+          <option value="">All products</option>
+          {Object.values(Product).map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
         <div style={{ flex: 1 }} />
         <ExportButtons filename="sales" title="Sales activity" columns={SALE_COLUMNS} rows={fetchAllForExport} />
       </div>
@@ -109,8 +129,8 @@ export function SalesList() {
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
         <Card padding={0}>
           {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-          {!loading && sales.length === 0 && <EmptyState title="No sales recorded yet" />}
-          {!loading && sales.length > 0 && (
+          {!loading && filteredSales.length === 0 && <EmptyState title="No sales found" />}
+          {!loading && filteredSales.length > 0 && (
             <Table>
               <thead>
                 <tr>
@@ -126,7 +146,7 @@ export function SalesList() {
                 </tr>
               </thead>
               <tbody>
-                {sales.map((s) => (
+                {filteredSales.map((s) => (
                   <Tr
                     key={s.id}
                     onClick={() => {

@@ -1,5 +1,5 @@
 import type { Customer, Sale, Station } from '@loyalty/shared';
-import { Permission } from '@loyalty/shared';
+import { Permission, Product } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -43,7 +43,9 @@ export function CustomerProfile() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [printingSticker, setPrintingSticker] = useState(false);
   const [stickerError, setStickerError] = useState<string | null>(null);
-  const { paged, page, pageCount, setPage } = usePagedRows(sales);
+  const [productFilter, setProductFilter] = useState('');
+  const filteredSales = sales.filter((s) => !productFilter || s.product === productFilter);
+  const { paged, page, pageCount, setPage } = usePagedRows(filteredSales);
 
   function reload() {
     if (!id) return;
@@ -99,8 +101,21 @@ export function CustomerProfile() {
             right={sales.length > 0 && <ExportButtons filename={`customer-${customer.id}-sales`} title={`${customer.fullName} — sales history`} columns={SALE_COLUMNS} rows={sales} />}
           />
           <div style={{ marginTop: 12 }}>
-            {sales.length === 0 && <EmptyState title="No sales yet" body="This customer hasn't fuelled at any station yet." />}
             {sales.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <select style={{ ...inputStyle, maxWidth: 160 }} value={productFilter} onChange={(e) => setProductFilter(e.target.value)}>
+                  <option value="">All products</option>
+                  {Object.values(Product).map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {sales.length === 0 && <EmptyState title="No sales yet" body="This customer hasn't fuelled at any station yet." />}
+            {sales.length > 0 && filteredSales.length === 0 && <EmptyState title="No sales match this filter" />}
+            {filteredSales.length > 0 && (
               <Table>
                 <thead>
                   <tr>
@@ -128,7 +143,7 @@ export function CustomerProfile() {
                 </tbody>
               </Table>
             )}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${sales.length} sale(s)`} />
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filteredSales.length} sale(s)`} />
           </div>
         </Card>
 

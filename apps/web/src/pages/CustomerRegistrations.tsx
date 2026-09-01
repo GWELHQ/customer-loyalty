@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useCustomerRegistrationsCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { ExportButtons } from '../ui/ExportButtons';
@@ -29,7 +30,11 @@ export function CustomerRegistrations() {
 
   const pending = requests.filter((r) => r.status === CustomerRegistrationStatus.PENDING);
   const decided = requests.filter((r) => r.status !== CustomerRegistrationStatus.PENDING);
-  const { paged: pagedDecided, page, pageCount, setPage } = usePagedRows(decided, 10);
+  const { search, setSearch, filtered: filteredDecided } = useTextFilter(
+    decided,
+    (r) => `${r.customerFullName} ${r.customerPhoneNumber}`,
+  );
+  const { paged: pagedDecided, page, pageCount, setPage } = usePagedRows(filteredDecided, 10);
 
   return (
     <AppShell
@@ -70,10 +75,18 @@ export function CustomerRegistrations() {
             >
               Decided requests
             </div>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--color-border)' }}>
+              <input
+                placeholder="Search by customer or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ ...inputStyle, maxWidth: 260 }}
+              />
+            </div>
             {pagedDecided.map((r) => (
               <RequestRow key={r.id} request={r} canApprove={false} onDecided={reload} />
             ))}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${decided.length} decided`} />
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filteredDecided.length} decided`} />
           </Card>
         )}
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
@@ -84,7 +85,8 @@ export function CashbackLedgers() {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
   const [showReject, setShowReject] = useState(false);
-  const { paged, page, pageCount, setPage } = usePagedRows(ledger?.entries ?? []);
+  const { search, setSearch, filtered } = useTextFilter(ledger?.entries ?? [], (e) => `${e.customerName} ${e.customerPhone}`);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   function reload() {
     api.cashbackLedgers.get(month).then(setLedger);
@@ -171,19 +173,26 @@ export function CashbackLedgers() {
         )}
 
         {ledger && ledger.entries.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              placeholder="Search by customer or phone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 260 }}
+            />
+            <div style={{ flex: 1 }} />
             <ExportButtons
               filename={`cashback-ledger-${month}`}
               title={`Cashback ledger — ${month}`}
               columns={LEDGER_ENTRY_COLUMNS}
-              rows={ledger.entries}
+              rows={filtered}
             />
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
           <Card padding={0}>
-            {!ledger || ledger.entries.length === 0 ? (
+            {!ledger || filtered.length === 0 ? (
               <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No eligible sales for this month yet.</div>
             ) : (
               <Table>
@@ -209,7 +218,7 @@ export function CashbackLedgers() {
                 </tbody>
               </Table>
             )}
-            {ledger && <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${ledger.entries.length} customer(s)`} />}
+            {ledger && <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} customer(s)`} />}
           </Card>
 
           {selected && <CustomerMonthSales entry={selected} month={month} onClose={() => setSelected(null)} />}

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useApi } from '../data/client';
 import { useUsersCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { useRoles } from '../data/useRoles';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
@@ -44,7 +45,21 @@ export function Users() {
   const roleLabel = useMemo(() => new Map(roles.map((r) => [r.key, r.displayName])), [roles]);
   // Attendants have no web account — never assignable to a User via this form.
   const assignableRoles = useMemo(() => roles.filter((r) => r.key !== Role.ATTENDANT), [roles]);
-  const { paged, page, pageCount, setPage } = usePagedRows(users);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [stationFilter, setStationFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const filteredByColumns = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          (!roleFilter || u.role === roleFilter) &&
+          (!stationFilter || u.assignedStationId === stationFilter) &&
+          (!statusFilter || u.status === statusFilter),
+      ),
+    [users, roleFilter, stationFilter, statusFilter],
+  );
+  const { search, setSearch, filtered } = useTextFilter(filteredByColumns, (u) => `${u.fullName} ${u.email}`);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,16 +100,45 @@ export function Users() {
             {error}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'Cancel' : 'Add user'}
           </Button>
+          <input
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 240 }}
+          />
+          <select style={{ ...inputStyle, maxWidth: 180 }} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+            <option value="">All roles</option>
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.displayName}
+              </option>
+            ))}
+          </select>
+          {stations.length > 0 && (
+            <select style={{ ...inputStyle, maxWidth: 180 }} value={stationFilter} onChange={(e) => setStationFilter(e.target.value)}>
+              <option value="">All stations</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <select style={{ ...inputStyle, maxWidth: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value={UserStatus.ACTIVE}>Active</option>
+            <option value={UserStatus.INACTIVE}>Inactive</option>
+          </select>
           <div style={{ flex: 1 }} />
           <ExportButtons
             filename="users"
             title="Users"
             columns={userColumns(stations, roleLabel)}
-            rows={users}
+            rows={filtered}
           />
         </div>
         {showForm && (
@@ -159,7 +203,7 @@ export function Users() {
             page={page}
             pageCount={pageCount}
             onChange={setPage}
-            totalLabel={`${users.length} user(s)`}
+            totalLabel={`${filtered.length} user(s)`}
           />
         </Card>
       </div>

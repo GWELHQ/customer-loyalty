@@ -25,6 +25,11 @@ export function Shifts() {
   const [date, setDate] = useState(nairobiToday);
   const [records, setRecords] = useState<ShiftRoster[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [stationFilter, setStationFilter] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('');
+  const filtered = records.filter(
+    (r) => (!stationFilter || r.stationId === stationFilter) && (!shiftFilter || r.shift === shiftFilter),
+  );
 
   function reload() {
     api.shifts.list({ date }).then(setRecords);
@@ -41,6 +46,21 @@ export function Shifts() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="date" style={{ ...inputStyle, maxWidth: 180 }} value={date} onChange={(e) => setDate(e.target.value)} />
+          {!lockedStationId && stations.length > 0 && (
+            <select style={{ ...inputStyle, maxWidth: 200 }} value={stationFilter} onChange={(e) => setStationFilter(e.target.value)}>
+              <option value="">All stations</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <select style={{ ...inputStyle, maxWidth: 180 }} value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
+            <option value="">All shifts</option>
+            <option value={ShiftType.DAY}>{SHIFT_LABEL[ShiftType.DAY]}</option>
+            <option value={ShiftType.NIGHT}>{SHIFT_LABEL[ShiftType.NIGHT]}</option>
+          </select>
           <div style={{ flex: 1 }} />
           {canManage && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
@@ -63,12 +83,12 @@ export function Shifts() {
         )}
 
         <Card padding={0}>
-          {records.length === 0 && (
+          {filtered.length === 0 && (
             <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>
               No shift rosters recorded for this date yet.
             </div>
           )}
-          {records.length > 0 && (
+          {filtered.length > 0 && (
             <Table>
               <thead>
                 <tr>
@@ -78,7 +98,7 @@ export function Shifts() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
+                {filtered.map((r) => (
                   <Tr key={r.id}>
                     <Td>{stations.find((s) => s.id === r.stationId)?.name ?? 'Unknown station'}</Td>
                     <Td>

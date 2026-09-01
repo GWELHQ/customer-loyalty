@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { usePagedRows } from '../data/usePagedRows';
+import { useTextFilter } from '../data/useTextFilter';
 import { useRoles } from '../data/useRoles';
 import { AppShell } from '../layout/AppShell';
 import { Icon } from '../ui/Icon';
@@ -14,7 +15,8 @@ export function RolesAdmin() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.RBAC_MANAGE);
   const { roles, refresh } = useRoles();
-  const { paged, page, pageCount, setPage } = usePagedRows(roles);
+  const { search, setSearch, filtered } = useTextFilter(roles, (r) => `${r.displayName} ${r.description}`);
+  const { paged, page, pageCount, setPage } = usePagedRows(filtered);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<RoleDefinition | null>(null);
   const [deleting, setDeleting] = useState<RoleDefinition | null>(null);
@@ -39,13 +41,19 @@ export function RolesAdmin() {
   return (
     <AppShell title="Roles" subtitle="Create roles and assign permissions to them — Admin only">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
-        {canManage && (
-          <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {canManage && (
             <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
               {showForm ? 'Cancel' : 'New custom role'}
             </Button>
-          </div>
-        )}
+          )}
+          <input
+            placeholder="Search roles…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 240 }}
+          />
+        </div>
         {showForm && (
           <RoleFormCard
             onDone={() => {
@@ -103,7 +111,7 @@ export function RolesAdmin() {
               ))}
             </tbody>
           </Table>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${roles.length} role(s)`} />
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} role(s)`} />
         </Card>
       </div>
 
