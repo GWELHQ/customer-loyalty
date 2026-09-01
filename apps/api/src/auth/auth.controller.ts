@@ -45,6 +45,19 @@ export class AuthController {
   }
 
   /**
+   * Silent session renewal for a device syncing an offline sales queue with
+   * nobody logged in — exchanges a still-valid attendant refresh token for
+   * a fresh access token, no PIN. Same throttle as login: a refresh token
+   * is a bearer credential same as a PIN, worth rate-limiting guesses/abuse.
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('attendant/refresh')
+  attendantRefresh(@Body() dto: RefreshTokenDto) {
+    return this.auth.refreshAttendantSession(dto.refreshToken);
+  }
+
+  /**
    * Badge-tap login — no PIN. Same throttle as PIN login: a wrong/unregistered
    * tag isn't a guessable secret, but this still caps how fast a scanning
    * device (or someone probing) can hammer the endpoint.

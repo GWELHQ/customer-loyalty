@@ -69,6 +69,7 @@ Response:
 ```json
 {
   "accessToken": "<jwt>",
+  "refreshToken": "<jwt>",
   "attendant": {
     "kind": "attendant",
     "attendantId": "...",
@@ -86,13 +87,28 @@ Response:
   resets the counter.
 - Inactive attendants (deactivated by a Station Supervisor/Admin) get a
   `401` — treat this as "contact your supervisor", not a retryable error.
-- There is **no refresh token** for attendants (unlike staff). The access
-  token's lifetime is `ATTENDANT_JWT_TTL`, currently **12 hours**. When it
-  expires, the app must show the PIN login screen again — plan the UX
-  around "log in once at shift start, re-enter PIN if a shift runs past 12h
-  or the app was killed and restarted after expiry."
-- There's no `/auth/logout` call needed beyond discarding the token
+- **`accessToken`**: lifetime is `ATTENDANT_JWT_TTL`, currently **12
+  hours**. Every `/mobile/*` call and `POST /mobile/sync` uses this.
+- **`refreshToken`** (added 2026-09-01): lifetime is
+  `ATTENDANT_REFRESH_JWT_TTL`, currently **30 days**. Store it alongside
+  the access token, per logged-in attendant. Exists specifically for
+  background sync: once `accessToken` expires, call §3.1c below with the
+  stored `refreshToken` to silently mint a fresh `accessToken` (and a
+  rotated `refreshToken` — store the new one, discard the old) with **no
+  PIN prompt**, then flush that attendant's queued sales via
+  `POST /mobile/sync`. This is what makes "sync an offline queue once the
+  device is back online, even with nobody logged in at that moment"
+  possible — see §5 for the full recommended flow.
+- If the UI needs a fresh PIN-login prompt at all (e.g. `refreshToken`
+  itself has expired, or an attendant's local queue is fully flushed and
+  they're just starting a new shift), show the PIN screen — same as
+  before, this hasn't changed.
+- There's no `/auth/logout` call needed beyond discarding the tokens
   locally — sessions are stateless JWTs, nothing to invalidate server-side.
+  Discarding `refreshToken` on logout is a **product decision, not a
+  requirement**: keeping it around (per the offline-sync flow above) is
+  exactly what lets that attendant's queued-but-unsynced sales flush later
+  without them being present.
 
 ### 3.1b Badge login (RFID/NFC tap, no PIN)
 
@@ -130,6 +146,30 @@ string your NFC read returns, punctuated or not.
 **UX suggestion, not a requirement:** show both a "Tap badge" and a
 "Enter ID + PIN" option on the same login screen, so a lost/dead badge
 never blocks an attendant from working a shift.
+
+### 3.1c Silent refresh (added 2026-09-01)
+
+```
+POST /auth/attendant/refresh
+Body: { "refreshToken": "<the refreshToken from login>" }
+```
+
+Same response shape as PIN login (`accessToken` + `refreshToken` +
+`attendant`) — call this instead of showing a login screen whenever you
+have a still-valid `refreshToken` for an attendant but their `accessToken`
+has expired. No PIN involved; this is meant to run invisibly, typically
+right before a background sync of that attendant's queued offline sales.
+
+- Rate-limited the same as PIN login (10/60s per client).
+- `401` ("Session no longer valid") if the `refreshToken` itself has
+  expired (30 days), is malformed, or the attendant has been deactivated
+  since it was issued — fall back to the PIN login screen in that case.
+- The response's `refreshToken` is a **new, rotated** token — always store
+  it in place of the one you just used; the old one is not reusable after
+  a successful refresh (same rotation behavior as the staff refresh flow).
+- This does **not** create an audit-log entry the way a real login does —
+  it's a credential renewal, not a new "an attendant started using the
+  app" event.
 
 Attach `Authorization: Bearer <accessToken>`. A `401` on any call means the
 token is invalid/expired or the attendant was deactivated — send the user
@@ -504,10 +544,21 @@ keys, stale-cache detection) exists for this. Recommended flow:
    few hours) to catch price changes — the `claimedPricePerLitre`/
    `claimedCashbackEarned` fields are what let the server tell you when a
    cached price went stale mid-queue.
+6. **For syncing with nobody logged in** (added 2026-09-01): retain each
+   attendant's `refreshToken` on-device, per session, even after they're
+   logged out of the UI. When connectivity returns and an access token has
+   expired, silently call §3.1c to mint a fresh one for that attendant,
+   then flush their queue as in step 3. Do this **once per attendant** —
+   don't try to merge multiple attendants' queued sales into a single
+   `/mobile/sync` call; the whole batch in one call is always attributed
+   to whichever token made that call, there's no per-item attendant field.
+   Discard a session's retained `refreshToken` once its queue is fully
+   synced (`accepted`/`already_processed`/`rejected` for every row).
 
 ## 6. What Android does **not** need to worry about
 
-- No refresh-token flow (attendants don't get one — re-login on expiry).
+- Staff-style manual token management beyond what §3.1c above already
+  covers — refreshing is one call, no separate concept to build.
 - No station/attendant selection UI — both are fixed to the logged-in
   attendant and returned by bootstrap/login.
 - No direct Firestore access — everything goes through this REST API.

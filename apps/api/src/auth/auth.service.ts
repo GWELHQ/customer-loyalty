@@ -18,6 +18,7 @@ export interface StaffSession {
 
 export interface AttendantSession {
   accessToken: string;
+  refreshToken: string;
   attendant: AttendantPrincipal;
 }
 
@@ -127,9 +128,25 @@ export class AuthService {
     return this.issueAttendantSession(attendant, 'auth.attendant_nfc_login');
   }
 
+  /**
+   * Silently exchanges a still-valid attendant refresh token for a fresh
+   * access + refresh pair — no PIN, no audit action distinct from a normal
+   * login (this is meant to be invisible to the attendant, typically fired
+   * by the app in the background right before flushing an offline sales
+   * queue). Rotates the refresh token on every use, same as staff.
+   */
+  async refreshAttendantSession(refreshToken: string): Promise<AttendantSession> {
+    const attendantId = await this.tokens.verifyAttendantRefreshToken(refreshToken);
+    const attendant = await this.attendants.findById(attendantId);
+    if (!attendant || attendant.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Session no longer valid');
+    }
+    return this.issueAttendantSession(attendant);
+  }
+
   private async issueAttendantSession(
     attendant: Attendant,
-    auditAction: 'auth.attendant_login' | 'auth.attendant_nfc_login',
+    auditAction?: 'auth.attendant_login' | 'auth.attendant_nfc_login',
   ): Promise<AttendantSession> {
     const principal: AttendantPrincipal = {
       kind: 'attendant',
@@ -140,16 +157,21 @@ export class AuthService {
       assignedStationId: attendant.assignedStationId,
     };
 
-    const accessToken = await this.tokens.signAttendantAccessToken(principal);
+    const [accessToken, refreshToken] = await Promise.all([
+      this.tokens.signAttendantAccessToken(principal),
+      this.tokens.signAttendantRefreshToken(attendant.id),
+    ]);
 
-    await this.audit.record({
-      actor: principal,
-      action: auditAction,
-      entityType: 'attendant',
-      entityId: attendant.id,
-      entityLabel: attendant.fullName,
-    });
+    if (auditAction) {
+      await this.audit.record({
+        actor: principal,
+        action: auditAction,
+        entityType: 'attendant',
+        entityId: attendant.id,
+        entityLabel: attendant.fullName,
+      });
+    }
 
-    return { accessToken, attendant: principal };
+    return { accessToken, refreshToken, attendant: principal };
   }
 }

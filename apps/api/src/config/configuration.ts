@@ -16,6 +16,7 @@ export interface AppConfig {
     accessTtl: string;
     refreshTtl: string;
     attendantTtl: string;
+    attendantRefreshTtl: string;
   };
   sms: {
     provider: string;
@@ -56,6 +57,7 @@ export default (): AppConfig => ({
     accessTtl: process.env.JWT_ACCESS_TTL ?? '15m',
     refreshTtl: process.env.JWT_REFRESH_TTL ?? '7d',
     attendantTtl: process.env.ATTENDANT_JWT_TTL ?? '12h',
+    attendantRefreshTtl: process.env.ATTENDANT_REFRESH_JWT_TTL ?? '30d',
   },
   sms: {
     provider: process.env.SMS_PROVIDER ?? 'mock',
