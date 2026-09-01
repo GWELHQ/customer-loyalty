@@ -24,6 +24,8 @@ import type {
   RoleDefinition,
   Sale,
   SaleApprovalDelegation,
+  ShiftRoster,
+  ShiftType,
   SmsDelivery,
   SpecialRateRequest,
   Station,
@@ -255,6 +257,13 @@ export class LoyaltyApiClient {
     get: (id: string) => this.http.get<ReconciliationDaily>(`/reconciliation/daily/${id}`),
     ingestDailyTotals: (input: { stationId: string; product: Product; date: string; totalSales: number }) =>
       this.http.post<ReconciliationDaily>('/reconciliation/daily-totals', input),
+  };
+
+  shifts = {
+    list: (params: { stationId?: string; date?: string } = {}) =>
+      this.http.get<ShiftRoster[]>(`/shifts${toQueryString(params)}`),
+    record: (input: { stationId: string; shift: ShiftType; date: string; attendantIds: string[] }) =>
+      this.http.post<ShiftRoster>('/shifts', input),
   };
 
   cashbackLedgers = {

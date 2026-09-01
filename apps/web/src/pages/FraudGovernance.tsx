@@ -23,6 +23,7 @@ const TYPE_LABELS: Record<FraudFlagType, string> = {
   [FraudFlagType.ATTENDANT_VOLUME_OUTLIER]: 'Attendant volume outlier',
   [FraudFlagType.ADMIN_MANUAL_BURST]: 'Manual-entry burst',
   [FraudFlagType.LICENSE_PLATE_MISMATCH]: 'License plate mismatch',
+  [FraudFlagType.ATTENDANT_OUTSIDE_SHIFT]: 'Attendant outside shift',
 };
 
 interface RuleInfo {
@@ -80,6 +81,11 @@ const RULE_INFO: Record<FraudFlagType, RuleInfo> = {
     mode: 'Nightly batch',
     description:
       "A customer registered within the last 14 days has a first-sale volume more than 2× the average first-sale volume of other recently registered customers — unusual for a brand-new account.",
+  },
+  [FraudFlagType.ATTENDANT_OUTSIDE_SHIFT]: {
+    mode: 'Real-time',
+    description:
+      "The selling attendant isn't on the shift roster recorded for that station/date/shift (day 07:30-16:30, night 16:30-07:30). Only fires when a roster was actually recorded — a station with no roster for that day doesn't get flagged.",
   },
 };
 

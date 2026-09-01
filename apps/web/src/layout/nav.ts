@@ -15,6 +15,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Special rates', path: '/special-rates', icon: 'star', permission: Permission.SPECIAL_RATES_VIEW },
   { label: 'Customer registrations', path: '/customer-registrations', icon: 'checkCircle', permission: Permission.CUSTOMER_REGISTRATIONS_VIEW },
   { label: 'Reconciliation', path: '/reconciliation', icon: 'reconciliation', permission: Permission.RECONCILIATION_VIEW_ALL },
+  { label: 'Shifts', path: '/shifts', icon: 'clock', permission: Permission.SHIFTS_VIEW_ALL },
   { label: 'Cashback ledger', path: '/cashback-ledgers', icon: 'ledger', permission: Permission.LEDGERS_VIEW },
   { label: 'Disbursements', path: '/disbursements', icon: 'disbursements', permission: Permission.DISBURSEMENTS_VIEW },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_ALL },
@@ -32,19 +33,30 @@ const ALL_NAV_ITEMS: NavItem[] = [
 const STATION_SCOPED_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'dashboard', permission: Permission.REPORTS_VIEW_OWN_STATION },
   { label: 'Reconciliation', path: '/reconciliation', icon: 'reconciliation', permission: Permission.RECONCILIATION_VIEW_OWN_STATION },
+  { label: 'Shifts', path: '/shifts', icon: 'clock', permission: Permission.SHIFTS_VIEW_OWN_STATION },
   { label: 'Sales', path: '/sales', icon: 'sales', permission: Permission.SALES_VIEW_OWN_STATION },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_OWN_STATION },
 ];
 
 export function navItemsForRole(role: string, hasPermission: (p: Permission) => boolean): NavItem[] {
-  const merged = [...ALL_NAV_ITEMS, ...STATION_SCOPED_NAV_ITEMS];
-  const seenPaths = new Set<string>();
+  // Single pass over ALL_NAV_ITEMS' fixed declaration order — every role
+  // sees the same relative sidebar order (Dashboard always first). A
+  // station-scoped item (Dashboard/Reconciliation/Shifts/Sales/Reports for
+  // Station Supervisor) is substituted in at its ALL_NAV_ITEMS position
+  // when the "_all" permission is missing but the "_own_station" one
+  // isn't — never appended at the end, which previously pushed those
+  // items to the bottom of the sidebar for that role only.
+  const scopedByPath = new Map(STATION_SCOPED_NAV_ITEMS.map((item) => [item.path, item]));
   const result: NavItem[] = [];
-  for (const item of merged) {
-    if (seenPaths.has(item.path)) continue;
-    if (item.permission && !hasPermission(item.permission)) continue;
-    seenPaths.add(item.path);
-    result.push(item);
+  for (const item of ALL_NAV_ITEMS) {
+    if (item.permission && hasPermission(item.permission)) {
+      result.push(item);
+      continue;
+    }
+    const scoped = scopedByPath.get(item.path);
+    if (scoped?.permission && hasPermission(scoped.permission)) {
+      result.push(scoped);
+    }
   }
   return result;
 }

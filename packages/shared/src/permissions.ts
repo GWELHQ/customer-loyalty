@@ -46,6 +46,9 @@ export enum Permission {
   SALES_APPROVE_OWN_STATION = 'sales:approve_own_station',
   /** Create/edit/delete dynamic role definitions (`/rbac/roles`). Granted only to Admin by default — see SYSTEM_ROLE_DEFINITIONS below. */
   RBAC_MANAGE = 'rbac:manage',
+  SHIFTS_VIEW_ALL = 'shifts:view_all',
+  SHIFTS_VIEW_OWN_STATION = 'shifts:view_own_station',
+  SHIFTS_MANAGE = 'shifts:manage',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -77,6 +80,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   Permission.SALES_APPROVE_ALL,
   Permission.RBAC_MANAGE,
+  Permission.SHIFTS_VIEW_ALL,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 
@@ -98,6 +102,7 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.AUDIT_VIEW,
   Permission.FRAUD_VIEW,
+  Permission.SHIFTS_VIEW_ALL,
 ];
 
 // Everything the Chairman can see, minus the two actions the Chairman can
@@ -166,6 +171,7 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   Permission.SALES_APPROVE_ALL,
+  Permission.SHIFTS_VIEW_ALL,
 ];
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
@@ -195,6 +201,12 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   Permission.CUSTOMER_REGISTRATIONS_VIEW,
   Permission.CUSTOMER_REGISTRATIONS_APPROVE,
   Permission.SALES_APPROVE_OWN_STATION,
+  // Records daily attendant rosters for their own station — see
+  // apps/api/src/shifts/. Scoped server-side by
+  // resolveStationScope/assertStationAccessible, same as
+  // RECONCILIATION_MANAGE and the ATTENDANTS_MANAGE grant above.
+  Permission.SHIFTS_VIEW_OWN_STATION,
+  Permission.SHIFTS_MANAGE,
 ];
 
 const ATTENDANT_PERMISSIONS: Permission[] = [

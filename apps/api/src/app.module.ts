@@ -31,6 +31,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SalesModule } from './sales/sales.module';
 import { SalesDelegationsModule } from './sales-delegations/sales-delegations.module';
 import { SettingsModule } from './settings/settings.module';
+import { ShiftsModule } from './shifts/shifts.module';
 import { SmsModule } from './sms/sms.module';
 import { SpecialRateRequestsModule } from './special-rate-requests/special-rate-requests.module';
 import { StationsModule } from './stations/stations.module';
@@ -61,6 +62,7 @@ import { VehiclePlateChecksModule } from './vehicle-plate-checks/vehicle-plate-c
     SpecialRateRequestsModule,
     CustomerRegistrationsModule,
     ReconciliationModule,
+    ShiftsModule,
     CashbackLedgersModule,
     DisbursementBatchesModule,
     ReportsModule,

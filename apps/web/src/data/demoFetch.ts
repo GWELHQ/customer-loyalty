@@ -31,6 +31,7 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
   if (path === '/users' && method === 'GET') return json(demoUsers);
   if (path === '/rbac/roles' && method === 'GET') return json(Object.values(SYSTEM_ROLE_DEFINITIONS));
   if (path === '/rbac/permissions' && method === 'GET') return json(Object.values(Permission));
+  if (path === '/shifts' && method === 'GET') return json([]);
   if (path.startsWith('/customers/search')) {
     const phone = new URL(url, 'http://x').searchParams.get('phone') ?? '';
     return json(demoCustomers.filter((c) => c.phoneNumber.includes(phone.replace(/\D/g, ''))));

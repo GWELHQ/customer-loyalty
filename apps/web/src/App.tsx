@@ -18,6 +18,7 @@ import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
 import { RolesAdmin } from './pages/RolesAdmin';
 import { SalesList } from './pages/SalesList';
+import { Shifts } from './pages/Shifts';
 import { SignIn } from './pages/SignIn';
 import { SpecialRates } from './pages/SpecialRates';
 import { Stations } from './pages/Stations';
@@ -69,6 +70,15 @@ export function App() {
       />
 
       <Route path="/reconciliation" element={<RequireStaff><Reconciliation /></RequireStaff>} />
+
+      <Route
+        path="/shifts"
+        element={
+          <RequireStaff anyPermission={[Permission.SHIFTS_VIEW_ALL, Permission.SHIFTS_VIEW_OWN_STATION]}>
+            <Shifts />
+          </RequireStaff>
+        }
+      />
 
       <Route path="/cashback-ledgers" element={<RequireStaff permission={Permission.LEDGERS_VIEW}><CashbackLedgers /></RequireStaff>} />
       <Route path="/disbursements" element={<RequireStaff permission={Permission.DISBURSEMENTS_VIEW}><Disbursements /></RequireStaff>} />

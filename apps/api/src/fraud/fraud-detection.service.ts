@@ -4,6 +4,7 @@ import { CustomersService } from '../customers/customers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc } from '../common/firestore/helpers';
 import { nairobiDateKey } from '../common/time/nairobi';
+import { ShiftsService } from '../shifts/shifts.service';
 import { FraudFlagsService, type CreateFraudFlagInput } from './fraud-flags.service';
 
 const SALES_COLLECTION = 'sales';
@@ -30,6 +31,7 @@ export class FraudDetectionService {
     private readonly firestore: FirestoreService,
     private readonly flags: FraudFlagsService,
     private readonly customers: CustomersService,
+    private readonly shifts: ShiftsService,
   ) {}
 
   private salesCol() {
@@ -46,6 +48,7 @@ export class FraudDetectionService {
         this.checkRepeatedExactLitres(sale),
         this.checkLicensePlateMismatch(sale),
         this.checkHighFrequencyRefuel(sale),
+        this.checkAttendantOutsideShift(sale),
       ]);
     } catch (err) {
       this.logger.error(`Real-time fraud check failed for sale ${sale.id}`, err instanceof Error ? err.stack : err);
@@ -141,6 +144,36 @@ export class FraudDetectionService {
         windowHours: HIGH_FREQUENCY_WINDOW_HOURS,
         minGapMinutes: HIGH_FREQUENCY_MIN_GAP_MINUTES,
         flaggedSaleCount: closePairs.length,
+      },
+    });
+  }
+
+  /**
+   * Flags a sale made by an attendant who isn't on the recorded shift
+   * roster for that station/date/shift. Skips silently (no flag) when no
+   * roster was ever recorded — a supervisor not having filled it in yet
+   * isn't the attendant's fault, and shouldn't produce false positives.
+   */
+  private async checkAttendantOutsideShift(sale: Sale): Promise<void> {
+    const roster = await this.shifts.findRosterForSale(sale.stationId, sale.saleDate);
+    if (!roster) return;
+    if (roster.attendantIds.includes(sale.attendantId)) return;
+
+    if (await this.flags.hasOpenFlag(FraudFlagType.ATTENDANT_OUTSIDE_SHIFT, { attendantId: sale.attendantId })) return;
+
+    await this.createFlag({
+      type: FraudFlagType.ATTENDANT_OUTSIDE_SHIFT,
+      severity: FraudFlagSeverity.MEDIUM,
+      stationId: sale.stationId,
+      stationNameAtFlag: sale.stationNameAtSale,
+      attendantId: sale.attendantId,
+      attendantNameAtFlag: sale.attendantNameAtSale,
+      relatedSaleIds: [sale.id],
+      detectionMode: 'realtime',
+      evidence: {
+        shift: roster.shift,
+        rosterDate: roster.date,
+        rosteredAttendantIds: roster.attendantIds,
       },
     });
   }

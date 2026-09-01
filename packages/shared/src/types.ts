@@ -12,6 +12,7 @@ import type {
   Product,
   ReconciliationStatus,
   SaleApprovalStatus,
+  ShiftType,
   SmsStatus,
   SpecialRateStatus,
   SyncRecordResult,
@@ -240,6 +241,15 @@ export interface ReconciliationDaily extends BaseDoc {
   status: ReconciliationStatus;
   ingestedByUserId: string;
   flaggedSaleIds: string[];
+}
+
+export interface ShiftRoster extends BaseDoc {
+  stationId: string;
+  /** The Nairobi calendar day the shift *starts* on — see nairobiShiftBucket. */
+  date: ISODateString;
+  shift: ShiftType;
+  attendantIds: string[];
+  recordedByUserId: string;
 }
 
 export interface MonthlyCashbackLedgerEntry {

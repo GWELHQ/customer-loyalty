@@ -43,3 +43,26 @@ export function nairobiMonthBoundsUtc(monthKey: string): { startUtc: string; end
     endUtc: new Date(endMs).toISOString(),
   };
 }
+
+const DAY_SHIFT_START_MIN = 7 * 60 + 30; // 07:30
+const DAY_SHIFT_END_MIN = 16 * 60 + 30; // 16:30
+
+/**
+ * Which shift a UTC instant falls in, and the Nairobi date that shift is
+ * keyed under. A night shift runs 16:30 -> 07:30 the next day, so its
+ * early-morning portion (00:00-07:29) is keyed under the *previous*
+ * calendar day — the day the shift actually started — not the day the
+ * sale happens to fall on.
+ */
+export function nairobiShiftBucket(input: string | Date = new Date()): { date: string; shift: 'day' | 'night' } {
+  const d = typeof input === 'string' ? new Date(input) : input;
+  const nairobi = new Date(d.getTime() + NAIROBI_OFFSET_MS);
+  const minutesOfDay = nairobi.getUTCHours() * 60 + nairobi.getUTCMinutes();
+  const dateKey = nairobi.toISOString().slice(0, 10);
+  if (minutesOfDay >= DAY_SHIFT_START_MIN && minutesOfDay < DAY_SHIFT_END_MIN) {
+    return { date: dateKey, shift: 'day' };
+  }
+  if (minutesOfDay >= DAY_SHIFT_END_MIN) return { date: dateKey, shift: 'night' };
+  const prevDate = new Date(nairobi.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return { date: prevDate, shift: 'night' };
+}

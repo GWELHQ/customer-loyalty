@@ -127,6 +127,7 @@ export enum FraudFlagType {
   ATTENDANT_VOLUME_OUTLIER = 'attendant_volume_outlier',
   ADMIN_MANUAL_BURST = 'admin_manual_burst',
   LICENSE_PLATE_MISMATCH = 'license_plate_mismatch',
+  ATTENDANT_OUTSIDE_SHIFT = 'attendant_outside_shift',
 }
 
 export enum FraudFlagStatus {
@@ -160,4 +161,9 @@ export enum SaleApprovalStatus {
   PENDING_APPROVAL = 'pending_approval',
   APPROVED = 'approved',
   REJECTED = 'rejected',
+}
+
+export enum ShiftType {
+  DAY = 'day',
+  NIGHT = 'night',
 }
