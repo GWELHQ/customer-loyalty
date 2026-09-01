@@ -9,6 +9,7 @@ import { useCustomersCache } from '../../data/useCustomersCache';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import type { ExportColumn } from '../../lib/exportTable';
+import { exportCustomerQrCodesPdf } from '../../lib/customerSticker';
 import { ExportButtons } from '../../ui/ExportButtons';
 import { Button, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
 
@@ -37,6 +38,41 @@ export function CustomersList() {
   );
   const { search, setSearch, filtered } = useTextFilter(byStation, (c) => `${c.fullName} ${c.phoneNumber}`);
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exportingQr, setExportingQr] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllOnPage() {
+    const pageIds = paged.map((c) => c.id);
+    const allChecked = pageIds.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allChecked) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function exportQrCodes() {
+    const customers = selected.size > 0 ? filtered.filter((c) => selected.has(c.id)) : filtered;
+    setQrError(null);
+    setExportingQr(true);
+    try {
+      await exportCustomerQrCodesPdf(customers);
+    } catch (err) {
+      setQrError(err instanceof Error ? err.message : 'Could not generate the QR code PDF');
+    } finally {
+      setExportingQr(false);
+    }
+  }
 
   return (
     <AppShell title="Customers" subtitle={`${customers.length} centralised across every station`}>
@@ -58,6 +94,9 @@ export function CustomersList() {
           </select>
         )}
         <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={exportQrCodes} disabled={exportingQr || filtered.length === 0}>
+          {exportingQr ? 'Generating…' : selected.size > 0 ? `Export ${selected.size} QR code(s)` : 'Export all QR codes'}
+        </Button>
         <ExportButtons filename="customers" title="Customers" columns={customerColumns(stations)} rows={filtered} />
         {hasPermission(Permission.CUSTOMERS_IMPORT) && (
           <Button variant="secondary" onClick={() => navigate('/customers/import')}>
@@ -71,6 +110,12 @@ export function CustomersList() {
         )}
       </div>
 
+      {qrError && (
+        <div style={{ fontSize: 12.5, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 10, marginBottom: 14 }}>
+          {qrError}
+        </div>
+      )}
+
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
         {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
         {!loading && filtered.length === 0 && <EmptyState title="No customers found" body="Try a different search, or add one." />}
@@ -78,6 +123,14 @@ export function CustomersList() {
           <Table>
             <thead>
               <tr>
+                <Th>
+                  <input
+                    type="checkbox"
+                    checked={paged.length > 0 && paged.every((c) => selected.has(c.id))}
+                    onChange={toggleAllOnPage}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Th>
                 <Th>Name</Th>
                 <Th>Phone</Th>
                 <Th>Home station</Th>
@@ -87,6 +140,14 @@ export function CustomersList() {
             <tbody>
               {paged.map((c) => (
                 <Tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)}>
+                  <Td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(c.id)}
+                      onChange={() => toggleOne(c.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Td>
                   <Td>
                     <span style={{ fontWeight: 700 }}>{c.fullName}</span>
                     {c.specialRateKesPerLitre && (

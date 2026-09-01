@@ -1,4 +1,5 @@
 import type { Customer } from '@loyalty/shared';
+import { jsPDF } from 'jspdf';
 
 // 80mm x 80mm sticker at ~300 DPI print quality: 12px per mm -> 960x960px.
 const SIZE_MM = 80;
@@ -46,17 +47,17 @@ async function loadWhiteMark(): Promise<{ image: HTMLImageElement; aspectRatio: 
   return { image: whiteMark, aspectRatio: canvas.width / canvas.height };
 }
 
-async function loadQrImage(value: string): Promise<HTMLImageElement> {
+// Same styling as the on-screen QrCode component (apps/web/src/ui/QrCode.tsx)
+// — literal hex, not var(--gw-green-*), for the same reason it's literal
+// there: qr-code-styling paints via canvas/svg attributes that don't
+// resolve CSS custom properties.
+async function qrDataUrl(value: string, sizePx: number, margin = 24): Promise<string> {
   const { default: QRCodeStyling } = await import('qr-code-styling');
-  // Same styling as the on-screen QrCode component (apps/web/src/ui/QrCode.tsx)
-  // — literal hex, not var(--gw-green-*), for the same reason it's literal
-  // there: qr-code-styling paints via canvas/svg attributes that don't
-  // resolve CSS custom properties.
   const qrCode = new QRCodeStyling({
-    width: mm(36.8) * 2, // rendered well above final display size for crisp downscaling
-    height: mm(36.8) * 2,
+    width: sizePx,
+    height: sizePx,
     data: value,
-    margin: 24,
+    margin,
     qrOptions: { errorCorrectionLevel: 'M' },
     dotsOptions: { type: 'dots', color: '#20713b' },
     cornersSquareOptions: { type: 'extra-rounded', color: '#20713b' },
@@ -64,12 +65,17 @@ async function loadQrImage(value: string): Promise<HTMLImageElement> {
     backgroundOptions: { color: '#eafaf0' },
   });
   const blob = (await qrCode.getRawData('png')) as Blob;
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error('Could not read QR code image'));
     reader.readAsDataURL(blob);
   });
+}
+
+async function loadQrImage(value: string): Promise<HTMLImageElement> {
+  // Rendered well above final display size for crisp downscaling.
+  const dataUrl = await qrDataUrl(value, mm(36.8) * 2);
   const img = new Image();
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();
@@ -141,4 +147,46 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Generates and downloads a single A4 PDF with every customer's QR code — 3x4 per page, name and phone underneath each. */
+export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<void> {
+  if (customers.length === 0) throw new Error('No customers to export');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 12;
+  const cols = 3;
+  const rowsPerPage = 4;
+  const perPage = cols * rowsPerPage;
+  const cellW = (pageWidth - margin * 2) / cols;
+  const cellH = (pageHeight - margin * 2) / rowsPerPage;
+  const qrSize = Math.min(cellW, cellH) - 22;
+
+  for (const [i, customer] of customers.entries()) {
+    const posOnPage = i % perPage;
+    if (i > 0 && posOnPage === 0) doc.addPage();
+    const col = posOnPage % cols;
+    const row = Math.floor(posOnPage / cols);
+
+    const qrValue = `${window.location.origin}/qr/${customer.id}`;
+    const dataUrl = await qrDataUrl(qrValue, 480, 16);
+
+    const cellX = margin + col * cellW;
+    const cellY = margin + row * cellH;
+    const qrX = cellX + (cellW - qrSize) / 2;
+    const qrY = cellY + 4;
+    doc.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+    doc.setFontSize(9);
+    doc.setTextColor(20, 20, 20);
+    doc.text(customer.fullName, cellX + cellW / 2, qrY + qrSize + 6, { align: 'center', maxWidth: cellW - 4 });
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(customer.phoneNumber, cellX + cellW / 2, qrY + qrSize + 11, { align: 'center' });
+  }
+
+  doc.save(`customer-qr-codes-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

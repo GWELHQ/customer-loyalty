@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { SmsStatus, type PaginatedResult, type SmsDelivery } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
@@ -74,9 +75,10 @@ export class SmsService {
   }
 
   /**
-   * Sends a customer inactivity reset notice — same delivery/log/retry
-   * shape as a sale-confirmation SMS, but with no saleId (nothing to sync
-   * a sale's smsStatus against) and no retry beyond the provider's own result.
+   * Sends a customer inactivity reset notice — same delivery/log shape as a
+   * sale-confirmation SMS, but with no saleId (nothing to sync a sale's
+   * smsStatus against). A failure here is picked up by the same hourly
+   * retry sweep as everything else in smsDeliveries.
    */
   async sendInactivityNotice(input: { customerPhone: string; message: string }): Promise<void> {
     const now = nowIso();
@@ -145,6 +147,32 @@ export class SmsService {
     const delivery = fromDoc<SmsDelivery>(snap.docs[0]!);
     await this.attemptSend(delivery.id, delivery);
     return this.getBySaleId(saleId);
+  }
+
+  /**
+   * Hourly sweep that retries every PENDING delivery (stuck mid-send, e.g.
+   * from a crash between creating the record and reaching the provider —
+   * uncapped, since it never actually attempted a send) and every FAILED
+   * delivery still under MAX_RETRIES. Runs sequentially, not in parallel,
+   * to stay well under the SMS provider's own rate limit during a sweep
+   * that could cover a large batch at once.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async retryPendingAndFailed(): Promise<void> {
+    const [pendingSnap, failedSnap] = await Promise.all([
+      this.col().where('status', '==', SmsStatus.PENDING).get(),
+      this.col().where('status', '==', SmsStatus.FAILED).get(),
+    ]);
+    const candidates = [
+      ...pendingSnap.docs.map((d) => fromDoc<SmsDelivery>(d)),
+      ...failedSnap.docs.map((d) => fromDoc<SmsDelivery>(d)).filter((d) => d.retryCount < MAX_RETRIES),
+    ];
+    if (candidates.length === 0) return;
+
+    this.logger.log(`Hourly SMS retry sweep: retrying ${candidates.length} pending/failed delivery(ies)`);
+    for (const delivery of candidates) {
+      await this.attemptSend(delivery.id, delivery);
+    }
   }
 
   async getBySaleId(saleId: string): Promise<SmsDelivery | null> {
