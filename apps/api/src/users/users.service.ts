@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Role, UserStatus, type User } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
+import type { StaffPrincipal } from '../common/types/principal';
 import { ChangeEventsService } from '../events/change-events.service';
 import { RbacService } from '../rbac/rbac.service';
 
@@ -75,13 +76,12 @@ export class UsersService {
     return { ...doc, id: ref.id };
   }
 
-  async create(input: {
-    fullName: string;
-    email: string;
-    role: string;
-    assignedStationId?: string;
-  }): Promise<User> {
+  async create(
+    input: { fullName: string; email: string; role: string; assignedStationId?: string },
+    actor: StaffPrincipal,
+  ): Promise<User> {
     await this.assertRoleExists(input.role);
+    this.assertCanAssignRole(input.role, actor);
     this.assertStationAssignmentRule(input.role, input.assignedStationId);
     const existing = await this.findByEmail(input.email);
     if (existing) throw new BadRequestException('A user with this email already exists');
@@ -104,12 +104,16 @@ export class UsersService {
   async update(
     id: string,
     input: Partial<Pick<User, 'fullName' | 'role' | 'assignedStationId'>>,
+    actor: StaffPrincipal,
   ): Promise<User> {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
 
     const nextRole = input.role ?? user.role;
-    if (input.role) await this.assertRoleExists(input.role);
+    if (input.role) {
+      await this.assertRoleExists(input.role);
+      if (input.role !== user.role) this.assertCanAssignRole(input.role, actor);
+    }
     const nextStation = 'assignedStationId' in input ? input.assignedStationId : user.assignedStationId;
     this.assertStationAssignmentRule(nextRole, nextStation);
 
@@ -133,6 +137,19 @@ export class UsersService {
 
   async touchLastLogin(id: string): Promise<void> {
     await this.col().doc(id).update({ lastLoginAt: nowIso() });
+  }
+
+  /**
+   * The one privilege-escalation path that isn't governed by the normal
+   * permission system: assigning the super_admin role requires the actor
+   * to already *be* super_admin — checked against their actual signed-in
+   * role, never against USERS_MANAGE or any other permission, so an Admin
+   * can't reach it no matter what a custom role definition grants them.
+   */
+  private assertCanAssignRole(role: string, actor: StaffPrincipal): void {
+    if (role === Role.SUPER_ADMIN && actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a Super Admin can assign the Super Admin role');
+    }
   }
 
   /**

@@ -36,7 +36,7 @@ export class UsersController {
   @Post()
   @RequirePermissions(Permission.USERS_MANAGE)
   async create(@Body() dto: CreateUserDto, @CurrentUser() actor: StaffPrincipal) {
-    const user = await this.users.create(dto);
+    const user = await this.users.create(dto, actor);
     await this.audit.record({
       actor,
       action: 'user.create',
@@ -55,7 +55,7 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @CurrentUser() actor: StaffPrincipal,
   ) {
-    const user = await this.users.update(id, dto);
+    const user = await this.users.update(id, dto, actor);
     await this.audit.record({ actor, action: 'user.update', entityType: 'user', entityId: id, entityLabel: user.fullName });
     return user;
   }

@@ -1,5 +1,7 @@
 export enum Role {
   ADMIN = 'admin',
+  /** Identical permissions to Admin — the only role allowed to assign the super_admin role to a user (see UsersService.assertCanAssignRole). Exists solely to keep that one privilege-escalation path out of every Admin's reach. */
+  SUPER_ADMIN = 'super_admin',
   CHAIRMAN = 'chairman',
   /** Checks and approves the monthly cashback ledger RTSM releases — does not execute payouts. */
   FINANCE_APPROVER = 'finance_approver',

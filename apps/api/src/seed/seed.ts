@@ -6,13 +6,25 @@
  */
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { Role, UserStatus } from '@loyalty/shared';
+import { Permission, Role, UserStatus } from '@loyalty/shared';
 import { AppModule } from '../app.module';
 import { AttendantsService } from '../attendants/attendants.service';
+import type { StaffPrincipal } from '../common/types/principal';
 import { CustomersService } from '../customers/customers.service';
 import { PricesService } from '../prices/prices.service';
 import { StationsService } from '../stations/stations.service';
 import { UsersService } from '../users/users.service';
+
+/** This offline script has no real signed-in actor — a synthetic Admin principal satisfies UsersService.create/update's actor param (none of the seeded users are super_admin, so the role-assignment guard never fires here). */
+const SEED_ACTOR: StaffPrincipal = {
+  kind: 'staff',
+  userId: 'seed-script',
+  email: 'seed-script@greenwellsenergies.co.ke',
+  fullName: 'Seed Script',
+  role: Role.ADMIN,
+  permissions: Object.values(Permission),
+  status: UserStatus.ACTIVE,
+};
 
 async function seed() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -37,47 +49,65 @@ async function seed() {
   }
 
   console.log('Seeding staff users (Microsoft login roles)...');
-  const admin = await usersSvc.create({
-    fullName: 'Amina Wanjiru',
-    email: 'a.wanjiru@greenwellsenergies.co.ke',
-    role: Role.ADMIN,
-  });
+  const admin = await usersSvc.create(
+    {
+      fullName: 'Amina Wanjiru',
+      email: 'a.wanjiru@greenwellsenergies.co.ke',
+      role: Role.ADMIN,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(admin.id, UserStatus.ACTIVE);
 
-  const chairman = await usersSvc.create({
-    fullName: 'James Otieno',
-    email: 'j.otieno@greenwellsenergies.co.ke',
-    role: Role.CHAIRMAN,
-  });
+  const chairman = await usersSvc.create(
+    {
+      fullName: 'James Otieno',
+      email: 'j.otieno@greenwellsenergies.co.ke',
+      role: Role.CHAIRMAN,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(chairman.id, UserStatus.ACTIVE);
 
-  const financeApprover = await usersSvc.create({
-    fullName: 'Grace Mwangi',
-    email: 'g.mwangi@greenwellsenergies.co.ke',
-    role: Role.FINANCE_APPROVER,
-  });
+  const financeApprover = await usersSvc.create(
+    {
+      fullName: 'Grace Mwangi',
+      email: 'g.mwangi@greenwellsenergies.co.ke',
+      role: Role.FINANCE_APPROVER,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(financeApprover.id, UserStatus.ACTIVE);
 
-  const financeDisburser = await usersSvc.create({
-    fullName: 'Peter Njoroge',
-    email: 'p.njoroge@greenwellsenergies.co.ke',
-    role: Role.FINANCE_DISBURSER,
-  });
+  const financeDisburser = await usersSvc.create(
+    {
+      fullName: 'Peter Njoroge',
+      email: 'p.njoroge@greenwellsenergies.co.ke',
+      role: Role.FINANCE_DISBURSER,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(financeDisburser.id, UserStatus.ACTIVE);
 
-  const rtsm = await usersSvc.create({
-    fullName: 'Brian Kiplagat',
-    email: 'b.kiplagat@greenwellsenergies.co.ke',
-    role: Role.RTSM,
-  });
+  const rtsm = await usersSvc.create(
+    {
+      fullName: 'Brian Kiplagat',
+      email: 'b.kiplagat@greenwellsenergies.co.ke',
+      role: Role.RTSM,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(rtsm.id, UserStatus.ACTIVE);
 
-  const supervisor = await usersSvc.create({
-    fullName: 'Susan Adhiambo',
-    email: 's.adhiambo@greenwellsenergies.co.ke',
-    role: Role.STATION_SUPERVISOR,
-    assignedStationId: stations.KIS1!,
-  });
+  const supervisor = await usersSvc.create(
+    {
+      fullName: 'Susan Adhiambo',
+      email: 's.adhiambo@greenwellsenergies.co.ke',
+      role: Role.STATION_SUPERVISOR,
+      assignedStationId: stations.KIS1!,
+    },
+    SEED_ACTOR,
+  );
   await usersSvc.setStatus(supervisor.id, UserStatus.ACTIVE);
 
   console.log('Seeding attendants (PIN login)...');

@@ -251,7 +251,7 @@ export interface RoleDefinition {
 }
 
 /**
- * Static defaults for the 9 built-in roles — every one of these still
+ * Static defaults for the 10 built-in roles — every one of these still
  * works identically even if `roleDefinitions` in Firestore is completely
  * empty (no migration/backfill needed to ship dynamic roles). This is
  * also the single source of a role's display name now, replacing what
@@ -263,6 +263,16 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
     key: Role.ADMIN,
     displayName: 'Admin',
     description: 'Full operational access, including creating roles and assigning permissions.',
+    permissions: ADMIN_PERMISSIONS,
+    isSystem: true,
+  },
+  [Role.SUPER_ADMIN]: {
+    key: Role.SUPER_ADMIN,
+    displayName: 'Super Admin',
+    // Same permission set as Admin by design — the distinction isn't a
+    // permission at all, it's UsersService only letting a Super Admin
+    // assign the super_admin role to a user (an Admin cannot).
+    description: 'Full operational access, identical to Admin — the only role that can promote another user to Super Admin.',
     permissions: ADMIN_PERMISSIONS,
     isSystem: true,
   },

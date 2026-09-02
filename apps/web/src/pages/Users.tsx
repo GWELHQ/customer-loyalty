@@ -1,6 +1,7 @@
 import type { RoleDefinition, Station, User } from '@loyalty/shared';
 import { Role, UserStatus } from '@loyalty/shared';
 import { useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useUsersCache } from '../data/entityCaches';
 import { usePagedRows } from '../data/usePagedRows';
@@ -39,12 +40,22 @@ function userColumns(stations: Station[], roleLabel: Map<string, string>): Expor
 
 export function Users() {
   const api = useApi();
+  const { user: currentUser } = useAuth();
   const { items: users, refresh: reload } = useUsersCache();
   const { stations } = useStations();
   const { roles } = useRoles();
   const roleLabel = useMemo(() => new Map(roles.map((r) => [r.key, r.displayName])), [roles]);
-  // Attendants have no web account — never assignable to a User via this form.
-  const assignableRoles = useMemo(() => roles.filter((r) => r.key !== Role.ATTENDANT), [roles]);
+  // Attendants have no web account — never assignable to a User via this
+  // form. Super Admin is likewise hidden from anyone who isn't already a
+  // Super Admin — the server rejects the assignment either way, this just
+  // keeps the dropdown from offering a choice that would 403.
+  const assignableRoles = useMemo(
+    () =>
+      roles.filter(
+        (r) => r.key !== Role.ATTENDANT && (r.key !== Role.SUPER_ADMIN || currentUser?.role === Role.SUPER_ADMIN),
+      ),
+    [roles, currentUser],
+  );
   const [roleFilter, setRoleFilter] = useState('');
   const [stationFilter, setStationFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -84,7 +95,7 @@ export function Users() {
   return (
     <AppShell
       title="Users"
-      subtitle="Admin, Chairman, Finance Approver, Finance Disburser, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)"
+      subtitle="Admin, Super Admin, Chairman, Finance Approver, Finance Disburser, RTSM, Station Supervisor and Exec Viewer accounts (Microsoft login)"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (
@@ -238,11 +249,16 @@ function EditUserModal({
   onSaved: () => void;
 }) {
   const api = useApi();
+  const { user: currentUser } = useAuth();
   const [fullName, setFullName] = useState(user.fullName);
   const [role, setRole] = useState(user.role);
   const [assignedStationId, setAssignedStationId] = useState(user.assignedStationId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Neither assignable-to nor demotable-from Super Admin by anyone but a
+  // Super Admin — lock the field entirely rather than offering a dropdown
+  // whose options don't include the user's actual current role.
+  const roleLocked = user.role === Role.SUPER_ADMIN && currentUser?.role !== Role.SUPER_ADMIN;
 
   async function submit() {
     setError(null);
@@ -282,13 +298,19 @@ function EditUserModal({
       </Field>
       <div style={{ marginTop: 12 }}>
         <Field label="Role" required>
-          <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
-            {assignableRoles.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.displayName}
-              </option>
-            ))}
-          </select>
+          {roleLocked ? (
+            <div style={{ ...inputStyle, color: 'var(--color-text-secondary)' }}>
+              Super Admin — only a Super Admin can change this
+            </div>
+          ) : (
+            <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+              {assignableRoles.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.displayName}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
       </div>
       {role === Role.STATION_SUPERVISOR && (

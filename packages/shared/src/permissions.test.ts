@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Role } from './enums.js';
-import { Permission, roleHasPermission } from './permissions.js';
+import { getPermissionsForRole, Permission, roleHasPermission } from './permissions.js';
 
 describe('RBAC permission matrix', () => {
   it('Admin cannot approve special rates', () => {
@@ -69,6 +69,10 @@ describe('RBAC permission matrix', () => {
     expect(roleHasPermission(Role.ATTENDANT, Permission.SALES_VIEW_OWN)).toBe(true);
     expect(roleHasPermission(Role.ATTENDANT, Permission.SALES_VIEW_ALL)).toBe(false);
     expect(roleHasPermission(Role.ATTENDANT, Permission.SALES_VIEW_OWN_STATION)).toBe(false);
+  });
+
+  it('Super Admin has exactly the same permissions as Admin', () => {
+    expect(getPermissionsForRole(Role.SUPER_ADMIN).sort()).toEqual(getPermissionsForRole(Role.ADMIN).sort());
   });
 
   it('every role is present in the permission matrix', () => {
