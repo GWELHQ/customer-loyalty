@@ -149,6 +149,10 @@ const FINANCE_DISBURSER_PERMISSIONS: Permission[] = [
   Permission.DISBURSEMENTS_MANAGE,
   Permission.NOTIFICATIONS_VIEW_OWN,
   Permission.AUDIT_VIEW,
+  // Every role lands on /dashboard after sign-in (landingPathForRole) —
+  // this is what makes that route resolvable for Finance Disburser rather
+  // than an immediate redirect loop against RequireStaff.
+  Permission.REPORTS_VIEW_ALL,
 ];
 
 const RTSM_PERMISSIONS: Permission[] = [
@@ -191,6 +195,10 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   // supervisor's own station, but still list every station).
   Permission.STATIONS_VIEW,
   Permission.PRICES_VIEW,
+  // Scoped to their own station server-side (assertStationAccessible in
+  // prices.controller.ts) — a supervisor can publish a PMS/AGO price only
+  // for the station they're assigned to, never system-wide like Admin/RTSM.
+  Permission.PRICES_MANAGE,
   // Scoped to their own station server-side (see resolveStationScope /
   // assertStationAccessible in attendants.controller.ts) — a supervisor
   // can list/create/edit/delete attendants only at the station they're

@@ -17,9 +17,18 @@ export function Prices() {
   const { user, hasPermission } = useAuth();
   const { stations } = useStations();
   const canManage = hasPermission(Permission.PRICES_MANAGE);
+  // The monthly reminder settings are org-wide, not per-station — keep them
+  // out of reach for any station-scoped role (currently just Station
+  // Supervisor) even though it shares the PRICES_MANAGE permission.
+  const canManageReminders = canManage && !user?.assignedStationId;
   const canManageDisbursementSettings = hasPermission(Permission.DISBURSEMENT_SETTINGS_MANAGE);
   const canManageInactivitySettings = hasPermission(Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE);
   const [stationId, setStationId] = useState(user?.assignedStationId ?? '');
+  // A Station Supervisor holds PRICES_MANAGE too, but the server only lets
+  // them publish for their own station (assertStationAccessible in
+  // prices.controller.ts) — only show the publish form once they've
+  // selected that station, rather than a form that 403s for any other pick.
+  const canManageSelectedStation = canManage && (!user?.assignedStationId || stationId === user.assignedStationId);
   const [current, setCurrent] = useState<Record<Product, ProductPrice | null> | null>(null);
   const [allStationsCurrent, setAllStationsCurrent] = useState<AllStationsCurrent | null>(null);
   const [reminders, setReminders] = useState<PriceReminderSetting | null>(null);
@@ -141,99 +150,109 @@ export function Prices() {
           })}
         </div>
 
-        {canManage && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
-            <Card>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
-                Set next price — {stations.find((s) => s.id === stationId)?.name ?? 'select a station above'}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                Applies only to the station selected above. A new price never replaces the old one — sales keep the price that was live when they happened.
-              </div>
-              {error && (
-                <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>
-                  {error}
-                </div>
-              )}
-              <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Field label="Product" required>
-                  <select style={inputStyle} value={product} onChange={(e) => setProduct(e.target.value as Product)}>
-                    {Object.values(Product).map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Effective from" required>
-                  <input type="date" style={inputStyle} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
-                </Field>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <Field label="Price per litre (KSh)" required>
-                    <input type="number" step="0.01" style={inputStyle} value={pricePerLitre} onChange={(e) => setPricePerLitre(e.target.value)} placeholder="226.40" />
-                  </Field>
-                </div>
-              </div>
-              <Button variant="primary" onClick={publish} disabled={busy || !pricePerLitre || !effectiveFrom} style={{ marginTop: 16 }}>
-                {busy ? 'Publishing…' : 'Publish price'}
-              </Button>
-            </Card>
+        {canManage && !canManageSelectedStation && (
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            Select {stations.find((s) => s.id === user?.assignedStationId)?.name ?? 'your own station'} above to publish a price — you can only set prices for your own station.
+          </div>
+        )}
 
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Monthly price reminder</div>
-                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-                    An email goes out before the monthly change so prices are never missed.
+        {(canManageSelectedStation || canManageReminders) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
+            {canManageSelectedStation && (
+              <Card>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
+                  Set next price — {stations.find((s) => s.id === stationId)?.name ?? 'select a station above'}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                  Applies only to the station selected above. A new price never replaces the old one — sales keep the price that was live when they happened.
+                </div>
+                {error && (
+                  <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>
+                    {error}
+                  </div>
+                )}
+                <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="Product" required>
+                    <select style={inputStyle} value={product} onChange={(e) => setProduct(e.target.value as Product)}>
+                      {Object.values(Product).map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Effective from" required>
+                    <input type="date" style={inputStyle} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+                  </Field>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <Field label="Price per litre (KSh)" required>
+                      <input type="number" step="0.01" style={inputStyle} value={pricePerLitre} onChange={(e) => setPricePerLitre(e.target.value)} placeholder="226.40" />
+                    </Field>
                   </div>
                 </div>
-                {reminders && !editingReminders && (
-                  <Button variant="secondary" size="sm" onClick={() => setEditingReminders(true)}>
-                    Edit
-                  </Button>
-                )}
-              </div>
-              {reminders && !editingReminders && (
-                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
-                  <Row label="Reminder">
-                    <Badge tone={reminders.enabled ? 'success' : 'neutral'}>{reminders.enabled ? 'On' : 'Off'}</Badge>
-                  </Row>
-                  <Row label="Sends on">
-                    <strong>
-                      {reminders.dayOfMonth}
-                      {ordinal(reminders.dayOfMonth)} of each month, {String(reminders.hourOfDay).padStart(2, '0')}:00
-                    </strong>
-                  </Row>
-                  <Row label="Timezone">
-                    <strong>{reminders.timezone}</strong>
-                  </Row>
-                  <Row label="Next reminder">
-                    <strong>{formatNairobiDateTime(reminders.nextReminderAt)}</strong>
-                  </Row>
+                <Button variant="primary" onClick={publish} disabled={busy || !pricePerLitre || !effectiveFrom} style={{ marginTop: 16 }}>
+                  {busy ? 'Publishing…' : 'Publish price'}
+                </Button>
+              </Card>
+            )}
+
+            {canManageReminders && (
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 6 }}>Recipients</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {reminders.recipientEmails.length === 0 && <span style={{ color: 'var(--color-text-muted)' }}>None configured</span>}
-                      {reminders.recipientEmails.map((e) => (
-                        <span key={e} style={{ fontSize: 12, background: 'var(--color-surface-sunken)', border: '1px solid var(--color-border)', borderRadius: 999, padding: '4px 10px' }}>
-                          {e}
-                        </span>
-                      ))}
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Monthly price reminder</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                      An email goes out before the monthly change so prices are never missed.
                     </div>
                   </div>
+                  {reminders && !editingReminders && (
+                    <Button variant="secondary" size="sm" onClick={() => setEditingReminders(true)}>
+                      Edit
+                    </Button>
+                  )}
                 </div>
-              )}
-              {reminders && editingReminders && (
-                <ReminderSettingsForm
-                  settings={reminders}
-                  onCancel={() => setEditingReminders(false)}
-                  onSaved={() => {
-                    setEditingReminders(false);
-                    reload();
-                  }}
-                />
-              )}
-            </Card>
+                {reminders && !editingReminders && (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+                    <Row label="Reminder">
+                      <Badge tone={reminders.enabled ? 'success' : 'neutral'}>{reminders.enabled ? 'On' : 'Off'}</Badge>
+                    </Row>
+                    <Row label="Sends on">
+                      <strong>
+                        {reminders.dayOfMonth}
+                        {ordinal(reminders.dayOfMonth)} of each month, {String(reminders.hourOfDay).padStart(2, '0')}:00
+                      </strong>
+                    </Row>
+                    <Row label="Timezone">
+                      <strong>{reminders.timezone}</strong>
+                    </Row>
+                    <Row label="Next reminder">
+                      <strong>{formatNairobiDateTime(reminders.nextReminderAt)}</strong>
+                    </Row>
+                    <div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: 6 }}>Recipients</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {reminders.recipientEmails.length === 0 && <span style={{ color: 'var(--color-text-muted)' }}>None configured</span>}
+                        {reminders.recipientEmails.map((e) => (
+                          <span key={e} style={{ fontSize: 12, background: 'var(--color-surface-sunken)', border: '1px solid var(--color-border)', borderRadius: 999, padding: '4px 10px' }}>
+                            {e}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {reminders && editingReminders && (
+                  <ReminderSettingsForm
+                    settings={reminders}
+                    onCancel={() => setEditingReminders(false)}
+                    onSaved={() => {
+                      setEditingReminders(false);
+                      reload();
+                    }}
+                  />
+                )}
+              </Card>
+            )}
           </div>
         )}
 

@@ -74,19 +74,9 @@ async function refreshStoredSession(api: LoyaltyApiClient): Promise<StoredSessio
   }
 }
 
-export function landingPathForRole(role: string): string {
-  switch (role) {
-    case Role.CHAIRMAN:
-      return '/special-rates';
-    case Role.FINANCE_APPROVER:
-      return '/cashback-ledgers';
-    case Role.FINANCE_DISBURSER:
-      return '/disbursements';
-    case Role.STATION_SUPERVISOR:
-      return '/reconciliation';
-    default:
-      return '/dashboard';
-  }
+/** Every active staff role lands on the dashboard after sign-in — see REPORTS_VIEW_ALL/REPORTS_VIEW_OWN_STATION on each role's permission set for why this never dead-ends into a redirect loop against RequireStaff. */
+export function landingPathForRole(_role: string): string {
+  return '/dashboard';
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {

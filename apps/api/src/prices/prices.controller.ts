@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission, Product, Role, UserStatus } from '@loyalty/shared';
+import { assertStationAccessible } from '../common/access/station-scope';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -48,6 +49,10 @@ export class PricesController {
   @Post('prices')
   @RequirePermissions(Permission.PRICES_MANAGE)
   async create(@Body() dto: CreatePriceDto, @CurrentUser() actor: StaffPrincipal) {
+    // A Station Supervisor holds PRICES_MANAGE too, but only for their own
+    // station — Admin/RTSM are unrestricted (assertStationAccessible is a
+    // no-op for every other role).
+    assertStationAccessible(actor, dto.stationId);
     const price = await this.prices.create(dto, actor);
     await this.audit.record({
       actor,

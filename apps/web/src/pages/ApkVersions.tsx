@@ -69,7 +69,7 @@ export function ApkVersions() {
   }
 
   return (
-    <AppShell title="Android app" subtitle="Manage app builds and choose which one the /apk page serves">
+    <AppShell title="Mobile App" subtitle="Manage app builds and choose which one the /apk page serves">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
         {error && (
           <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
