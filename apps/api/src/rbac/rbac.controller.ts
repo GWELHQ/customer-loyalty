@@ -14,7 +14,8 @@ import { RbacService } from './rbac.service';
  * Reads (roles/permissions catalogue) are reachable by any authenticated
  * staff member — every page in the app needs role display names, and the
  * permission picker needs the full catalogue. Only create/update/delete
- * require RBAC_MANAGE, granted by default only to Admin.
+ * require RBAC_MANAGE, granted by default only to Super Admin — Admin can
+ * assign roles to users (USERS_MANAGE) but not edit what a role grants.
  */
 @ApiTags('rbac')
 @ApiBearerAuth()

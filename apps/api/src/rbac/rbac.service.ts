@@ -162,11 +162,13 @@ export class RbacService {
     const nextPermissions = dto.permissions ?? current.permissions;
     this.validatePermissions(nextPermissions);
 
-    // Admin and Super Admin must always retain RBAC_MANAGE — otherwise
-    // every holder of that role (including whoever's making this edit)
-    // could get locked out of role management with no way back in short
-    // of a manual Firestore edit.
-    if ((key === Role.ADMIN || key === Role.SUPER_ADMIN) && !nextPermissions.includes(Permission.RBAC_MANAGE)) {
+    // Super Admin must always retain RBAC_MANAGE — otherwise every
+    // Super Admin (including whoever's making this edit) could get locked
+    // out of role management with no way back in short of a manual
+    // Firestore edit. Admin deliberately does NOT hold RBAC_MANAGE at all
+    // (only assigns roles to users, never edits what a role grants), so
+    // it isn't included in this guard.
+    if (key === Role.SUPER_ADMIN && !nextPermissions.includes(Permission.RBAC_MANAGE)) {
       throw new BadRequestException(
         `The ${key} role must always retain rbac:manage — this would lock out all role management.`,
       );

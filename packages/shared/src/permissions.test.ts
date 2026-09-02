@@ -71,8 +71,12 @@ describe('RBAC permission matrix', () => {
     expect(roleHasPermission(Role.ATTENDANT, Permission.SALES_VIEW_OWN_STATION)).toBe(false);
   });
 
-  it('Super Admin has exactly the same permissions as Admin', () => {
-    expect(getPermissionsForRole(Role.SUPER_ADMIN).sort()).toEqual(getPermissionsForRole(Role.ADMIN).sort());
+  it('Super Admin has every Admin permission plus rbac:manage, which Admin does not have', () => {
+    expect(roleHasPermission(Role.ADMIN, Permission.RBAC_MANAGE)).toBe(false);
+    expect(roleHasPermission(Role.SUPER_ADMIN, Permission.RBAC_MANAGE)).toBe(true);
+    const adminOnly = getPermissionsForRole(Role.ADMIN).filter((p) => p !== Permission.RBAC_MANAGE);
+    const superAdminOnly = getPermissionsForRole(Role.SUPER_ADMIN).filter((p) => p !== Permission.RBAC_MANAGE);
+    expect(superAdminOnly.sort()).toEqual(adminOnly.sort());
   });
 
   it('every role is present in the permission matrix', () => {

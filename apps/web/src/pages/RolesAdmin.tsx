@@ -58,7 +58,7 @@ export function RolesAdmin() {
   }
 
   return (
-    <AppShell title="Roles" subtitle="Create roles and assign permissions to them — Admin only">
+    <AppShell title="Roles" subtitle="Create roles and assign permissions to them — Super Admin only">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {canManage && (

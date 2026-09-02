@@ -86,11 +86,20 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   Permission.SALES_APPROVE_ALL,
-  Permission.RBAC_MANAGE,
   Permission.SHIFTS_VIEW_ALL,
   Permission.APK_MANAGE,
-  // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
+  // Admin explicitly does NOT get SPECIAL_RATES_APPROVE, and (as of this
+  // permission set) not RBAC_MANAGE either — creating/editing/deleting
+  // role definitions is Super Admin only now. Admin still assigns roles
+  // to users via USERS_MANAGE, just can't change what a role grants.
 ];
+
+// Everything Admin has, plus RBAC_MANAGE — the one thing that
+// distinguishes Super Admin's permission set from Admin's. (The other
+// distinguishing behavior, "only a Super Admin can assign the super_admin
+// role," is enforced separately in UsersService against the actor's
+// actual signed-in role, not a permission at all.)
+const SUPER_ADMIN_PERMISSIONS: Permission[] = [...ADMIN_PERMISSIONS, Permission.RBAC_MANAGE];
 
 const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.CUSTOMERS_VIEW,
@@ -281,11 +290,8 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
   [Role.SUPER_ADMIN]: {
     key: Role.SUPER_ADMIN,
     displayName: 'Super Admin',
-    // Same permission set as Admin by design — the distinction isn't a
-    // permission at all, it's UsersService only letting a Super Admin
-    // assign the super_admin role to a user (an Admin cannot).
-    description: 'Full operational access, identical to Admin — the only role that can promote another user to Super Admin.',
-    permissions: ADMIN_PERMISSIONS,
+    description: 'Everything Admin can do, plus creating/editing/deleting role definitions and promoting another user to Super Admin.',
+    permissions: SUPER_ADMIN_PERMISSIONS,
     isSystem: true,
   },
   [Role.CHAIRMAN]: {
