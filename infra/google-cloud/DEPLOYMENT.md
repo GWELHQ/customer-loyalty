@@ -176,6 +176,30 @@ gcloud scheduler jobs create http customer-inactivity-check \
 
 Daily pass over customers: those with `lastActivityAt` older than `noticeAfterDays` (and no notice already sent) get an SMS notice; those already notified more than `resetAfterAdditionalDays` days ago have `totalCashbackEarned` zeroed. Both periods are Admin/RTSM-configurable from the Prices page settings, or via `PATCH /customer-inactivity-settings`. A fresh sale (`CustomersService.incrementCashback`) clears any pending notice, so a customer who returns before the reset window is never zeroed out.
 
+## Cloud Scheduler: monthly ledger release reminders
+
+Not yet created — set these up manually (two separate jobs hitting the same endpoint, one per reminder day):
+
+```bash
+gcloud scheduler jobs create http ledger-release-reminder-day1 \
+  --location=<REGION> \
+  --schedule="0 9 1 * *" \
+  --time-zone="Africa/Nairobi" \
+  --uri="https://<api-domain>/api/v1/jobs/ledger-release-reminders" \
+  --http-method=POST \
+  --headers="x-scheduler-secret=<value-of-scheduler-shared-secret>"
+
+gcloud scheduler jobs create http ledger-release-reminder-day2 \
+  --location=<REGION> \
+  --schedule="0 9 2 * *" \
+  --time-zone="Africa/Nairobi" \
+  --uri="https://<api-domain>/api/v1/jobs/ledger-release-reminders" \
+  --http-method=POST \
+  --headers="x-scheduler-secret=<value-of-scheduler-shared-secret>"
+```
+
+Chases release of the prior month's cashback ledger (the one that just ended). On both days, every active station not yet released gets its Station Supervisor(s) emailed/in-app-notified about just their own station; RTSM is emailed/notified to release the whole month for approval, unless it's already been submitted. Every Admin is CC'd on both kinds of email (never notified directly — Admin can release any day, so isn't the one being chased). The day-2 run additionally warns that the release button disables itself after that day (`assertWithinReleaseWindow` in `cashback-ledgers.service.ts` — Admin is exempt, everyone else can only release on the 1st/2nd). The endpoint no-ops outside the 1st/2nd (defensive against a manual trigger or scheduler misfire) and once the ledger is no longer `open_accruing`/`ready_for_review`.
+
 ## CI/CD
 
 `.github/workflows/backend-deploy.yml` and `.github/workflows/frontend-deploy.yml` redeploy on every push to `main` that touches the relevant paths (or via manual `workflow_dispatch`). Both authenticate to GCP keylessly via Workload Identity Federation — no service account key lives in GitHub. One-time setup already done for `loyalty-points-413d5`:

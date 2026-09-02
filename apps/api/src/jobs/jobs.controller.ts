@@ -1,11 +1,12 @@
 import { Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { NotificationType, Product, Role } from '@loyalty/shared';
+import { LedgerStatus, NotificationType, Product, Role, UserStatus } from '@loyalty/shared';
+import { CashbackLedgersService } from '../cashback-ledgers/cashback-ledgers.service';
 import { Public } from '../common/decorators/public.decorator';
 import { EmailService } from '../common/email/email.service';
 import { formatEmailCurrency, formatEmailDate } from '../common/email/render-email';
 import { SchedulerSecretGuard } from '../common/guards/scheduler-secret.guard';
-import { nairobiToday } from '../common/time/nairobi';
+import { nairobiPreviousMonthKey, nairobiToday } from '../common/time/nairobi';
 import { CustomersService } from '../customers/customers.service';
 import { FraudDetectionService } from '../fraud/fraud-detection.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -39,6 +40,7 @@ export class JobsController {
     private readonly sms: SmsService,
     private readonly inactivitySettings: CustomerInactivitySettingsService,
     private readonly fraudDetection: FraudDetectionService,
+    private readonly cashbackLedgers: CashbackLedgersService,
   ) {}
 
   @Post('price-reminders')
@@ -146,5 +148,102 @@ export class JobsController {
   @HttpCode(HttpStatus.OK)
   async runFraudScan() {
     return this.fraudDetection.runScan();
+  }
+
+  /**
+   * Run at 09:00 Nairobi time on the 1st and 2nd of the month (see
+   * infra/google-cloud/DEPLOYMENT.md) — chases release of the month that
+   * just ended. Station Supervisors are reminded per-station (only for
+   * stations still unreleased), RTSM is reminded to release the whole
+   * month for approval (only while the ledger hasn't been submitted yet);
+   * Admin is CC'd on every email rather than notified directly, since
+   * Admin can release any day and isn't the one being chased. The 2nd's
+   * reminder additionally warns that the release button disables itself
+   * after today, matching assertWithinReleaseWindow on the ledger service.
+   */
+  @Post('ledger-release-reminders')
+  @HttpCode(HttpStatus.OK)
+  async runLedgerReleaseReminders() {
+    const dayOfMonth = Number(nairobiToday().slice(8, 10));
+    if (dayOfMonth !== 1 && dayOfMonth !== 2) {
+      return { sent: false, reason: 'not the 1st or 2nd of the month' };
+    }
+
+    const month = nairobiPreviousMonthKey();
+    const ledger = await this.cashbackLedgers.getOrCreate(month);
+    if (ledger.status !== LedgerStatus.OPEN_ACCRUING && ledger.status !== LedgerStatus.READY_FOR_REVIEW) {
+      return { sent: false, reason: `${month} already released (status: ${ledger.status})` };
+    }
+
+    const [allStations, allUsers] = await Promise.all([this.stations.list(), this.users.list()]);
+    const activeStations = allStations.filter((s) => s.active);
+    const releasedStationIds = new Set(ledger.stationReleases.map((r) => r.stationId));
+    const pendingStations = activeStations.filter((s) => !releasedStationIds.has(s.id));
+    const adminEmails = allUsers
+      .filter((u) => u.status === UserStatus.ACTIVE && u.role === Role.ADMIN)
+      .map((u) => u.email);
+
+    const isSecondReminder = dayOfMonth === 2;
+    const disableWarning = "If it isn't released today, the release button will be disabled until next month's cycle.";
+
+    let remindersSent = 0;
+
+    for (const station of pendingStations) {
+      const supervisors = allUsers.filter(
+        (u) => u.status === UserStatus.ACTIVE && u.role === Role.STATION_SUPERVISOR && u.assignedStationId === station.id,
+      );
+      if (supervisors.length === 0) continue;
+
+      const body = `${station.name}'s cashback ledger for ${month} is still awaiting release for disbursement.`;
+      await this.notifications.notifyMany(
+        supervisors.map((u) => u.id),
+        {
+          type: NotificationType.LEDGER_STATE_CHANGE,
+          title: `Release ${station.name}'s ${month} sales`,
+          body: isSecondReminder ? `${body} ${disableWarning}` : body,
+          linkPath: '/cashback-ledgers',
+        },
+      );
+      await this.email.send(
+        supervisors.map((u) => u.email),
+        `Green Wells: release ${station.name}'s ${month} sales for disbursement`,
+        {
+          title: `Release ${station.name} for ${month}`,
+          bodyLines: isSecondReminder ? [body, disableWarning] : [body],
+        },
+        { cc: adminEmails },
+      );
+      remindersSent += 1;
+    }
+
+    const rtsmUsers = allUsers.filter((u) => u.status === UserStatus.ACTIVE && u.role === Role.RTSM);
+    if (rtsmUsers.length > 0) {
+      const pendingNote =
+        pendingStations.length > 0
+          ? `${pendingStations.length} station(s) still need releasing: ${pendingStations.map((s) => s.name).join(', ')}.`
+          : 'Every station has already released — you just need to submit the month for approval.';
+      const body = `${month}'s cashback ledger is still awaiting release for approval. ${pendingNote}`;
+      await this.notifications.notifyMany(
+        rtsmUsers.map((u) => u.id),
+        {
+          type: NotificationType.LEDGER_STATE_CHANGE,
+          title: `Release ${month} for approval`,
+          body: isSecondReminder ? `${body} ${disableWarning}` : body,
+          linkPath: '/cashback-ledgers',
+        },
+      );
+      await this.email.send(
+        rtsmUsers.map((u) => u.email),
+        `Green Wells: release ${month} for approval`,
+        {
+          title: `Release ${month} for approval`,
+          bodyLines: isSecondReminder ? [body, disableWarning] : [body],
+        },
+        { cc: adminEmails },
+      );
+      remindersSent += 1;
+    }
+
+    return { sent: true, remindersSent, month, dayOfMonth };
   }
 }

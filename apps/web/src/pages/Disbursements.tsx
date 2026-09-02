@@ -16,6 +16,7 @@ import { Badge, Button, Card, Field, Pagination, Table, Td, Th, Tr, inputStyle }
 
 const BATCH_COLUMNS: ExportColumn<DisbursementBatch>[] = [
   { header: 'Month', value: (b) => b.month },
+  { header: 'Station', value: (b) => b.stationName },
   { header: 'Total amount (KSh)', value: (b) => b.totalAmount },
   { header: 'Customers', value: (b) => b.entries.length },
   { header: 'Status', value: (b) => b.status },
@@ -42,7 +43,7 @@ export function Disbursements() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const filteredByStatus = batches.filter((b) => !statusFilter || b.status === statusFilter);
-  const { search, setSearch, filtered } = useTextFilter(filteredByStatus, (b) => b.month);
+  const { search, setSearch, filtered } = useTextFilter(filteredByStatus, (b) => `${b.month} ${b.stationName}`);
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
 
   async function downloadBankFile(batch: DisbursementBatch) {
@@ -52,7 +53,7 @@ export function Disbursements() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename ?? `green-wells-${batch.month}-disbursement.txt`;
+      a.download = filename ?? `green-wells-${batch.month}-${batch.stationName}-disbursement.txt`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -66,8 +67,8 @@ export function Disbursements() {
     setCreateError(null);
     setBusy(true);
     try {
-      const batch = await api.disbursementBatches.create(month);
-      setSelected(batch);
+      const batches = await api.disbursementBatches.create(month);
+      setSelected(batches[0] ?? null);
       reload();
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Could not create disbursement batch');
@@ -127,12 +128,12 @@ export function Disbursements() {
                 <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
               </Field>
               <Button variant="primary" onClick={createBatch} disabled={busy || !month} style={{ marginTop: 19 }}>
-                Create disbursement batch
+                Create disbursement batches
               </Button>
             </>
           )}
           <input
-            placeholder="Search by month…"
+            placeholder="Search by month or station…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ ...inputStyle, maxWidth: 200 }}
@@ -163,6 +164,7 @@ export function Disbursements() {
                 <thead>
                   <tr>
                     <Th>Month</Th>
+                    <Th>Station</Th>
                     <Th align="right">Total</Th>
                     <Th align="right">Customers</Th>
                     <Th>Status</Th>
@@ -172,6 +174,7 @@ export function Disbursements() {
                   {paged.map((b) => (
                     <Tr key={b.id} onClick={() => setSelected(b)}>
                       <Td>{b.month}</Td>
+                      <Td>{b.stationName}</Td>
                       <Td align="right">KSh {b.totalAmount.toLocaleString('en-KE')}</Td>
                       <Td align="right">{b.entries.length}</Td>
                       <Td>
@@ -187,7 +190,9 @@ export function Disbursements() {
 
           {selected && (
             <Card>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>Batch {selected.month}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16 }}>
+                {selected.stationName} — {selected.month}
+              </div>
               <Badge tone={STATUS_TONE[selected.status]}>{selected.status}</Badge>
               <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-text-secondary)' }}>
                 {selected.entries.length} customers · KSh {selected.totalAmount.toLocaleString('en-KE')}

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   Product,
   ReconciliationStatus,
-  SpecialRateStatus,
   type Sale,
   type SalesReportGroup,
   type SalesReportGroupBy,
@@ -20,9 +19,13 @@ import {
   nairobiMonthKey,
   nairobiShiftBucket,
   nairobiToday,
+  nairobiWeekBoundsUtc,
+  nairobiYearBoundsUtc,
 } from '../common/time/nairobi';
 import type { StaffPrincipal } from '../common/types/principal';
 import { salesReportToHtmlTable, salesReportToPdfBuffer, salesReportToXlsxBuffer } from './sales-report-export';
+
+export type DashboardPeriod = 'today' | 'week' | 'month' | 'year';
 
 const GROUP_LABEL: Record<SalesReportGroupBy, string> = {
   attendant: 'Sales Assistant',
@@ -47,13 +50,20 @@ export class ReportsService {
     private readonly email: EmailService,
   ) {}
 
-  async dashboard(stationId?: string) {
+  /**
+   * `period` scopes only the sales-derived totals (cashback/amount/count/
+   * customers) — the trend chart (fixed last-7-days), today's per-station
+   * totals, and reconciliation-needs-attention (always "today") are the
+   * same regardless of period, matching what the dashboard's KPI row vs.
+   * the rest of the page are each meant to show.
+   */
+  async dashboard(stationId?: string, period: DashboardPeriod = 'month') {
     const today = nairobiToday();
-    const monthStart = nairobiMonthBoundsUtc(nairobiMonthKey()).startUtc;
+    const periodStart = this.periodStartUtc(period, today);
 
     let salesQuery = this.firestore
       .collection('sales')
-      .where('saleDate', '>=', monthStart) as FirebaseFirestore.Query;
+      .where('saleDate', '>=', periodStart) as FirebaseFirestore.Query;
     if (stationId) salesQuery = salesQuery.where('stationId', '==', stationId);
     const salesSnap = await salesQuery.get();
     const sales = salesSnap.docs.map((d) => fromDoc<Sale>(d));
@@ -62,21 +72,20 @@ export class ReportsService {
     const totalSalesAmountMonth = round2(sales.reduce((s, x) => s + x.amountPaid, 0));
     const uniqueCustomers = new Set(sales.map((s) => s.customerId)).size;
 
-    // specialRateRequests has no stationId — this count is unavoidably
-    // company-wide, so only surface it to an unscoped (all-stations)
-    // caller. A station-scoped role (station_supervisor) doesn't hold
-    // SPECIAL_RATES_VIEW at all; returning null here (rather than a
-    // sitewide count) keeps this endpoint from being the one place that
-    // leaks it to them.
-    const pendingSpecialRateRequests = stationId
-      ? null
-      : (
-          await this.firestore
-            .collection('specialRateRequests')
-            .where('status', '==', SpecialRateStatus.PENDING)
-            .count()
-            .get()
-        ).data().count;
+    // Month-to-date sales, independent of `period`, purely for
+    // todayStationTotals()'s "today's sales by station" panel below.
+    const monthStart = nairobiMonthBoundsUtc(nairobiMonthKey()).startUtc;
+    const monthToDateSales =
+      period === 'month'
+        ? sales
+        : (
+            await (async () => {
+              let q = this.firestore.collection('sales').where('saleDate', '>=', monthStart) as FirebaseFirestore.Query;
+              if (stationId) q = q.where('stationId', '==', stationId);
+              const snap = await q.get();
+              return snap.docs.map((d) => fromDoc<Sale>(d));
+            })()
+          );
 
     let reconQuery = this.firestore.collection('reconciliationDaily').where('date', '==', today) as FirebaseFirestore.Query;
     if (stationId) reconQuery = reconQuery.where('stationId', '==', stationId);
@@ -87,19 +96,26 @@ export class ReportsService {
     }).length;
 
     const trend = await this.salesTrend(stationId);
-    const stationTotals = stationId ? null : await this.todayStationTotals(sales, today);
+    const stationTotals = stationId ? null : await this.todayStationTotals(monthToDateSales, today);
 
     return {
+      period,
       month: today.slice(0, 7),
       totalCashbackMonth,
       totalSalesAmountMonth,
       saleCount: sales.length,
       uniqueCustomers,
-      pendingSpecialRateRequests,
       reconciliationRecordsNeedingAttention: needsAttention,
       trend,
       stationTotals,
     };
+  }
+
+  private periodStartUtc(period: DashboardPeriod, today: string): string {
+    if (period === 'today') return nairobiDayBoundsUtc(today).startUtc;
+    if (period === 'week') return nairobiWeekBoundsUtc(today).startUtc;
+    if (period === 'year') return nairobiYearBoundsUtc(Number(today.slice(0, 4))).startUtc;
+    return nairobiMonthBoundsUtc(nairobiMonthKey(today)).startUtc;
   }
 
   /** Last 7 Nairobi calendar days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */

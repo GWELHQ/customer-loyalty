@@ -31,6 +31,8 @@ export enum Permission {
   LEDGERS_VIEW = 'ledgers:view',
   LEDGERS_MANAGE = 'ledgers:manage',
   LEDGERS_APPROVE = 'ledgers:approve',
+  /** Sign off that one's own station's sales are ready for the monthly disbursement release — Station Supervisor's narrower, station-scoped counterpart to LEDGERS_MANAGE's org-wide "Release for approval". */
+  LEDGERS_RELEASE_OWN_STATION = 'ledgers:release_own_station',
   DISBURSEMENTS_MANAGE = 'disbursements:manage',
   DISBURSEMENTS_VIEW = 'disbursements:view',
   REPORTS_VIEW_ALL = 'reports:view_all',
@@ -218,6 +220,11 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   // RECONCILIATION_MANAGE and the ATTENDANTS_MANAGE grant above.
   Permission.SHIFTS_VIEW_OWN_STATION,
   Permission.SHIFTS_MANAGE,
+  // Deliberately not LEDGERS_VIEW — a supervisor never sees the org-wide
+  // customer cashback ledger (it isn't broken out per station), only
+  // whether their own station has signed off for the month. See
+  // CashbackLedgersController's my-station endpoint.
+  Permission.LEDGERS_RELEASE_OWN_STATION,
 ];
 
 const ATTENDANT_PERMISSIONS: Permission[] = [

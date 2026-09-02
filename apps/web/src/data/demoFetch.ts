@@ -77,14 +77,14 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
   if (path === '/reports/sales/email' && method === 'POST') {
     return json({ success: true });
   }
-  if (path === '/reports/dashboard') {
+  if (path.startsWith('/reports/dashboard')) {
     return json({
+      period: new URL(path, 'http://demo').searchParams.get('period') ?? 'month',
       month: '2026-08',
       totalCashbackMonth: 2040,
       totalSalesAmountMonth: 512000,
       saleCount: 214,
       uniqueCustomers: 87,
-      pendingSpecialRateRequests: 1,
       reconciliationRecordsNeedingAttention: 2,
       trend: [],
       stationTotals: null,

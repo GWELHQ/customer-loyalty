@@ -262,17 +262,36 @@ export interface ShiftRoster extends BaseDoc {
   recordedByUserId: string;
 }
 
+/**
+ * One customer's cashback for the month **at one station** — keyed by
+ * (customerId, stationId), not customerId alone, so a customer who buys
+ * at more than one station in the same month gets a separate entry per
+ * station. This is what lets disbursement batches split cleanly by
+ * station: each entry's cashback is only ever attributed to the station
+ * it was actually earned at.
+ */
 export interface MonthlyCashbackLedgerEntry {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  stationId: string;
+  stationName: string;
   eligibleSalesCount: number;
   totalCashback: number;
-  /** Amount carried forward from a prior month's below-threshold disbursement exclusion. */
+  /** Amount carried forward from a prior month's below-threshold disbursement exclusion (same customer, same station). */
   carriedForwardAmount?: number;
   carriedForwardFromMonth?: string;
-  /** Running total already paid out across all of this month's disbursement batches. totalCashback - disbursedAmount = still owed. */
+  /** Running total already paid out across all of this month's disbursement batches for this customer at this station. totalCashback - disbursedAmount = still owed. */
   disbursedAmount?: number;
+}
+
+/** One station's monthly sign-off — set either by that station's own Station Supervisor, or in bulk by RTSM/Admin's "Release for approval" for whichever stations no supervisor released yet. */
+export interface MonthlyCashbackLedgerStationRelease {
+  stationId: string;
+  stationName: string;
+  releasedByUserId: string;
+  releasedByName: string;
+  releasedAt: ISODateString;
 }
 
 export interface MonthlyCashbackLedger extends BaseDoc {
@@ -280,6 +299,8 @@ export interface MonthlyCashbackLedger extends BaseDoc {
   status: LedgerStatus;
   entries: MonthlyCashbackLedgerEntry[];
   totalCashback: number;
+  /** Every active station present here has signed off for the month — RTSM/Admin's "Release for approval" fills in whichever ones are still missing before submitting. */
+  stationReleases: MonthlyCashbackLedgerStationRelease[];
   submittedByUserId?: string;
   submittedByName?: string;
   submittedAt?: ISODateString;
@@ -303,8 +324,11 @@ export interface DisbursementEntry {
   holdReason?: string;
 }
 
+/** Always scoped to exactly one station — a month with N stations owing cashback produces up to N batches, never one combined batch. */
 export interface DisbursementBatch extends BaseDoc {
   month: string;
+  stationId: string;
+  stationName: string;
   ledgerId: string;
   status: DisbursementBatchStatus;
   entries: DisbursementEntry[];

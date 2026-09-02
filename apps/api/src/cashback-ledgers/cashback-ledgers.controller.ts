@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificationType, Permission, Role, type User } from '@loyalty/shared';
+import { assertStationAccessible } from '../common/access/station-scope';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { EmailService } from '../common/email/email.service';
@@ -35,6 +36,40 @@ export class CashbackLedgersController {
   @RequirePermissions(Permission.LEDGERS_VIEW)
   findOne(@Param('month') month: string) {
     return this.ledgers.getOrCreate(month);
+  }
+
+  /** The narrow status a Station Supervisor is allowed to see — see CashbackLedgersService.getMyStationStatus. */
+  @Get(':month/my-station')
+  @RequirePermissions(Permission.LEDGERS_RELEASE_OWN_STATION)
+  myStationStatus(@Param('month') month: string, @CurrentUser() actor: StaffPrincipal) {
+    const stationId = actor.kind === 'staff' ? actor.assignedStationId : undefined;
+    if (!stationId) throw new BadRequestException('No station assigned to this account');
+    return this.ledgers.getMyStationStatus(month, stationId);
+  }
+
+  /**
+   * Station Supervisor's own-station sign-off — narrower than /submit
+   * below, and deliberately doesn't require LEDGERS_VIEW (a supervisor
+   * never sees the org-wide ledger, only whether their own station is
+   * released for the month).
+   */
+  @Post(':month/stations/:stationId/release')
+  @RequirePermissions(Permission.LEDGERS_RELEASE_OWN_STATION)
+  async releaseStation(
+    @Param('month') month: string,
+    @Param('stationId') stationId: string,
+    @CurrentUser() actor: StaffPrincipal,
+  ) {
+    assertStationAccessible(actor, stationId);
+    const ledger = await this.ledgers.releaseStation(month, stationId, actor);
+    await this.audit.record({
+      actor,
+      action: 'ledger.release_station',
+      entityType: 'monthlyCashbackLedger',
+      entityId: month,
+      metadata: { stationId },
+    });
+    return ledger;
   }
 
   /** RTSM (or Admin) releases the month's ledger for Finance Approver review. */

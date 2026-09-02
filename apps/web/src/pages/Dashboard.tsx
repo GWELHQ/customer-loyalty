@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useCustomersCache } from '../data/useCustomersCache';
-import { useDashboardSnapshot, type DashboardStationTotal, type DashboardTrendDay } from '../data/useDashboardCache';
+import type { DashboardData, DashboardPeriod, DashboardStationTotal, DashboardTrendDay } from '../data/useDashboardCache';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import { formatNairobiDateTime } from '../lib/time';
@@ -12,50 +12,64 @@ import { Badge, Button, Card, KpiTile, Table, Td, Th, Tr } from '../ui/primitive
 
 const RECENT_SALES_LIMIT = 8;
 
-type TrendDay = DashboardTrendDay;
-type StationTotal = DashboardStationTotal;
+const PERIOD_OPTIONS: { value: DashboardPeriod; label: string; kpiLabel: string }[] = [
+  { value: 'today', label: 'Today', kpiLabel: 'today' },
+  { value: 'week', label: 'This week', kpiLabel: 'this week' },
+  { value: 'month', label: 'This month', kpiLabel: 'this month' },
+  { value: 'year', label: 'This year', kpiLabel: 'this year' },
+];
+
+/** Fetches the dashboard summary for one KPI period — a fresh call per period, not the cross-page cached month-only snapshot (see useDashboardCache), since the whole point here is switching periods on the fly. */
+function useDashboardPeriodData(period: DashboardPeriod): DashboardData | null {
+  const api = useApi();
+  const [data, setData] = useState<DashboardData | null>(null);
+
+  function reload() {
+    api.reports.dashboard(undefined, period).then((res) => setData(res as DashboardData));
+  }
+  useEffect(reload, [api, period]);
+  useRealtimeRefresh(['sales', 'customers', 'reconciliationDaily'], reload);
+
+  return data;
+}
 
 export function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data } = useDashboardSnapshot();
+  const [period, setPeriod] = useState<DashboardPeriod>('month');
+  const data = useDashboardPeriodData(period);
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.value === period)!.kpiLabel;
 
   const kpis = data
     ? [
         {
-          label: 'Cashback this month',
+          label: `Cashback ${periodLabel}`,
           value: `KSh ${format(data.totalCashbackMonth)}`,
-          note: data.month,
           color: 'var(--color-primary)',
           go: '/cashback-ledgers',
         },
         {
-          label: 'Sales amount this month',
+          label: `Sales amount ${periodLabel}`,
           value: `KSh ${format(data.totalSalesAmountMonth)}`,
           note: `${data.saleCount} sales`,
           go: '/sales',
         },
         {
-          label: 'Customers active this month',
+          label: `Customers active ${periodLabel}`,
           value: data.uniqueCustomers,
           note: 'across all stations',
           go: '/customers',
         },
-        ...(data.pendingSpecialRateRequests !== null
-          ? [
-              {
-                label: 'Special rate requests',
-                value: data.pendingSpecialRateRequests,
-                note: 'awaiting Chairman decision',
-                color: data.pendingSpecialRateRequests > 0 ? 'var(--color-warning)' : undefined,
-                go: '/special-rates',
-              },
-            ]
-          : []),
+        {
+          label: `Sales ${periodLabel}`,
+          value: data.saleCount,
+          note: 'number of sales',
+          go: '/sales',
+        },
         {
           label: 'Reconciliation needs attention',
           value: data.reconciliationRecordsNeedingAttention,
-          note: 'stations/products',
+          note: 'stations/products, today',
           color: data.reconciliationRecordsNeedingAttention > 0 ? 'var(--color-danger)' : undefined,
           go: '/reconciliation',
         },
@@ -67,6 +81,38 @@ export function Dashboard() {
       {!data && <div style={{ color: 'var(--color-text-secondary)' }}>Loading…</div>}
       {data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignSelf: 'flex-start',
+              background: 'var(--color-surface-sunken)',
+              borderRadius: 999,
+              padding: 3,
+              gap: 2,
+            }}
+          >
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setPeriod(opt.value)}
+                style={{
+                  border: 'none',
+                  cursor: 'pointer',
+                  borderRadius: 999,
+                  padding: '7px 14px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-body)',
+                  background: period === opt.value ? 'var(--color-surface)' : 'transparent',
+                  color: period === opt.value ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                  boxShadow: period === opt.value ? 'var(--shadow-sm)' : 'none',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <div
             style={{
               display: 'grid',
@@ -242,8 +288,8 @@ function TrendCard({
   trend,
   stationTotals,
 }: {
-  trend: TrendDay[];
-  stationTotals: StationTotal[] | null;
+  trend: DashboardTrendDay[];
+  stationTotals: DashboardStationTotal[] | null;
 }) {
   const [animate, setAnimate] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);

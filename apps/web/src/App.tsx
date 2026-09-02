@@ -83,7 +83,14 @@ export function App() {
         }
       />
 
-      <Route path="/cashback-ledgers" element={<RequireStaff permission={Permission.LEDGERS_VIEW}><CashbackLedgers /></RequireStaff>} />
+      <Route
+        path="/cashback-ledgers"
+        element={
+          <RequireStaff anyPermission={[Permission.LEDGERS_VIEW, Permission.LEDGERS_RELEASE_OWN_STATION]}>
+            <CashbackLedgers />
+          </RequireStaff>
+        }
+      />
       <Route path="/disbursements" element={<RequireStaff permission={Permission.DISBURSEMENTS_VIEW}><Disbursements /></RequireStaff>} />
 
       <Route path="/reports" element={<RequireStaff><Reports /></RequireStaff>} />

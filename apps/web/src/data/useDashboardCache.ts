@@ -13,13 +13,15 @@ export interface DashboardStationTotal {
   value: number;
 }
 
+export type DashboardPeriod = 'today' | 'week' | 'month' | 'year';
+
 export interface DashboardData {
+  period: DashboardPeriod;
   month: string;
   totalCashbackMonth: number;
   totalSalesAmountMonth: number;
   saleCount: number;
   uniqueCustomers: number;
-  pendingSpecialRateRequests: number | null;
   reconciliationRecordsNeedingAttention: number;
   trend: DashboardTrendDay[];
   stationTotals: DashboardStationTotal[] | null;

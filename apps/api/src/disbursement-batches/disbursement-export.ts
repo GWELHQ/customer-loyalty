@@ -32,12 +32,12 @@ function padRow(cells: string[]): string {
   return row.join('\t');
 }
 
-function monthTitle(month: string): string {
+function monthTitle(month: string, stationName: string): string {
   const [year, monthNum] = month.split('-').map(Number) as [number, number];
   const monthName = new Date(Date.UTC(year, monthNum - 1, 1))
     .toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })
     .toUpperCase();
-  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER LOYALTY CASHBACK`;
+  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER LOYALTY CASHBACK - ${stationName.toUpperCase()}`;
 }
 
 function round2(n: number): number {
@@ -45,7 +45,7 @@ function round2(n: number): number {
 }
 
 export function buildDisbursementExportText(batch: DisbursementBatch): string {
-  const lines: string[] = [padRow([monthTitle(batch.month)]), padRow(HEADER), padRow([])];
+  const lines: string[] = [padRow([monthTitle(batch.month, batch.stationName)]), padRow(HEADER), padRow([])];
 
   const sortedEntries = [...batch.entries].sort((a, b) => a.customerName.localeCompare(b.customerName));
   let total = 0;

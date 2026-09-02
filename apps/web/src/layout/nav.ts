@@ -37,6 +37,7 @@ const STATION_SCOPED_NAV_ITEMS: NavItem[] = [
   { label: 'Shifts', path: '/shifts', icon: 'clock', permission: Permission.SHIFTS_VIEW_OWN_STATION },
   { label: 'Sales', path: '/sales', icon: 'sales', permission: Permission.SALES_VIEW_OWN_STATION },
   { label: 'Reports', path: '/reports', icon: 'reports', permission: Permission.REPORTS_VIEW_OWN_STATION },
+  { label: 'Cashback ledger', path: '/cashback-ledgers', icon: 'ledger', permission: Permission.LEDGERS_RELEASE_OWN_STATION },
 ];
 
 export function navItemsForRole(role: string, hasPermission: (p: Permission) => boolean): NavItem[] {

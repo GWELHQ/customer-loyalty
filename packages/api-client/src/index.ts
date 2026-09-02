@@ -272,6 +272,20 @@ export class LoyaltyApiClient {
   cashbackLedgers = {
     list: () => this.http.get<MonthlyCashbackLedger[]>('/cashback-ledgers'),
     get: (month: string) => this.http.get<MonthlyCashbackLedger>(`/cashback-ledgers/${month}`),
+    /** Station Supervisor's narrow view — whether their own station is released for the month, without the org-wide entries LEDGERS_VIEW would expose. */
+    myStationStatus: (month: string) =>
+      this.http.get<{
+        month: string;
+        status: MonthlyCashbackLedger['status'];
+        stationId: string;
+        stationName: string;
+        released: boolean;
+        releasedByName?: string;
+        releasedAt?: string;
+      }>(`/cashback-ledgers/${month}/my-station`),
+    /** Station Supervisor releases their own station — idempotent. */
+    releaseStation: (month: string, stationId: string) =>
+      this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/stations/${stationId}/release`),
     submit: (month: string) => this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/submit`),
     approve: (month: string) => this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/approve`),
     reject: (month: string, reason: string) =>
@@ -281,7 +295,8 @@ export class LoyaltyApiClient {
   disbursementBatches = {
     list: (month?: string) => this.http.get<DisbursementBatch[]>(`/disbursement-batches${toQueryString({ month })}`),
     get: (id: string) => this.http.get<DisbursementBatch>(`/disbursement-batches/${id}`),
-    create: (month: string) => this.http.post<DisbursementBatch>('/disbursement-batches', { month }),
+    /** Creates one batch per station with something new to pay out for the month. */
+    create: (month: string) => this.http.post<DisbursementBatch[]>('/disbursement-batches', { month }),
     confirm: (id: string) => this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/confirm`),
     markProcessing: (id: string) => this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/mark-processing`),
     complete: (id: string, results: { customerId: string; status: 'paid' | 'failed'; reference?: string; failureReason?: string }[]) =>
@@ -291,7 +306,8 @@ export class LoyaltyApiClient {
   };
 
   reports = {
-    dashboard: (stationId?: string) => this.http.get(`/reports/dashboard${toQueryString({ stationId })}`),
+    dashboard: (stationId?: string, period?: 'today' | 'week' | 'month' | 'year') =>
+      this.http.get(`/reports/dashboard${toQueryString({ stationId, period })}`),
     sales: (params: { stationId?: string; from?: string; to?: string; preset?: string; groupBy?: SalesReportGroupBy } = {}) =>
       this.http.get<{
         sales: Sale[];

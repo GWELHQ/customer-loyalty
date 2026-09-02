@@ -48,24 +48,28 @@ export class DisbursementBatchesController {
       entityId: id,
       entityLabel: batch.month,
     });
+    const stationSlug = batch.stationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="green-wells-${batch.month}-disbursement.txt"`);
+    res.setHeader('Content-Disposition', `attachment; filename="green-wells-${batch.month}-${stationSlug}-disbursement.txt"`);
     res.send(text);
   }
 
+  /** Creates one batch per station with something new to pay out — see DisbursementBatchesService.create. */
   @Post()
   @RequirePermissions(Permission.DISBURSEMENTS_MANAGE)
   async create(@Body() dto: CreateBatchDto, @CurrentUser() actor: StaffPrincipal) {
-    const batch = await this.batches.create(dto.month, actor);
-    await this.audit.record({
-      actor,
-      action: 'disbursement_batch.create',
-      entityType: 'disbursementBatch',
-      entityId: batch.id,
-      entityLabel: batch.month,
-      metadata: { month: dto.month, totalAmount: batch.totalAmount },
-    });
-    return batch;
+    const batches = await this.batches.create(dto.month, actor);
+    for (const batch of batches) {
+      await this.audit.record({
+        actor,
+        action: 'disbursement_batch.create',
+        entityType: 'disbursementBatch',
+        entityId: batch.id,
+        entityLabel: `${batch.month} — ${batch.stationName}`,
+        metadata: { month: dto.month, stationId: batch.stationId, totalAmount: batch.totalAmount },
+      });
+    }
+    return batches;
   }
 
   @Post(':id/confirm')

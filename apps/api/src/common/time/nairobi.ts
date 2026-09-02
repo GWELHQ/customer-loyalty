@@ -20,6 +20,13 @@ export function nairobiMonthKey(input: string | Date = new Date()): string {
   return nairobiDateKey(input).slice(0, 7);
 }
 
+/** The Nairobi calendar month (YYYY-MM) immediately before the one a UTC instant falls in — e.g. the month a release reminder sent on the 1st/2nd is chasing. */
+export function nairobiPreviousMonthKey(input: string | Date = new Date()): string {
+  const [year, month] = nairobiMonthKey(input).split('-').map(Number) as [number, number];
+  const date = new Date(Date.UTC(year, month - 2, 1)); // month is 1-based; -2 rolls back one full month
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export function nairobiToday(): string {
   return nairobiDateKey(new Date());
 }
@@ -41,6 +48,17 @@ export function nairobiMonthBoundsUtc(monthKey: string): { startUtc: string; end
   return {
     startUtc: new Date(startMs).toISOString(),
     endUtc: new Date(endMs).toISOString(),
+  };
+}
+
+/** UTC instant bounds [startUtc, endUtc) covering the Nairobi calendar week (Monday-Sunday) a date falls in. */
+export function nairobiWeekBoundsUtc(dateKey: string): { startUtc: string; endUtc: string } {
+  const d = new Date(`${dateKey}T00:00:00.000Z`);
+  const isoDayOfWeek = d.getUTCDay() === 0 ? 7 : d.getUTCDay(); // Mon=1..Sun=7
+  const mondayMs = d.getTime() - (isoDayOfWeek - 1) * 24 * 60 * 60 * 1000 - NAIROBI_OFFSET_MS;
+  return {
+    startUtc: new Date(mondayMs).toISOString(),
+    endUtc: new Date(mondayMs + 7 * 24 * 60 * 60 * 1000).toISOString(),
   };
 }
 

@@ -15,7 +15,7 @@ import {
 } from '../common/time/nairobi';
 import type { StaffPrincipal } from '../common/types/principal';
 import { EmailSalesReportDto } from './dto/email-sales-report.dto';
-import { ReportsService } from './reports.service';
+import { ReportsService, type DashboardPeriod } from './reports.service';
 
 type SalesReportPreset = 'this_month' | 'this_quarter' | 'ytd';
 
@@ -51,8 +51,12 @@ export class ReportsController {
 
   @Get('dashboard')
   @RequireAnyPermission(Permission.REPORTS_VIEW_ALL, Permission.REPORTS_VIEW_OWN_STATION)
-  dashboard(@CurrentUser() user: StaffPrincipal, @Query('stationId') stationId?: string) {
-    return this.reports.dashboard(resolveStationScope(user, stationId));
+  dashboard(
+    @CurrentUser() user: StaffPrincipal,
+    @Query('stationId') stationId?: string,
+    @Query('period') period?: DashboardPeriod,
+  ) {
+    return this.reports.dashboard(resolveStationScope(user, stationId), period);
   }
 
   @Get('sales')

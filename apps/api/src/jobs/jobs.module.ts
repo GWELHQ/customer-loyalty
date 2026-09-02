@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CashbackLedgersModule } from '../cashback-ledgers/cashback-ledgers.module';
 import { CustomersModule } from '../customers/customers.module';
 import { FraudModule } from '../fraud/fraud.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -21,6 +22,7 @@ import { JobsController } from './jobs.controller';
     SmsModule,
     SettingsModule,
     FraudModule,
+    CashbackLedgersModule,
   ],
   controllers: [JobsController],
 })
