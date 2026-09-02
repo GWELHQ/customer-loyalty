@@ -53,9 +53,18 @@ export class ShiftsService {
   }
 
   async listRosters(filters: { stationId?: string; date?: string }): Promise<ShiftRoster[]> {
-    let query = this.col().orderBy('date', 'desc') as FirebaseFirestore.Query;
+    let query = this.col() as FirebaseFirestore.Query;
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);
-    if (filters.date) query = query.where('date', '==', filters.date.slice(0, 10));
+    if (filters.date) {
+      // A specific date is already a single value — ordering by it too is
+      // redundant, and (worse) turns this into a 3-field composite index
+      // requirement (stationId ==, date ==, date orderBy) instead of a
+      // plain 2-field equality query, which needs no composite index at
+      // all. Only order by date when it *isn't* already pinned to one value.
+      query = query.where('date', '==', filters.date.slice(0, 10));
+    } else {
+      query = query.orderBy('date', 'desc');
+    }
     const snap = await query.limit(200).get();
     return snap.docs.map((d) => fromDoc<ShiftRoster>(d));
   }
