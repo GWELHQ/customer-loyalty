@@ -1,6 +1,8 @@
 import { Permission } from '@loyalty/shared';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireStaff } from './auth/RequireStaff';
+import { Apk } from './pages/Apk';
+import { ApkVersions } from './pages/ApkVersions';
 import { Attendants } from './pages/Attendants';
 import { CashbackLedgers } from './pages/CashbackLedgers';
 import { CustomerCreate } from './pages/customers/CustomerCreate';
@@ -28,6 +30,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<SignIn />} />
+      <Route path="/apk" element={<Apk />} />
       {/* MSAL popup redirect target — the library closes the popup itself once it detects the response; this route just needs to exist so it doesn't 404 mid-flow. */}
       <Route path="/auth/microsoft/callback" element={<div />} />
 
@@ -92,6 +95,7 @@ export function App() {
       <Route path="/roles" element={<RequireStaff permission={Permission.RBAC_MANAGE}><RolesAdmin /></RequireStaff>} />
       <Route path="/attendants" element={<RequireStaff permission={Permission.ATTENDANTS_MANAGE}><Attendants /></RequireStaff>} />
       <Route path="/stations" element={<RequireStaff permission={Permission.STATIONS_VIEW}><Stations /></RequireStaff>} />
+      <Route path="/apk-versions" element={<RequireStaff permission={Permission.APK_MANAGE}><ApkVersions /></RequireStaff>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

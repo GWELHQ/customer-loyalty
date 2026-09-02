@@ -417,6 +417,27 @@ export interface PaginatedResult<T> {
   nextCursor: string | null;
 }
 
+/**
+ * One uploaded build of the Android pump-attendant app, offered for
+ * download from the public, unauthenticated `/apk` page. At most one
+ * version has `isRelease: true` at a time — that's the one the public
+ * download button serves, so marking a different (e.g. older) version as
+ * the release is how a rollback works.
+ */
+export interface ApkVersion extends BaseDoc {
+  versionName: string;
+  versionCode: number;
+  features: string[];
+  fixes: string[];
+  fileName: string;
+  /** gs:// path of the uploaded .apk file. */
+  gcsPath: string;
+  fileSizeBytes: number;
+  isRelease: boolean;
+  uploadedByUserId: string;
+  uploadedByName: string;
+}
+
 export interface ImportedCollection {
   users: User[];
   stations: Station[];

@@ -25,6 +25,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },
   { label: 'Logs', path: '/logs', icon: 'audit', permission: Permission.AUDIT_VIEW },
   { label: 'Fraud & Governance', path: '/fraud', icon: 'shield', permission: Permission.FRAUD_VIEW },
+  { label: 'Android app', path: '/apk-versions', icon: 'upload', permission: Permission.APK_MANAGE },
 ];
 
 // Station Supervisor gets its own station-scoped variants of a few items —

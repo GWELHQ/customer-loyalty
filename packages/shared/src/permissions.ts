@@ -49,6 +49,8 @@ export enum Permission {
   SHIFTS_VIEW_ALL = 'shifts:view_all',
   SHIFTS_VIEW_OWN_STATION = 'shifts:view_own_station',
   SHIFTS_MANAGE = 'shifts:manage',
+  /** Upload/manage Android app builds and choose which one the public /apk page serves. */
+  APK_MANAGE = 'apk:manage',
 }
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -81,6 +83,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.SALES_APPROVE_ALL,
   Permission.RBAC_MANAGE,
   Permission.SHIFTS_VIEW_ALL,
+  Permission.APK_MANAGE,
   // Admin explicitly does NOT get SPECIAL_RATES_APPROVE.
 ];
 

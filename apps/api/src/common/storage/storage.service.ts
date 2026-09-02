@@ -6,9 +6,9 @@ import type { AppConfig } from '../../config/configuration';
 
 /**
  * Wraps Google Cloud Storage for the file categories the domain needs:
- * customer Excel imports, their generated error reports, and captured
- * vehicle-plate photos. All are kept out of Firestore entirely — only the
- * gs:// path is persisted there.
+ * customer Excel imports, their generated error reports, captured
+ * vehicle-plate photos, and uploaded Android .apk builds. All are kept out
+ * of Firestore entirely — only the gs:// path is persisted there.
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -27,7 +27,7 @@ export class StorageService implements OnModuleInit {
   }
 
   async uploadBuffer(
-    pathPrefix: 'imports' | 'import-error-reports' | 'vehicle-plate-checks',
+    pathPrefix: 'imports' | 'import-error-reports' | 'vehicle-plate-checks' | 'apk-releases',
     originalFileName: string,
     buffer: Buffer,
     contentType: string,
@@ -51,6 +51,11 @@ export class StorageService implements OnModuleInit {
       expires: Date.now() + expiresInMinutes * 60 * 1000,
     });
     return url;
+  }
+
+  async deleteObject(gcsPath: string): Promise<void> {
+    const objectPath = this.toObjectPath(gcsPath);
+    await this.bucket.file(objectPath).delete({ ignoreNotFound: true });
   }
 
   private toObjectPath(gcsPath: string): string {

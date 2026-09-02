@@ -32,6 +32,11 @@ export class HttpClient {
 
   constructor(private readonly options: ApiClientOptions) {}
 
+  /** Exposed for the rare case a caller needs to build a plain download URL rather than go through request()/getBlob() — e.g. an <a href> for a public, unauthenticated file download. */
+  get baseUrl(): string {
+    return this.options.baseUrl;
+  }
+
   private rawFetch(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,

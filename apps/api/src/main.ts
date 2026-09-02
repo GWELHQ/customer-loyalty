@@ -43,6 +43,8 @@ async function bootstrap() {
     .addTag('reports')
     .addTag('notifications')
     .addTag('audit-events')
+    .addTag('apk-versions')
+    .addTag('apk')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);

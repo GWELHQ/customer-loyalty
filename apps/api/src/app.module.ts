@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ApkVersionsModule } from './apk-versions/apk-versions.module';
 import { AttendantsModule } from './attendants/attendants.module';
 import { AuditEventsModule } from './audit-events/audit-events.module';
 import { AuthModule } from './auth/auth.module';
@@ -73,6 +74,7 @@ import { VehiclePlateChecksModule } from './vehicle-plate-checks/vehicle-plate-c
     SettingsModule,
     VehiclePlateChecksModule,
     JobsModule,
+    ApkVersionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

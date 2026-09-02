@@ -1,4 +1,5 @@
 import type {
+  ApkVersion,
   Attendant,
   AttendantLoginInput,
   AuditEvent,
@@ -353,5 +354,26 @@ export class LoyaltyApiClient {
     get: () => this.http.get<CustomerInactivitySettings>('/customer-inactivity-settings'),
     update: (input: Partial<{ noticeAfterDays: number; resetAfterAdditionalDays: number }>) =>
       this.http.patch<CustomerInactivitySettings>('/customer-inactivity-settings', input),
+  };
+
+  /** Public, unauthenticated — backs the /apk web page. */
+  apk = {
+    release: () => this.http.get<Omit<ApkVersion, 'gcsPath' | 'uploadedByUserId' | 'uploadedByName'>>('/apk/release'),
+    downloadUrl: () => `${this.http.baseUrl}/apk/download`,
+  };
+
+  apkVersions = {
+    list: () => this.http.get<ApkVersion[]>('/apk-versions'),
+    create: (input: { versionName: string; versionCode: number; features: string[]; fixes: string[]; file: File }) => {
+      const form = new FormData();
+      form.append('versionName', input.versionName);
+      form.append('versionCode', String(input.versionCode));
+      form.append('featuresJson', JSON.stringify(input.features));
+      form.append('fixesJson', JSON.stringify(input.fixes));
+      form.append('file', input.file);
+      return this.http.post<ApkVersion>('/apk-versions', form, { isFormData: true });
+    },
+    markRelease: (id: string) => this.http.patch<ApkVersion>(`/apk-versions/${id}/release`),
+    delete: (id: string) => this.http.delete<{ success: boolean }>(`/apk-versions/${id}`),
   };
 }
