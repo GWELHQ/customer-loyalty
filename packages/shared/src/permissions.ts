@@ -7,6 +7,8 @@ import { Role } from './enums.js';
  */
 export enum Permission {
   USERS_MANAGE = 'users:manage',
+  /** Read-only — see attendant names/ids (e.g. resolving names on the Shifts page) without the ability to create/edit/deactivate one. */
+  ATTENDANTS_VIEW = 'attendants:view',
   ATTENDANTS_MANAGE = 'attendants:manage',
   CUSTOMERS_VIEW = 'customers:view',
   CUSTOMERS_MANAGE = 'customers:manage',
@@ -57,6 +59,7 @@ export enum Permission {
 
 const ADMIN_PERMISSIONS: Permission[] = [
   Permission.USERS_MANAGE,
+  Permission.ATTENDANTS_VIEW,
   Permission.ATTENDANTS_MANAGE,
   Permission.CUSTOMERS_VIEW,
   Permission.CUSTOMERS_MANAGE,
@@ -108,6 +111,9 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.AUDIT_VIEW,
   Permission.FRAUD_VIEW,
   Permission.SHIFTS_VIEW_ALL,
+  // So the Shifts page can resolve attendant names instead of "Unknown
+  // attendant" for a role that can view shifts but not manage attendants.
+  Permission.ATTENDANTS_VIEW,
 ];
 
 // Everything the Chairman can see, minus the two actions the Chairman can
@@ -181,6 +187,11 @@ const RTSM_PERMISSIONS: Permission[] = [
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
   Permission.SALES_APPROVE_ALL,
   Permission.SHIFTS_VIEW_ALL,
+  Permission.ATTENDANTS_VIEW,
+  // Promoted from a live roleDefinitions override (an Admin had granted
+  // this to RTSM directly via the Roles page) into the code default —
+  // RTSM manages attendants org-wide, not just view them.
+  Permission.ATTENDANTS_MANAGE,
 ];
 
 const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
@@ -205,6 +216,7 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   // assertStationAccessible in attendants.controller.ts) — a supervisor
   // can list/create/edit/delete attendants only at the station they're
   // assigned to, never system-wide like Admin.
+  Permission.ATTENDANTS_VIEW,
   Permission.ATTENDANTS_MANAGE,
   Permission.SALES_VIEW_OWN_STATION,
   Permission.RECONCILIATION_VIEW_OWN_STATION,

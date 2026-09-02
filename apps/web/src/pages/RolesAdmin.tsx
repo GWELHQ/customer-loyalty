@@ -1,4 +1,4 @@
-import { Permission, type RoleDefinition } from '@loyalty/shared';
+import { Permission, Role, type RoleDefinition } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
@@ -12,8 +12,9 @@ import { Badge, Button, Card, Field, Modal, Pagination, Table, Td, Th, Tr, input
 
 export function RolesAdmin() {
   const api = useApi();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canManage = hasPermission(Permission.RBAC_MANAGE);
+  const isSuperAdmin = user?.role === Role.SUPER_ADMIN;
   const { roles, refresh } = useRoles();
   const { search, setSearch, filtered } = useTextFilter(roles, (r) => `${r.displayName} ${r.description}`);
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
@@ -22,6 +23,9 @@ export function RolesAdmin() {
   const [deleting, setDeleting] = useState<RoleDefinition | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [resetting, setResetting] = useState<RoleDefinition | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -35,6 +39,21 @@ export function RolesAdmin() {
       setDeleteError(err instanceof Error ? err.message : 'Could not delete this role');
     } finally {
       setDeleteBusy(false);
+    }
+  }
+
+  async function confirmReset() {
+    if (!resetting) return;
+    setResetError(null);
+    setResetBusy(true);
+    try {
+      await api.rbac.resetRole(resetting.key);
+      setResetting(null);
+      refresh();
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Could not reset this role');
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -90,6 +109,18 @@ export function RolesAdmin() {
                         <Button variant="secondary" size="sm" onClick={() => setEditing(r)}>
                           Edit
                         </Button>
+                        {r.isSystem && isSuperAdmin && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setResetError(null);
+                              setResetting(r);
+                            }}
+                          >
+                            Reset to default
+                          </Button>
+                        )}
                         {!r.isSystem && (
                           <Button
                             variant="danger"
@@ -142,6 +173,27 @@ export function RolesAdmin() {
               {deleteBusy ? 'Deleting…' : 'Delete permanently'}
             </Button>
             <Button variant="secondary" onClick={() => setDeleting(null)} disabled={deleteBusy}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {resetting && (
+        <Modal title={`Reset "${resetting.displayName}" to default?`} onClose={() => !resetBusy && setResetting(null)}>
+          <div style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+            This discards any custom permission changes made to <strong>{resetting.displayName}</strong> from this page and reverts it to the built-in default.
+          </div>
+          {resetError && (
+            <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>
+              {resetError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Button variant="danger" onClick={confirmReset} disabled={resetBusy}>
+              {resetBusy ? 'Resetting…' : 'Reset to default'}
+            </Button>
+            <Button variant="secondary" onClick={() => setResetting(null)} disabled={resetBusy}>
               Cancel
             </Button>
           </div>

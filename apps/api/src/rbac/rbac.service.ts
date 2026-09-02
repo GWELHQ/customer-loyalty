@@ -196,6 +196,24 @@ export class RbacService {
     return this.getRoleDefinition(key);
   }
 
+  /**
+   * Wipes a system role's Firestore override entirely, reverting its
+   * effective permissions to whatever `SYSTEM_ROLE_DEFINITIONS` says in
+   * code right now — Super Admin only (see RbacController), since this
+   * discards any customization an Admin made from the Roles page. A
+   * custom (non-system) role has no code default to revert to, so it's
+   * simply not eligible.
+   */
+  async resetRoleToDefault(key: string): Promise<RoleDefinition> {
+    const current = await this.getRoleDefinition(key);
+    if (!current.isSystem) {
+      throw new BadRequestException('Only a built-in system role can be reset to default — delete a custom role instead.');
+    }
+    await this.col().doc(key).delete();
+    this.changeEvents.emit(COLLECTION, key);
+    return this.getRoleDefinition(key);
+  }
+
   async deleteRole(key: string): Promise<void> {
     const current = await this.getRoleDefinition(key);
     if (current.isSystem) {

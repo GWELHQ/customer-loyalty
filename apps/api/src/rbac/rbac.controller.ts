@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Permission } from '@loyalty/shared';
+import { Permission, Role } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -63,6 +63,33 @@ export class RbacController {
     await this.audit.record({
       actor,
       action: 'role.update',
+      entityType: 'roleDefinition',
+      entityId: role.key,
+      entityLabel: role.displayName,
+      metadata: { permissions: role.permissions },
+    });
+    return role;
+  }
+
+  /**
+   * Discards a system role's Firestore customization, reverting it to the
+   * code default — restricted to Super Admin specifically (checked
+   * against the actor's actual signed-in role, same as the super_admin
+   * assignment guard in UsersService), not just anyone holding
+   * RBAC_MANAGE. An Admin editing a role's permissions is routine; an
+   * Admin discarding another Admin's prior customization is the kind of
+   * action this app reserves for the one role above Admin.
+   */
+  @Post('roles/:key/reset')
+  @RequirePermissions(Permission.RBAC_MANAGE)
+  async resetRole(@Param('key') key: string, @CurrentUser() actor: StaffPrincipal) {
+    if (actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a Super Admin can reset a role to its default permissions');
+    }
+    const role = await this.rbac.resetRoleToDefault(key);
+    await this.audit.record({
+      actor,
+      action: 'role.reset_to_default',
       entityType: 'roleDefinition',
       entityId: role.key,
       entityLabel: role.displayName,

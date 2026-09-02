@@ -109,6 +109,8 @@ export class LoyaltyApiClient {
     updateRole: (key: string, input: Partial<{ displayName: string; description: string; permissions: Permission[] }>) =>
       this.http.patch<RoleDefinition>(`/rbac/roles/${key}`, input),
     deleteRole: (key: string) => this.http.delete<{ success: boolean }>(`/rbac/roles/${key}`),
+    /** Discards a system role's Firestore customization, reverting to the code default — Super Admin only. */
+    resetRole: (key: string) => this.http.post<RoleDefinition>(`/rbac/roles/${key}/reset`),
   };
 
   attendants = {

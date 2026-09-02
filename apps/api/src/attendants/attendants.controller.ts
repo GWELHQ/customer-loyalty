@@ -34,11 +34,13 @@ export class AttendantsController {
   ) {}
 
   @Get()
+  @RequirePermissions(Permission.ATTENDANTS_VIEW)
   list(@Query('stationId') stationId: string | undefined, @CurrentUser() actor: StaffPrincipal) {
     return this.attendants.list(resolveStationScope(actor, stationId));
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.ATTENDANTS_VIEW)
   async findOne(@Param('id') id: string, @CurrentUser() actor: StaffPrincipal) {
     const attendant = await this.attendants.findById(id);
     if (attendant) assertStationAccessible(actor, attendant.assignedStationId);
