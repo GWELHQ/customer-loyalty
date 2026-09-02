@@ -415,7 +415,7 @@ function AttendantForm({
           <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </Field>
         <Field label="Employee ID" required>
-          <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="KIS1-003" />
+          <input style={inputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="099" />
         </Field>
         <Field label="Assigned station (exactly one)" required>
           {lockedStationId ? (
