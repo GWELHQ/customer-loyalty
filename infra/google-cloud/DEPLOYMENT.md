@@ -94,10 +94,13 @@ gcloud run deploy loyalty-api \
   --service-account loyalty-api-run@<PROJECT_ID>.iam.gserviceaccount.com \
   --set-env-vars GCP_PROJECT_ID=<PROJECT_ID>,FIRESTORE_DATABASE_ID='(default)',GCS_BUCKET_NAME=<PROJECT_ID>-loyalty-files,CORS_ORIGIN=https://<your-web-app-domain>,MS_ENTRA_TENANT_ID=<tenant-id>,MS_ENTRA_CLIENT_ID=<client-id>,MS_ENTRA_REDIRECT_URI=https://<your-web-app-domain>/auth/microsoft/callback,JWT_ACCESS_TTL=15m,JWT_REFRESH_TTL=7d,ATTENDANT_JWT_TTL=12h,SMS_PROVIDER=mock \
   --set-secrets JWT_ACCESS_SECRET=jwt-access-secret:latest,JWT_REFRESH_SECRET=jwt-refresh-secret:latest,SCHEDULER_SHARED_SECRET=scheduler-shared-secret:latest,MS_ENTRA_CLIENT_SECRET=ms-entra-client-secret:latest \
+  --memory=1Gi \
   --allow-unauthenticated
 ```
 
 `GOOGLE_APPLICATION_CREDENTIALS` is intentionally **not** set here — on Cloud Run the Admin SDK picks up the attached service account automatically (Application Default Credentials). Only set it locally, pointing at a downloaded key file for a dev/scratch project.
+
+`--memory=1Gi` (Cloud Run's platform default is 512Mi if never set) exists specifically for `POST /apk-versions` — `FileInterceptor` buffers the whole uploaded .apk in memory before it's streamed to GCS, and 512Mi isn't enough headroom for a typical multi-ten-megabyte APK on top of the Node/Nest baseline. Symptom when this regresses: the browser reports a CORS error on the upload, but Cloud Run's own `run.googleapis.com/varlog/system` log shows the real cause — "Truncated response body... the application exited before the response was finished" (an OOM kill mid-request, which cuts the connection before any response, CORS headers included, ever gets sent). `backend-deploy.yml`'s `gcloud run deploy` now passes this explicitly on every push so it can't silently drop back to the default.
 
 ## Deploying the web app
 

@@ -59,4 +59,5 @@ jobs:
             --image="${{ env.IMAGE }}" \
             --service-account="${{ env.RUNTIME_SA }}" \
             --allow-unauthenticated \
+            --memory=1Gi \
             --quiet
