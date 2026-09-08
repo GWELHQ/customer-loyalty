@@ -3,10 +3,8 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, MinLength, Min } from 'class-validator';
 
 /**
- * Submitted as multipart/form-data alongside the .apk file — `featuresJson`
- * and `fixesJson` are JSON-stringified string arrays (FormData has no
- * native array field type); the controller parses them back into arrays
- * after DTO validation.
+ * Submitted after the APK has been uploaded directly to GCS using a signed
+ * URL. The API validates the GCS object before recording the release.
  */
 export class CreateApkVersionDto {
   @ApiProperty({ example: '1.4.0' })
@@ -29,4 +27,21 @@ export class CreateApkVersionDto {
   @IsOptional()
   @IsString()
   fixesJson?: string;
+
+  @ApiProperty({ description: 'The gs:// path returned by the upload-url endpoint.' })
+  @IsString()
+  @MinLength(1)
+  gcsPath!: string;
+}
+
+export class CreateApkUploadUrlDto {
+  @ApiProperty({ example: 'green-wells-1.4.0.apk' })
+  @IsString()
+  @MinLength(1)
+  fileName!: string;
+
+  @ApiProperty({ example: 'application/vnd.android.package-archive' })
+  @IsString()
+  @MinLength(1)
+  contentType!: string;
 }

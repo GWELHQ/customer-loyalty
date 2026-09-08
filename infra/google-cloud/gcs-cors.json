@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://customer-loyalty-3af1a.web.app",
+      "http://localhost:5173"
+    ],
+    "method": ["PUT"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

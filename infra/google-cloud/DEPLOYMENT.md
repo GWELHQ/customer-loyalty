@@ -21,6 +21,7 @@ gcloud config set project <PROJECT_ID>
 
 gcloud services enable \
   run.googleapis.com \
+  iamcredentials.googleapis.com \
   firestore.googleapis.com \
   storage.googleapis.com \
   vision.googleapis.com \
@@ -72,6 +73,27 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   --role="roles/secretmanager.secretAccessor"
 ```
 
+### Browser-to-Cloud-Storage APK uploads
+
+APK files are uploaded directly from the admin web app to a short-lived signed
+Cloud Storage URL. This avoids Cloud Run's 32 MiB HTTP/1 request limit. Apply
+the bucket CORS policy once (replace the production Firebase Hosting origin in
+[`gcs-cors.json`](./gcs-cors.json) if yours differs):
+
+```bash
+gcloud storage buckets update gs://<PROJECT_ID>-loyalty-files \
+  --cors-file=infra/google-cloud/gcs-cors.json
+```
+
+The runtime service account must also be allowed to sign blobs for signed URLs:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  loyalty-api-run@<PROJECT_ID>.iam.gserviceaccount.com \
+  --member="serviceAccount:loyalty-api-run@<PROJECT_ID>.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
 If you deploy the web app to Cloud Run too, give it its own minimal service account with no extra roles (it serves static files only).
 
 ## Secrets
@@ -100,7 +122,10 @@ gcloud run deploy loyalty-api \
 
 `GOOGLE_APPLICATION_CREDENTIALS` is intentionally **not** set here — on Cloud Run the Admin SDK picks up the attached service account automatically (Application Default Credentials). Only set it locally, pointing at a downloaded key file for a dev/scratch project.
 
-`--memory=1Gi` (Cloud Run's platform default is 512Mi if never set) exists specifically for `POST /apk-versions` — `FileInterceptor` buffers the whole uploaded .apk in memory before it's streamed to GCS, and 512Mi isn't enough headroom for a typical multi-ten-megabyte APK on top of the Node/Nest baseline. Symptom when this regresses: the browser reports a CORS error on the upload, but Cloud Run's own `run.googleapis.com/varlog/system` log shows the real cause — "Truncated response body... the application exited before the response was finished" (an OOM kill mid-request, which cuts the connection before any response, CORS headers included, ever gets sent). `backend-deploy.yml`'s `gcloud run deploy` now passes this explicitly on every push so it can't silently drop back to the default.
+APK binaries are no longer buffered by the API: the admin browser uploads them
+directly to Cloud Storage, then sends only metadata to `POST /apk-versions`.
+`GET /apk/download` likewise redirects to a short-lived signed GCS URL, so APK
+downloads do not hit Cloud Run's HTTP/1 response-size limit.
 
 ## Deploying the web app
 

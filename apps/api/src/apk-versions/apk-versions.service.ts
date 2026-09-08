@@ -36,8 +36,7 @@ export class ApkVersionsService {
   }
 
   async create(
-    input: { versionName: string; versionCode: number; features: string[]; fixes: string[] },
-    file: { originalname: string; buffer: Buffer; mimetype: string },
+    input: { versionName: string; versionCode: number; features: string[]; fixes: string[]; gcsPath: string },
     actor: StaffPrincipal,
   ): Promise<ApkVersion> {
     const existing = await this.col().where('versionCode', '==', input.versionCode).limit(1).get();
@@ -45,7 +44,10 @@ export class ApkVersionsService {
       throw new BadRequestException(`Version code ${input.versionCode} already exists`);
     }
 
-    const gcsPath = await this.storage.uploadBuffer('apk-releases', file.originalname, file.buffer, file.mimetype);
+    if (!input.gcsPath.startsWith('gs://') || !input.gcsPath.includes('/apk-releases/')) {
+      throw new BadRequestException('Invalid APK upload path');
+    }
+    const fileSizeBytes = await this.storage.getObjectSize(input.gcsPath);
 
     const now = nowIso();
     const doc: Omit<ApkVersion, 'id'> = {
@@ -53,9 +55,9 @@ export class ApkVersionsService {
       versionCode: input.versionCode,
       features: input.features,
       fixes: input.fixes,
-      fileName: file.originalname,
-      gcsPath,
-      fileSizeBytes: file.buffer.length,
+      fileName: input.gcsPath.split('/').at(-1)!.replace(/^[0-9a-f-]+-/, ''),
+      gcsPath: input.gcsPath,
+      fileSizeBytes,
       isRelease: false,
       uploadedByUserId: actor.userId,
       uploadedByName: actor.fullName,

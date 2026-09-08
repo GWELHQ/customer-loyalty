@@ -1,6 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -8,7 +7,8 @@ import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
 import type { StaffPrincipal } from '../common/types/principal';
 import { ApkVersionsService } from './apk-versions.service';
-import { CreateApkVersionDto } from './dto/create-apk-version.dto';
+import { CreateApkUploadUrlDto, CreateApkVersionDto } from './dto/create-apk-version.dto';
+import { StorageService } from '../common/storage/storage.service';
 
 /** Admin management of Android app builds — see ApkController for the public download surface these feed. */
 @ApiTags('apk-versions')
@@ -19,6 +19,7 @@ import { CreateApkVersionDto } from './dto/create-apk-version.dto';
 export class ApkVersionsController {
   constructor(
     private readonly apkVersions: ApkVersionsService,
+    private readonly storage: StorageService,
     private readonly audit: AuditService,
   ) {}
 
@@ -28,20 +29,15 @@ export class ApkVersionsController {
   }
 
   @Post()
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 300 * 1024 * 1024 } }))
   async create(
-    @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateApkVersionDto,
     @CurrentUser() actor: StaffPrincipal,
   ) {
-    if (!file) throw new BadRequestException('file is required');
     const features = parseStringArrayField(dto.featuresJson);
     const fixes = parseStringArrayField(dto.fixesJson);
 
     const version = await this.apkVersions.create(
-      { versionName: dto.versionName, versionCode: dto.versionCode, features, fixes },
-      file,
+      { versionName: dto.versionName, versionCode: dto.versionCode, features, fixes, gcsPath: dto.gcsPath },
       actor,
     );
     await this.audit.record({
@@ -53,6 +49,11 @@ export class ApkVersionsController {
       metadata: { versionCode: version.versionCode },
     });
     return version;
+  }
+
+  @Post('upload-url')
+  createUploadUrl(@Body() dto: CreateApkUploadUrlDto) {
+    return this.storage.createApkUploadUrl(dto.fileName, dto.contentType);
   }
 
   @Patch(':id/release')

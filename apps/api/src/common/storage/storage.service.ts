@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Storage } from '@google-cloud/storage';
 import { randomUUID } from 'node:crypto';
@@ -38,6 +38,37 @@ export class StorageService implements OnModuleInit {
     return `gs://${this.bucketName}/${objectPath}`;
   }
 
+  /**
+   * Creates a short-lived, single-object upload URL.  The browser uploads
+   * directly to GCS so large APKs never pass through Cloud Run.
+   */
+  async createApkUploadUrl(originalFileName: string, contentType: string): Promise<{ uploadUrl: string; gcsPath: string }> {
+    if (!originalFileName.toLowerCase().endsWith('.apk')) {
+      throw new BadRequestException('Only .apk files can be uploaded');
+    }
+    if (contentType && contentType !== 'application/vnd.android.package-archive') {
+      throw new BadRequestException('APK file must use application/vnd.android.package-archive content type');
+    }
+
+    const objectPath = this.newObjectPath('apk-releases', originalFileName);
+    const [uploadUrl] = await this.bucket.file(objectPath).getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000,
+      contentType: 'application/vnd.android.package-archive',
+    });
+    return { uploadUrl, gcsPath: `gs://${this.bucketName}/${objectPath}` };
+  }
+
+  async getObjectSize(gcsPath: string): Promise<number> {
+    const [metadata] = await this.bucket.file(this.toObjectPath(gcsPath)).getMetadata();
+    const size = Number(metadata.size);
+    if (!Number.isSafeInteger(size) || size <= 0) {
+      throw new BadRequestException('Uploaded APK is empty or has an invalid size');
+    }
+    return size;
+  }
+
   async downloadBuffer(gcsPath: string): Promise<Buffer> {
     const objectPath = this.toObjectPath(gcsPath);
     const [buffer] = await this.bucket.file(objectPath).download();
@@ -64,5 +95,12 @@ export class StorageService implements OnModuleInit {
       throw new Error(`gcsPath ${gcsPath} does not belong to bucket ${this.bucketName}`);
     }
     return gcsPath.slice(prefix.length);
+  }
+
+  private newObjectPath(pathPrefix: 'imports' | 'import-error-reports' | 'vehicle-plate-checks' | 'apk-releases', originalFileName: string): string {
+    // Object names are not executed, but normalizing avoids awkward paths and
+    // keeps each upload confined to its intended prefix.
+    const safeFileName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `${pathPrefix}/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${safeFileName}`;
   }
 }

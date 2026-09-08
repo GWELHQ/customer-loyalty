@@ -382,14 +382,31 @@ export class LoyaltyApiClient {
 
   apkVersions = {
     list: () => this.http.get<ApkVersion[]>('/apk-versions'),
-    create: (input: { versionName: string; versionCode: number; features: string[]; fixes: string[]; file: File }) => {
-      const form = new FormData();
-      form.append('versionName', input.versionName);
-      form.append('versionCode', String(input.versionCode));
-      form.append('featuresJson', JSON.stringify(input.features));
-      form.append('fixesJson', JSON.stringify(input.fixes));
-      form.append('file', input.file);
-      return this.http.post<ApkVersion>('/apk-versions', form, { isFormData: true });
+    /**
+     * Requests a short-lived upload URL, sends the APK directly to GCS, then
+     * records its metadata with the API. This keeps large binaries off Cloud
+     * Run's HTTP request path.
+     */
+    create: async (input: { versionName: string; versionCode: number; features: string[]; fixes: string[]; file: File }) => {
+      const contentType = 'application/vnd.android.package-archive';
+      const upload = await this.http.post<{ uploadUrl: string; gcsPath: string }>('/apk-versions/upload-url', {
+        fileName: input.file.name,
+        contentType,
+      });
+      const res = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: input.file,
+      });
+      if (!res.ok) throw new ApiError(res.status, await res.text(), 'Could not upload APK to storage');
+
+      return this.http.post<ApkVersion>('/apk-versions', {
+        versionName: input.versionName,
+        versionCode: input.versionCode,
+        featuresJson: JSON.stringify(input.features),
+        fixesJson: JSON.stringify(input.fixes),
+        gcsPath: upload.gcsPath,
+      });
     },
     markRelease: (id: string) => this.http.patch<ApkVersion>(`/apk-versions/${id}/release`),
     delete: (id: string) => this.http.delete<{ success: boolean }>(`/apk-versions/${id}`),

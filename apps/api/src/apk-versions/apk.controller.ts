@@ -33,9 +33,9 @@ export class ApkController {
     const version = await this.apkVersions.getCurrentRelease();
     if (!version) throw new NotFoundException('No release is available yet');
 
-    const buffer = await this.storage.downloadBuffer(version.gcsPath);
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', `attachment; filename="green-wells-${version.versionName}.apk"`);
-    res.send(buffer);
+    // Let GCS serve the file instead of proxying it through Cloud Run (which
+    // has a 32 MiB HTTP/1 response limit).
+    const url = await this.storage.getSignedReadUrl(version.gcsPath);
+    res.redirect(url);
   }
 }
