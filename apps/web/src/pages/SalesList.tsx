@@ -1,5 +1,6 @@
 import { Permission, Product, type Sale } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useTextFilter } from '../data/useTextFilter';
@@ -30,6 +31,7 @@ const SALE_COLUMNS: ExportColumn<Sale>[] = [
 
 export function SalesList() {
   const api = useApi();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canViewPlatePhoto = hasPermission(Permission.FRAUD_VIEW);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -123,6 +125,11 @@ export function SalesList() {
         </select>
         <div style={{ flex: 1 }} />
         <ExportButtons filename="sales" title="Sales activity" columns={SALE_COLUMNS} rows={fetchAllForExport} />
+        {hasPermission(Permission.SALES_CREATE_MANUAL) && (
+          <Button variant="primary" onClick={() => navigate('/sales/new')}>
+            Record sale
+          </Button>
+        )}
       </div>
 
       <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>

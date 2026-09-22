@@ -19,6 +19,7 @@ import { Prices } from './pages/Prices';
 import { Reconciliation } from './pages/Reconciliation';
 import { Reports } from './pages/Reports';
 import { RolesAdmin } from './pages/RolesAdmin';
+import { SalesCreate } from './pages/SalesCreate';
 import { SalesList } from './pages/SalesList';
 import { Shifts } from './pages/Shifts';
 import { SignIn } from './pages/SignIn';
@@ -51,6 +52,7 @@ export function App() {
       <Route path="/customers/:id" element={<RequireStaff permission={Permission.CUSTOMERS_VIEW}><CustomerProfile /></RequireStaff>} />
 
       <Route path="/sales" element={<RequireStaff><SalesList /></RequireStaff>} />
+      <Route path="/sales/new" element={<RequireStaff permission={Permission.SALES_CREATE_MANUAL}><SalesCreate /></RequireStaff>} />
       {/*
         No permission prop, deliberately — a delegate granted approval
         access for a station may hold no permission at all normally

@@ -1,24 +1,63 @@
-# Android handover notes
+# Bug: attendant app can't find a customer that the backend confirms exists
 
-## 2026-09-01 — Attendant refresh tokens added (for offline-sync); two other feature asks are pure Android work
+## Symptom
+Customer "Michael" (phone `0711816766` / normalized `+254711816766`, current id
+`v13Z4yPiAezh1t12ivVn`) is not found in the Android app — neither by typing the
+phone number into search nor by scanning their QR code. This is reproducible
+after a full app resync (logged out and back in to force a fresh
+`GET /mobile/customers` pull) and still fails.
 
-**Where to point Android at:**
-- Backend/web monorepo, this machine: `/Users/verisence/Desktop/100/gcp/loyalty-points-app`. Mobile-relevant code: `apps/api/src/mobile/` (every `/mobile/*` endpoint), `apps/api/src/auth/` (attendant login), `apps/api/src/common/feature-flags.ts` (see below).
-- Full standalone API reference: `docs/ANDROID-HANDOVER.md` in the same repo (auth flow, every endpoint, request/response shapes, offline-sync design) — this file is the changelog, that one's the reference.
-- Live API: `https://loyalty-api-1092254911440.us-central1.run.app/api/v1` (Cloud Run `loyalty-api`, project `customer-loyalty-3af1a`, `us-central1`; Swagger at `/api/docs` on that host). Local dev: `http://localhost:8080/api/v1` via `npm run dev:api`.
+## What's already confirmed NOT the cause (checked server-side, do not re-investigate these)
+- The Firestore doc exists, is not soft-deleted, and has a correctly normalized
+  `phoneNumber` field (`+254711816766`).
+- `GET /mobile/customers/search?phone=711816766` and
+  `GET /mobile/customers/v13Z4yPiAezh1t12ivVn` both return **HTTP 200** on the
+  live Cloud Run service on every attempt (checked via Cloud Run request logs,
+  repeated calls from 10:56 through 12:40 on 2026-09-18, both before and after
+  the attendant's resync/re-login).
+- No tenant/station scoping excludes this customer — neither endpoint filters
+  by station (see `docs/ANDROID-HANDOVER.md`, "Neither of these two endpoints
+  is station-scoped").
+- QR scanning works fine for other, older customers on this same device, so
+  it isn't a QR-format-parsing regression (the 2026-08-27 URL-wrapped QR
+  format, documented in `docs/ANDROID-HANDOVER.md` under "QR code lookup", is
+  already handled correctly).
 
-**Still true as of today** (from `apps/api/src/common/feature-flags.ts` — code-level toggles, not endpoint removals, no contract change when flipped back on): customer NFC/card scan-to-select (`GET /mobile/customers/nfc/:tagId`), badge-tap attendant login (`POST /auth/attendant/nfc-login`), and plate-photo OCR (`POST /mobile/vehicle-plate-checks`) are all disabled. PIN login (`POST /auth/attendant/login`) is the only working login path. Sales are auto-approved on creation — no pending-approval delay, nothing to poll for.
+**Conclusion: the backend is returning a successful response with the
+customer's data every time. The bug is entirely on the Android side** — the
+app is either not correctly parsing/applying that response, or something in
+its local cache/state is shadowing or overriding it.
 
-**One mobile API change this session** (see below — attendant refresh tokens). Everything else: the attendant role's *display name* was renamed twice this session, "Attendant" → "Service Assistant" → **"Sales Assistant"** (final). This is UI-copy only on the web admin side — the `Role` enum value, every `Permission` key, the `attendants` Firestore collection, and the `/auth/attendant/*` routes are all untouched. If the app shows this role name anywhere in its own copy, update it to match; there's no API field for it, it's a hardcoded string on both sides.
+## Relevant history (may matter for the local cache angle)
+This customer record was deleted and recreated once during troubleshooting
+today. There are now two Firestore docs with the same phone number
+(`+254711816766`): an older one from 2026-09-10 that is soft-deleted
+(`deletedAt` set), and the current active one (`v13Z4yPiAezh1t12ivVn`,
+created 2026-09-18) with `deletedAt` absent. The backend's own query logic
+correctly filters to the active doc — verified directly against Firestore —
+but if the Android app's local store also picked up the old (now-deleted)
+record from an earlier sync and keys/dedupes customers by phone number rather
+than by id, that stale local record could be shadowing the new one even
+after a resync.
 
-Three feature asks came in for the mobile app:
+## What to check on the Android side
+1. Logcat around a repro attempt: confirm the app actually calls
+   `customers/search?phone=711816766` or `customers/<id>`, and log the raw
+   response body it receives — is the customer object actually present, and
+   is the app failing to parse/store/display it?
+2. Local DB (Room/SQLite/whatever local cache backs the customer list):
+   query for phone `+254711816766` — is there a stale row from before the
+   delete/recreate (possibly under the old doc id), and does the sync/upsert
+   logic key on phone number in a way that could ignore or conflict with the
+   new doc id?
+3. Does the full resync (`GET /mobile/customers`) actually clear/replace the
+   local table, or does it only upsert by id — which would leave an orphaned
+   old row (different id, same phone) that the search/QR UI matches against
+   instead of (or in addition to) the new one?
+4. Does the search UI query the local cache at all instead of always hitting
+   the live `customers/search` endpoint? If so, that's the most likely
+   culprit given the server-side evidence above.
 
-**1. Auto-logout after every sale + offline queue that syncs in the background even with nobody logged in.** Repeated login/logout cycles need no backend change — `POST /auth/attendant/login` is stateless (no server-side session), so log in, sell, discard the access token, log in as someone else works today with zero conflicts. Offline queuing itself is what `POST /mobile/sync` and its idempotency keys already exist for (docs §5, "Offline-first design summary").
-
-**Backend change made this session, to close the "sync with nobody logged in" gap:** attendant login (`POST /auth/attendant/login` and, once re-enabled, `/nfc-login`) now also returns a `refreshToken` (30-day lifetime, `ATTENDANT_REFRESH_JWT_TTL`), and there's a new `POST /auth/attendant/refresh` endpoint that silently exchanges a still-valid `refreshToken` for a fresh `accessToken` + rotated `refreshToken` — no PIN. Full detail in `docs/ANDROID-HANDOVER.md` §3.1/§3.1c and §5 point 6. **Implementation on the Android side:** retain each attendant's `refreshToken` on-device per session even after they're logged out of the UI; when connectivity returns and an access token has expired, call the refresh endpoint silently, then flush that attendant's queue via `/mobile/sync`. Do this **once per attendant, sequentially** — a single `/mobile/sync` call still attributes its whole batch to whichever token made the call (no per-item attendant field), so don't merge multiple attendants' queued sales into one call. Discard a session's `refreshToken` once its queue is fully synced. Past 30 days offline, the refresh token itself expires and a PIN re-entry is the only recovery — a much wider margin than the access token's 12h alone, and covers any realistic outage.
-
-**Reminder while building this:** badge/NFC login is still disabled (see above) — PIN login is the only working login path right now, so the offline-login flow only needs to handle PIN for now.
-
-**2. Fix responsiveness across phone sizes.** Pure Android layout work, no backend/API involvement, not investigated as part of this backend/web session.
-
-**3. Change the employee ID placeholder on the login page to "099".** Pure UI copy change — `employeeId` is a free-text string server-side, any placeholder is safe to ship. Worth a quick check with whoever requested it: real employee IDs in this system look like `KIS1-001` (station-prefixed, not numeric — see `apps/api/src/seed/seed.ts`), so `099` may read as a misleading example rather than a deliberate choice. Fine to ship as asked either way.
+## Reference
+`docs/ANDROID-HANDOVER.md` — general API contract for `/mobile/customers*`
+endpoints (search, QR/id lookup, NFC lookup, full/incremental sync).

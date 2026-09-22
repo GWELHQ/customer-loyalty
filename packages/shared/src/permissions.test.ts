@@ -71,11 +71,14 @@ describe('RBAC permission matrix', () => {
     expect(roleHasPermission(Role.ATTENDANT, Permission.SALES_VIEW_OWN_STATION)).toBe(false);
   });
 
-  it('Super Admin has every Admin permission plus rbac:manage, which Admin does not have', () => {
+  it('Super Admin has every Admin permission plus rbac:manage and sales:create_manual, which Admin does not have', () => {
     expect(roleHasPermission(Role.ADMIN, Permission.RBAC_MANAGE)).toBe(false);
     expect(roleHasPermission(Role.SUPER_ADMIN, Permission.RBAC_MANAGE)).toBe(true);
-    const adminOnly = getPermissionsForRole(Role.ADMIN).filter((p) => p !== Permission.RBAC_MANAGE);
-    const superAdminOnly = getPermissionsForRole(Role.SUPER_ADMIN).filter((p) => p !== Permission.RBAC_MANAGE);
+    expect(roleHasPermission(Role.ADMIN, Permission.SALES_CREATE_MANUAL)).toBe(false);
+    expect(roleHasPermission(Role.SUPER_ADMIN, Permission.SALES_CREATE_MANUAL)).toBe(true);
+    const superAdminExtras = [Permission.RBAC_MANAGE, Permission.SALES_CREATE_MANUAL];
+    const adminOnly = getPermissionsForRole(Role.ADMIN).filter((p) => !superAdminExtras.includes(p));
+    const superAdminOnly = getPermissionsForRole(Role.SUPER_ADMIN).filter((p) => !superAdminExtras.includes(p));
     expect(superAdminOnly.sort()).toEqual(adminOnly.sort());
   });
 

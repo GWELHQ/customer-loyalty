@@ -92,9 +92,9 @@ export class SalesController {
     return this.sales.findById(id);
   }
 
-  /** Admin manual sale entry — RTSM/Admin correcting or backfilling a record. Same rules and calculation apply as Android. */
+  /** Super Admin manual sale entry — correcting or backfilling a record from the web portal. Same rules and calculation apply as Android. */
   @Post()
-  @RequirePermissions(Permission.CUSTOMERS_MANAGE)
+  @RequirePermissions(Permission.SALES_CREATE_MANUAL)
   async create(@Body() dto: CreateSaleDto, @CurrentUser() actor: StaffPrincipal) {
     const sale = await this.sales.createSale(dto, actor);
     await this.audit.record({
