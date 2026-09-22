@@ -15,12 +15,18 @@ const PAGE_SIZE = 50;
  * and the Android app (which composes the same message for its own direct
  * send; the Android team must mirror this text and the "skip when
  * cashbackEarned is 0" rule below, since that path bypasses SmsService
- * entirely). Amounts are rounded to whole KES — cashback is always a
- * whole-litre multiple of a KES-denominated rate, so it never carries
- * cents worth showing.
+ * entirely — see docs/ANDROID-HANDOVER.md). Amounts are rounded to whole
+ * KES — cashback is always a whole-litre multiple of a KES-denominated
+ * rate, and `amountPaid` is customer-entered cash, so neither carries cents
+ * worth showing. `amountPaid` is this sale's own amount, not a cumulative
+ * figure — `monthToDateCashback` is the only running total in the message.
  */
-export function buildSaleConfirmationMessage(input: { cashbackEarned: number; monthToDateCashback: number }): string {
-  return `Green Wells: You earned KES ${Math.round(input.cashbackEarned)} cashback. Your total this month is KES ${Math.round(input.monthToDateCashback)}.`;
+export function buildSaleConfirmationMessage(input: {
+  amountPaid: number;
+  cashbackEarned: number;
+  monthToDateCashback: number;
+}): string {
+  return `Green Wells: You paid KES ${Math.round(input.amountPaid)} and earned KES ${Math.round(input.cashbackEarned)} cashback. Your total cashback this month is KES ${Math.round(input.monthToDateCashback)}.`;
 }
 
 @Injectable()
@@ -47,6 +53,7 @@ export class SmsService {
   async sendSaleConfirmation(input: {
     saleId: string;
     customerPhone: string;
+    amountPaid: number;
     cashbackEarned: number;
     monthToDateCashback: number;
   }): Promise<void> {

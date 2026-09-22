@@ -142,6 +142,7 @@ export class MobileController {
     }
     const summary = await this.sales.monthlySummary(sale.customerId, nairobiMonthKey(sale.saleDate));
     const message = buildSaleConfirmationMessage({
+      amountPaid: sale.amountPaid,
       cashbackEarned: sale.snapshot.cashbackEarned,
       monthToDateCashback: summary.totalCashback,
     });

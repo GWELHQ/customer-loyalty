@@ -264,6 +264,7 @@ export class SalesService {
       await this.sms.sendSaleConfirmation({
         saleId: sale.id,
         customerPhone: sale.customerPhoneAtSale,
+        amountPaid: sale.amountPaid,
         cashbackEarned: sale.snapshot.cashbackEarned,
         monthToDateCashback: summary.totalCashback,
       });
@@ -378,6 +379,7 @@ export class SalesService {
       await this.sms.sendSaleConfirmation({
         saleId: approvedSale.id,
         customerPhone: approvedSale.customerPhoneAtSale,
+        amountPaid: approvedSale.amountPaid,
         cashbackEarned: approvedSale.snapshot.cashbackEarned,
         monthToDateCashback: summary.totalCashback,
       });

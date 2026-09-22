@@ -398,9 +398,27 @@ Returns a `Sale`:
 
 Cashback is earned per **whole litre** (`wholeLitres`, floor of `litres`)
 at `cashbackRatePerLitre` — normally KES 2/litre, or a customer's active
-special rate if one applies at `saleDate`. The customer gets an SMS
-confirmation automatically (server-side, fire-and-forget) — nothing for
-Android to do there.
+special rate if one applies at `saleDate`.
+
+**The customer's SMS confirmation is Android's responsibility, not the
+backend's.** The server never sends SMS for an attendant-sourced sale
+(`source: "android"`) — only for a sale created manually through the web
+portal. The response body from `POST /mobile/sales` includes
+`monthToDateCashback` (the customer's running cashback total for the
+current calendar month, computed server-side) specifically so the app can
+build the exact same text the backend would use for a manual sale:
+
+```
+Green Wells: You paid KES {amountPaid} and earned KES {cashbackEarned} cashback. Your total cashback this month is KES {monthToDateCashback}.
+```
+
+All three amounts rounded to the nearest whole KES — `amountPaid` is this
+sale's own amount, `monthToDateCashback` is the only cumulative figure.
+Skip sending entirely when `cashbackEarned` is `0` (nothing worth texting
+the customer about — same rule the backend follows for its own manual-sale
+sends). Send via Africa's Talking directly from the app, then report the
+outcome with `POST /mobile/sales/:id/sms-status` (`{ success, providerResponse?, errorReason? }`)
+so `sale.smsStatus` (shown in the web app) and the audit trail stay accurate.
 
 Errors to handle specifically:
 - `404` — customer not found for that phone → send to the registration
