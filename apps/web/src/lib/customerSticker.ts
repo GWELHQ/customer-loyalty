@@ -76,8 +76,14 @@ async function loadQrImage(value: string, displaySizePx: number): Promise<HTMLIm
   return img;
 }
 
-/** Generates and downloads an 80mm x 80mm, ~300 DPI PNG windshield sticker for a customer, with their QR code embedded. */
-export async function generateCustomerStickerPdf(customer: Customer): Promise<void> {
+/**
+ * Renders one customer's 80mm x 80mm, ~300 DPI windshield sticker (Green
+ * Wells artwork + their QR badge) to an offscreen canvas. Shared by the
+ * single-customer download and the bulk PDF export below so both produce
+ * pixel-identical stickers — `artwork` is loaded once by the caller and
+ * passed in rather than re-fetched per customer.
+ */
+async function renderStickerCanvas(customer: Customer, artwork: HTMLImageElement): Promise<HTMLCanvasElement> {
   const qrValue = `${window.location.origin}/qr/${customer.id}`;
 
   // Scales the Green Wells Sticker design's badge measurements (authored at
@@ -86,11 +92,7 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   const s = (value: number) => value * scale;
   const qrPanelSize = s(216);
 
-  const [artwork, qrImage] = await Promise.all([
-    loadImage(ARTWORK_SRC),
-    loadQrImage(qrValue, qrPanelSize),
-  ]);
-  await document.fonts.load('800 40px "DM Sans"');
+  const qrImage = await loadQrImage(qrValue, qrPanelSize);
 
   const canvas = document.createElement('canvas');
   canvas.width = SIZE_PX;
@@ -144,6 +146,15 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   ctx.letterSpacing = `${s(26) * 0.06}px`;
   ctx.fillText('SCAN TO JOIN', badgeX + badgeWidth / 2, badgeY + padTop + qrPanelSize + gap + labelHeight * 0.8);
 
+  return canvas;
+}
+
+/** Generates and downloads an 80mm x 80mm, ~300 DPI PNG windshield sticker for a customer, with their QR code embedded. */
+export async function generateCustomerStickerPdf(customer: Customer): Promise<void> {
+  const artwork = await loadImage(ARTWORK_SRC);
+  await document.fonts.load('800 40px "DM Sans"');
+  const canvas = await renderStickerCanvas(customer, artwork);
+
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1));
   if (!blob) throw new Error('Could not render the sticker image');
 
@@ -157,21 +168,31 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   URL.revokeObjectURL(url);
 }
 
-/** Generates and downloads a single A4 PDF with every customer's QR code — 3x4 per page, name and phone underneath each. */
+/**
+ * Generates and downloads a single A4 PDF with every customer's full Green
+ * Wells sticker (same artwork + QR badge as `generateCustomerStickerPdf`,
+ * one per customer) — 2 per row x 3 per page at true 80mm print size, name
+ * and phone underneath each so a sheet can be cut apart and handed out to
+ * the right person.
+ */
 export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<void> {
   if (customers.length === 0) throw new Error('No customers to export');
+
+  const artwork = await loadImage(ARTWORK_SRC);
+  await document.fonts.load('800 40px "DM Sans"');
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   const pageWidth = 210;
   const pageHeight = 297;
-  const margin = 12;
-  const cols = 3;
-  const rowsPerPage = 4;
+  const margin = 10;
+  const cols = 2;
+  const rowsPerPage = 3;
   const perPage = cols * rowsPerPage;
   const cellW = (pageWidth - margin * 2) / cols;
   const cellH = (pageHeight - margin * 2) / rowsPerPage;
-  const qrSize = Math.min(cellW, cellH) - 22;
+  const stickerSize = SIZE_MM;
+  const textBlockHeight = 9;
 
   for (const [i, customer] of customers.entries()) {
     const posOnPage = i % perPage;
@@ -179,22 +200,22 @@ export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<v
     const col = posOnPage % cols;
     const row = Math.floor(posOnPage / cols);
 
-    const qrValue = `${window.location.origin}/qr/${customer.id}`;
-    const dataUrl = await qrDataUrl(qrValue, 480, 16);
+    const canvas = await renderStickerCanvas(customer, artwork);
+    const dataUrl = canvas.toDataURL('image/png', 1);
 
     const cellX = margin + col * cellW;
     const cellY = margin + row * cellH;
-    const qrX = cellX + (cellW - qrSize) / 2;
-    const qrY = cellY + 4;
-    doc.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+    const stickerX = cellX + (cellW - stickerSize) / 2;
+    const stickerY = cellY + (cellH - stickerSize - textBlockHeight) / 2;
+    doc.addImage(dataUrl, 'PNG', stickerX, stickerY, stickerSize, stickerSize);
 
     doc.setFontSize(9);
     doc.setTextColor(20, 20, 20);
-    doc.text(customer.fullName, cellX + cellW / 2, qrY + qrSize + 6, { align: 'center', maxWidth: cellW - 4 });
+    doc.text(customer.fullName, cellX + cellW / 2, stickerY + stickerSize + 5, { align: 'center', maxWidth: cellW - 4 });
     doc.setFontSize(8);
     doc.setTextColor(120);
-    doc.text(customer.phoneNumber, cellX + cellW / 2, qrY + qrSize + 11, { align: 'center' });
+    doc.text(customer.phoneNumber, cellX + cellW / 2, stickerY + stickerSize + 9, { align: 'center' });
   }
 
-  doc.save(`customer-qr-codes-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`customer-stickers-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
