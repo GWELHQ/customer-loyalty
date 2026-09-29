@@ -274,6 +274,58 @@ export class SalesService {
   }
 
   /**
+   * Super Admin correction of the amount paid on an already-recorded sale.
+   * The price-per-litre and cashback rate stay pinned to what was captured
+   * in the original snapshot — only amountPaid (and the litres/cashback it
+   * derives) changes, never what rate applied at sale time. Rejected sales
+   * can't be edited (nothing to correct, and the cashback was never
+   * credited); pending-approval sales get their snapshot recomputed but no
+   * customer-balance change (approval hasn't credited them yet); approved
+   * (or legacy, pre-approval-gate) sales apply the cashback delta straight
+   * to the customer's balance, same FieldValue.increment approveOne() uses.
+   */
+  async updateAmount(saleId: string, amountPaid: number, _actor: StaffPrincipal): Promise<Sale> {
+    const sale = await this.findById(saleId);
+    if (sale.approvalStatus === SaleApprovalStatus.REJECTED) {
+      throw new BadRequestException('Cannot edit the amount of a rejected sale');
+    }
+
+    const newSnapshot = calculateCashback({
+      amountPaid,
+      pricePerLitre: sale.snapshot.pricePerLitre,
+      cashbackRatePerLitre: sale.snapshot.cashbackRatePerLitre,
+    });
+    const deltaAmount = amountPaid - sale.amountPaid;
+    const deltaCashback = newSnapshot.cashbackEarned - sale.snapshot.cashbackEarned;
+    const now = nowIso();
+
+    const updated = await this.firestore.instance.runTransaction(async (tx) => {
+      const saleRef = this.col().doc(saleId);
+
+      await this.reconciliation.adjustLoyaltySaleAmount(tx, {
+        stationId: sale.stationId,
+        product: sale.product,
+        date: nairobiDateKey(sale.saleDate),
+        deltaAmount,
+      });
+
+      if (isApprovedOrLegacy(sale) && deltaCashback !== 0) {
+        const customerRef = this.customers.col().doc(sale.customerId);
+        tx.update(customerRef, { totalCashbackEarned: FieldValue.increment(deltaCashback), updatedAt: now });
+      }
+
+      tx.update(saleRef, { amountPaid, snapshot: newSnapshot, updatedAt: now });
+      return { ...sale, amountPaid, snapshot: newSnapshot, updatedAt: now };
+    });
+
+    this.changeEvents.emit('sales');
+    this.changeEvents.emit('reconciliationDaily');
+    if (isApprovedOrLegacy(sale) && deltaCashback !== 0) this.changeEvents.emit('customers');
+
+    return updated;
+  }
+
+  /**
    * Sales awaiting a station-supervisor (or delegate, or RTSM/Admin)
    * decision. `stationId` scopes to exactly one station — RTSM/Admin may
    * omit it (all stations); every other actor is always forced to their

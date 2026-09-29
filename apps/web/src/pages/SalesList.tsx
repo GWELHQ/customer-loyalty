@@ -44,6 +44,8 @@ export function SalesList() {
   const [selected, setSelected] = useState<Sale | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const canEditAmount = hasPermission(Permission.SALES_EDIT_AMOUNT);
+  const [editingAmount, setEditingAmount] = useState(false);
   const { customers } = useCustomersCache();
   const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.fullName])), [customers]);
 
@@ -97,7 +99,7 @@ export function SalesList() {
   }
 
   return (
-    <AppShell title="Sales activity" subtitle="Every sale keeps an immutable snapshot of how its cashback was calculated">
+    <AppShell title="Sales activity" subtitle="Every sale keeps a snapshot of how its cashback was calculated">
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           placeholder="Search this page by customer or phone…"
@@ -157,6 +159,7 @@ export function SalesList() {
                     onClick={() => {
                       setSelected(s);
                       setRetryError(null);
+                      setEditingAmount(false);
                     }}
                   >
                     <Td>{formatNairobiDateTime(s.saleDate)}</Td>
@@ -189,14 +192,41 @@ export function SalesList() {
                 ×
               </button>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>Immutable — this is exactly what was recorded at sale time</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              This is exactly what was recorded at sale time{canEditAmount && selected.approvalStatus !== 'rejected' ? ' — a Super Admin may correct the amount paid below' : ''}
+            </div>
 
             <DetailRow label="Customer" value={customerName(selected)} />
             <DetailRow label="Customer phone" value={selected.customerPhoneAtSale} />
             <DetailRow label="Station" value={selected.stationNameAtSale} />
             <DetailRow label="Sales Assistant" value={selected.attendantNameAtSale} />
             <DetailRow label="Product" value={selected.product} />
-            <DetailRow label="Amount paid" value={`KSh ${selected.amountPaid}`} />
+            {editingAmount ? (
+              <EditAmountForm
+                sale={selected}
+                onCancel={() => setEditingAmount(false)}
+                onSaved={(fresh) => {
+                  setSelected(fresh);
+                  setEditingAmount(false);
+                  reload();
+                }}
+              />
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--color-border)', fontSize: 13 }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Amount paid</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>KSh {selected.amountPaid}</span>
+                  {canEditAmount && selected.approvalStatus !== 'rejected' && (
+                    <button
+                      onClick={() => setEditingAmount(true)}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-primary)', fontWeight: 700 }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </span>
+              </div>
+            )}
             <DetailRow label="Price per litre (snapshot)" value={`KSh ${selected.snapshot.pricePerLitre}`} />
             <DetailRow label="Litres" value={`${selected.snapshot.litres}`} />
             <DetailRow label="Whole litres" value={`${selected.snapshot.wholeLitres}`} />
@@ -251,6 +281,57 @@ function approvalLabel(status: Sale['approvalStatus']): string {
   if (!status || status === 'approved') return 'Approved';
   if (status === 'pending_approval') return 'Pending approval';
   return 'Rejected';
+}
+
+function EditAmountForm({ sale, onCancel, onSaved }: { sale: Sale; onCancel: () => void; onSaved: (sale: Sale) => void }) {
+  const api = useApi();
+  const [amountPaid, setAmountPaid] = useState(String(sale.amountPaid));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    const parsed = Number(amountPaid);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setError('Enter a valid amount greater than zero');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const fresh = await api.sales.updateAmount(sale.id, parsed);
+      onSaved(fresh);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update the amount');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Amount paid</span>
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={amountPaid}
+          onChange={(e) => setAmountPaid(e.target.value)}
+          style={{ ...inputStyle, maxWidth: 140, textAlign: 'right' }}
+          autoFocus
+        />
+      </div>
+      {error && <div style={{ fontSize: 12.5, color: 'var(--color-danger)', marginTop: 8 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function DetailRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

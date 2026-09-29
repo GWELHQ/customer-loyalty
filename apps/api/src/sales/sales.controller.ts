@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permission } from '@loyalty/shared';
 import { resolveStationScope } from '../common/access/station-scope';
@@ -14,6 +14,7 @@ import { ApproveSalesBatchDto } from './dto/approve-sales-batch.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { ListSalesQueryDto } from './dto/list-sales-query.dto';
 import { RejectSaleDto } from './dto/reject-sale.dto';
+import { UpdateSaleAmountDto } from './dto/update-sale-amount.dto';
 import { SalesService } from './sales.service';
 
 @ApiTags('sales')
@@ -104,6 +105,23 @@ export class SalesController {
       entityId: sale.id,
       entityLabel: `${sale.customerPhoneAtSale} · ${sale.stationNameAtSale}`,
       metadata: { stationId: sale.stationId, product: sale.product },
+    });
+    return sale;
+  }
+
+  /** Super Admin correction of the amount paid on an already-recorded sale — recomputes the cashback snapshot and adjusts the customer's balance and the day's reconciliation bucket accordingly. */
+  @Patch(':id/amount')
+  @RequirePermissions(Permission.SALES_EDIT_AMOUNT)
+  async updateAmount(@Param('id') id: string, @Body() dto: UpdateSaleAmountDto, @CurrentUser() actor: StaffPrincipal) {
+    const before = await this.sales.findById(id);
+    const sale = await this.sales.updateAmount(id, dto.amountPaid, actor);
+    await this.audit.record({
+      actor,
+      action: 'sale.edit_amount',
+      entityType: 'sale',
+      entityId: sale.id,
+      entityLabel: `${sale.customerPhoneAtSale} · ${sale.stationNameAtSale}`,
+      metadata: { previousAmountPaid: before.amountPaid, newAmountPaid: sale.amountPaid },
     });
     return sale;
   }

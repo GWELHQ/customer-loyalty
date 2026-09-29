@@ -201,6 +201,7 @@ export class LoyaltyApiClient {
       idempotencyKey: string;
       saleDate?: string;
     }) => this.http.post<Sale>('/sales', input),
+    updateAmount: (id: string, amountPaid: number) => this.http.patch<Sale>(`/sales/${id}/amount`, { amountPaid }),
     retrySms: (id: string) => this.http.post(`/sales/${id}/sms/retry`),
     monthlySummary: (customerId: string, month: string) =>
       this.http.get<{ month: string; totalCashback: number; saleCount: number }>(

@@ -141,6 +141,58 @@ export class ReconciliationService {
     return { status };
   }
 
+  /**
+   * Called inside a sale-amount-correction transaction (Super Admin editing
+   * an already-recorded sale). Unlike reserveLoyaltySaleAmount(), never
+   * throws on the ceiling — a correction to an existing sale must always be
+   * allowed to land, even if it pushes the day into EXCEEDED; that's a
+   * signal for review, not a reason to block the correction itself.
+   */
+  async adjustLoyaltySaleAmount(
+    tx: FirebaseFirestore.Transaction,
+    params: { stationId: string; product: Product; date: string; deltaAmount: number },
+  ): Promise<void> {
+    if (params.deltaAmount === 0) return;
+    const id = dailyKey(params.stationId, params.product, params.date);
+    const ref = this.col().doc(id);
+    const snap = await tx.get(ref);
+
+    if (!snap.exists) {
+      // Nothing ingested for this day/station/product yet — mirror
+      // reserveLoyaltySaleAmount()'s bootstrap path.
+      const now = nowIso();
+      const doc: Omit<ReconciliationDaily, 'id'> = {
+        stationId: params.stationId,
+        product: params.product,
+        date: params.date.slice(0, 10),
+        totalSales: 0,
+        loyaltySales: Math.max(0, params.deltaAmount),
+        percentage: 0,
+        headroom: 0,
+        status: ReconciliationStatus.PENDING,
+        ingestedByUserId: 'system',
+        flaggedSaleIds: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      tx.set(ref, doc);
+      return;
+    }
+
+    const data = snap.data()!;
+    const totalSales = data.totalSales as number;
+    const newLoyalty = Math.max(0, (data.loyaltySales as number) + params.deltaAmount);
+    const status = computeStatus(totalSales, newLoyalty);
+
+    tx.update(ref, {
+      loyaltySales: newLoyalty,
+      percentage: totalSales > 0 ? round2((newLoyalty / totalSales) * 100) : 0,
+      headroom: round2(totalSales - newLoyalty),
+      status,
+      updatedAt: nowIso(),
+    });
+  }
+
   async listDaily(filters: { stationId?: string; date?: string }): Promise<ReconciliationDaily[]> {
     let query = this.col().orderBy('date', 'desc') as FirebaseFirestore.Query;
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);

@@ -50,6 +50,8 @@ export enum Permission {
   SALES_APPROVE_OWN_STATION = 'sales:approve_own_station',
   /** Manually record a sale from the web portal (backfill/correction outside the normal Android flow). Granted only to Super Admin — see SUPER_ADMIN_PERMISSIONS. */
   SALES_CREATE_MANUAL = 'sales:create_manual',
+  /** Correct the amount paid on an already-recorded sale from the web portal. Granted only to Super Admin — see SUPER_ADMIN_PERMISSIONS. */
+  SALES_EDIT_AMOUNT = 'sales:edit_amount',
   /** Create/edit/delete dynamic role definitions (`/rbac/roles`). Granted only to Admin by default — see SYSTEM_ROLE_DEFINITIONS below. */
   RBAC_MANAGE = 'rbac:manage',
   SHIFTS_VIEW_ALL = 'shifts:view_all',
@@ -96,8 +98,9 @@ const ADMIN_PERMISSIONS: Permission[] = [
   // to users via USERS_MANAGE, just can't change what a role grants.
 ];
 
-// Everything Admin has, plus RBAC_MANAGE and SALES_CREATE_MANUAL — what
-// distinguishes Super Admin's permission set from Admin's. (The other
+// Everything Admin has, plus RBAC_MANAGE, SALES_CREATE_MANUAL, and
+// SALES_EDIT_AMOUNT — what distinguishes Super Admin's permission set from
+// Admin's. (The other
 // distinguishing behavior, "only a Super Admin can assign the super_admin
 // role," is enforced separately in UsersService against the actor's
 // actual signed-in role, not a permission at all.)
@@ -105,6 +108,7 @@ const SUPER_ADMIN_PERMISSIONS: Permission[] = [
   ...ADMIN_PERMISSIONS,
   Permission.RBAC_MANAGE,
   Permission.SALES_CREATE_MANUAL,
+  Permission.SALES_EDIT_AMOUNT,
 ];
 
 const CHAIRMAN_PERMISSIONS: Permission[] = [
