@@ -190,6 +190,7 @@ export class LoyaltyApiClient {
         product?: Product;
         from?: string;
         to?: string;
+        search?: string;
       } = {},
     ) => this.http.get<PaginatedResult<Sale>>(`/sales${toQueryString(params)}`),
     get: (id: string) => this.http.get<Sale>(`/sales/${id}`),
@@ -207,8 +208,9 @@ export class LoyaltyApiClient {
       this.http.get<{ month: string; totalCashback: number; saleCount: number }>(
         `/sales/monthly-summary${toQueryString({ customerId, month })}`,
       ),
-    listPendingApproval: (params: { stationId?: string; page?: number; pageSize?: number; cursor?: string } = {}) =>
-      this.http.get<PaginatedResult<Sale>>(`/sales/pending-approval${toQueryString(params)}`),
+    listPendingApproval: (
+      params: { stationId?: string; page?: number; pageSize?: number; cursor?: string; search?: string } = {},
+    ) => this.http.get<PaginatedResult<Sale>>(`/sales/pending-approval${toQueryString(params)}`),
     approveBatch: (saleIds: string[]) =>
       this.http.post<{ approved: string[]; skipped: { saleId: string; reason: string }[] }>('/sales/approve-batch', {
         saleIds,
@@ -344,18 +346,25 @@ export class LoyaltyApiClient {
   };
 
   auditEvents = {
-    list: (params: { entityType?: string; entityId?: string; cursor?: string } = {}) =>
+    list: (params: { entityType?: string; entityId?: string; cursor?: string; search?: string } = {}) =>
       this.http.get<PaginatedResult<AuditEvent>>(`/audit-events${toQueryString(params)}`),
   };
 
   smsDeliveries = {
-    list: (params: { cursor?: string } = {}) =>
+    list: (params: { cursor?: string; status?: SmsDelivery['status']; search?: string } = {}) =>
       this.http.get<PaginatedResult<SmsDelivery>>(`/sms-deliveries${toQueryString(params)}`),
   };
 
   fraudFlags = {
     list: (
-      params: { type?: FraudFlagType; status?: FraudFlagStatus; stationId?: string; customerId?: string; cursor?: string } = {},
+      params: {
+        type?: FraudFlagType;
+        status?: FraudFlagStatus;
+        stationId?: string;
+        customerId?: string;
+        cursor?: string;
+        search?: string;
+      } = {},
     ) => this.http.get<PaginatedResult<FraudFlag>>(`/fraud-flags${toQueryString(params)}`),
     get: (id: string) => this.http.get<FraudFlag>(`/fraud-flags/${id}`),
     startReview: (id: string) => this.http.patch<FraudFlag>(`/fraud-flags/${id}/start-review`, {}),

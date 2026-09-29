@@ -91,6 +91,24 @@ export class CustomersService {
     return snap.docs.map((d) => fromDoc<Customer>(d)).filter((c) => !c.deletedAt);
   }
 
+  /**
+   * Full id→fullName map for every active customer — used to resolve a
+   * customer's name from another collection's denormalized customerId
+   * (e.g. server-side sale search, which needs to match by name but only
+   * stores customerPhoneAtSale on the sale doc itself). Customers are
+   * bounded (hundreds, not millions — same assumption useCustomersCache.ts
+   * makes client-side), so one full-collection read is cheap.
+   */
+  async allNamesById(): Promise<Map<string, string>> {
+    const snap = await this.col().get();
+    const map = new Map<string, string>();
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!data.deletedAt) map.set(doc.id, data.fullName as string);
+    }
+    return map;
+  }
+
   async list(
     pagination: PaginationQueryDto,
     filters: { name?: string; stationId?: string },

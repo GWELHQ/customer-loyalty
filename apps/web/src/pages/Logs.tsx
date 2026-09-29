@@ -7,7 +7,6 @@ import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDateTime } from '../lib/time';
 import { Badge, Button, Card, EmptyState, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { ExportButtons } from '../ui/ExportButtons';
-import { useTextFilter } from '../data/useTextFilter';
 
 // Every entityType value any audit.record() call in apps/api/src currently
 // uses — kept as a flat allow-list rather than derived from live data so the
@@ -73,17 +72,21 @@ function AuditLogTab() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  // Filters this page only — there's no backend search endpoint for audit
-  // events, so this narrows the currently-loaded page, not the whole log.
-  const { search, setSearch, filtered: filteredEvents } = useTextFilter(
-    events,
-    (e) => `${e.actorName} ${e.action} ${e.entityLabel ?? ''} ${e.entityType}`,
-  );
+  // Matched server-side against every recent event satisfying the entityType
+  // filter, not just the current cursor page — see AuditEventsController's
+  // search branch (bounded to the most recent SEARCH_SCAN_LIMIT rows, since
+  // the audit log grows forever). Debounced to avoid a request per keystroke.
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   function reload() {
     setLoading(true);
     api.auditEvents
-      .list({ cursor: cursorStack[pageIndex], entityType: entityType || undefined })
+      .list({ cursor: cursorStack[pageIndex], entityType: entityType || undefined, search: search || undefined })
       .then((res) => {
         setEvents(res.items);
         setTotal(res.total);
@@ -91,7 +94,11 @@ function AuditLogTab() {
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, pageIndex, entityType]);
+  useEffect(reload, [api, pageIndex, entityType, search]);
+  useEffect(() => {
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  }, [search]);
   useRealtimeRefresh(['auditEvents'], () => {
     setCursorStack([undefined]);
     setPageIndex(0);
@@ -116,7 +123,7 @@ function AuditLogTab() {
     const all: AuditEvent[] = [];
     let cursor: string | undefined;
     for (;;) {
-      const res = await api.auditEvents.list({ cursor, entityType: entityType || undefined });
+      const res = await api.auditEvents.list({ cursor, entityType: entityType || undefined, search: search || undefined });
       all.push(...res.items);
       if (!res.nextCursor || all.length >= res.total) break;
       cursor = res.nextCursor;
@@ -129,9 +136,9 @@ function AuditLogTab() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
-            placeholder="Search this page…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             style={{ ...inputStyle, maxWidth: 220 }}
           />
           <select
@@ -151,10 +158,10 @@ function AuditLogTab() {
         <ExportButtons filename="audit-log" title="Audit log" columns={AUDIT_COLUMNS} rows={fetchAllForExport} />
       </div>
       <Card padding={0}>
-        {!loading && filteredEvents.length === 0 && (
+        {!loading && events.length === 0 && (
           <EmptyState title={entityType ? `No "${entityType}" events yet` : 'No audit events yet'} />
         )}
-        {filteredEvents.length > 0 && (
+        {events.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -167,7 +174,7 @@ function AuditLogTab() {
               </tr>
             </thead>
             <tbody>
-              {filteredEvents.map((e) => (
+              {events.map((e) => (
                 <Tr
                   key={e.id}
                   style={e.hasFraudFlag ? { background: 'var(--color-danger-tint)' } : undefined}
@@ -263,13 +270,21 @@ function SmsLogTab() {
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
-  const byStatus = deliveries.filter((d) => !statusFilter || d.status === statusFilter);
-  const { search, setSearch, filtered: filteredDeliveries } = useTextFilter(byStatus, (d) => `${d.customerPhone} ${d.message}`);
+  // Matched server-side against every recent delivery satisfying the status
+  // filter, not just the current cursor page — see SmsService.list()'s
+  // search branch (bounded to the most recent SEARCH_SCAN_LIMIT rows, since
+  // this log grows forever). Debounced to avoid a request per keystroke.
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   function reload() {
     setLoading(true);
     api.smsDeliveries
-      .list({ cursor: cursorStack[pageIndex] })
+      .list({ cursor: cursorStack[pageIndex], status: (statusFilter || undefined) as SmsDelivery['status'] | undefined, search: search || undefined })
       .then((res) => {
         setDeliveries(res.items);
         setTotal(res.total);
@@ -277,7 +292,11 @@ function SmsLogTab() {
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, pageIndex]);
+  useEffect(reload, [api, pageIndex, statusFilter, search]);
+  useEffect(() => {
+    setCursorStack([undefined]);
+    setPageIndex(0);
+  }, [statusFilter, search]);
   useRealtimeRefresh(['smsDeliveries'], () => {
     setCursorStack([undefined]);
     setPageIndex(0);
@@ -296,7 +315,11 @@ function SmsLogTab() {
     const all: SmsDelivery[] = [];
     let cursor: string | undefined;
     for (;;) {
-      const res = await api.smsDeliveries.list({ cursor });
+      const res = await api.smsDeliveries.list({
+        cursor,
+        status: (statusFilter || undefined) as SmsDelivery['status'] | undefined,
+        search: search || undefined,
+      });
       all.push(...res.items);
       if (!res.nextCursor || all.length >= res.total) break;
       cursor = res.nextCursor;
@@ -309,9 +332,9 @@ function SmsLogTab() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
-            placeholder="Search this page by phone or message…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by phone or message…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             style={{ ...inputStyle, maxWidth: 260 }}
           />
           <select style={{ ...inputStyle, maxWidth: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -324,8 +347,8 @@ function SmsLogTab() {
         <ExportButtons filename="sms-log" title="SMS log" columns={SMS_COLUMNS} rows={fetchAllForExport} />
       </div>
       <Card padding={0}>
-        {!loading && filteredDeliveries.length === 0 && <EmptyState title="No SMS found" />}
-        {filteredDeliveries.length > 0 && (
+        {!loading && deliveries.length === 0 && <EmptyState title="No SMS found" />}
+        {deliveries.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -337,7 +360,7 @@ function SmsLogTab() {
               </tr>
             </thead>
             <tbody>
-              {filteredDeliveries.map((d) => (
+              {deliveries.map((d) => (
                 <Tr key={d.id}>
                   <Td>{formatNairobiDateTime(d.createdAt)}</Td>
                   <Td>{d.customerPhone}</Td>

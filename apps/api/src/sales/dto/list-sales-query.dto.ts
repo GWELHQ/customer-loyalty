@@ -29,4 +29,9 @@ export class ListSalesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @ApiPropertyOptional({ description: 'Free-text match against customer name or phone, across the whole result set (not just the current page)' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

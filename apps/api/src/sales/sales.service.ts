@@ -109,7 +109,7 @@ export class SalesService {
 
   async list(
     pagination: PaginationQueryDto,
-    filters: { stationId?: string; attendantId?: string; product?: Product; from?: string; to?: string },
+    filters: { stationId?: string; attendantId?: string; product?: Product; from?: string; to?: string; search?: string },
   ): Promise<PaginatedResult<Sale>> {
     let query = this.col().orderBy('saleDate', 'desc') as FirebaseFirestore.Query;
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);
@@ -117,6 +117,29 @@ export class SalesService {
     if (filters.product) query = query.where('product', '==', filters.product);
     if (filters.from) query = query.where('saleDate', '>=', filters.from);
     if (filters.to) query = query.where('saleDate', '<=', filters.to);
+
+    const needle = filters.search?.trim().toLowerCase();
+    if (needle) {
+      // No Firestore field holds a case-insensitive, name-or-phone
+      // haystack to query against, and the customer's name isn't even
+      // denormalized onto the sale doc (only customerPhoneAtSale is) — so
+      // a real "search the whole table" match means reading every sale
+      // that matches the structural filters above and filtering/paginating
+      // in memory, rather than pushing pagination down to Firestore.
+      const [snap, customerNameById] = await Promise.all([query.get(), this.customers.allNamesById()]);
+      const matches = snap.docs.map((d) => fromDoc<Sale>(d)).filter((s) => {
+        const name = customerNameById.get(s.customerId) ?? '';
+        return name.toLowerCase().includes(needle) || s.customerPhoneAtSale.toLowerCase().includes(needle);
+      });
+      const start = (pagination.page - 1) * pagination.pageSize;
+      return {
+        items: matches.slice(start, start + pagination.pageSize),
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total: matches.length,
+        nextCursor: null,
+      };
+    }
 
     const countSnap = await query.count().get();
     const total = countSnap.data().count;
@@ -335,6 +358,7 @@ export class SalesService {
     requestedStationId: string | undefined,
     pagination: PaginationQueryDto,
     actor: StaffPrincipal,
+    search?: string,
   ): Promise<PaginatedResult<Sale>> {
     const stationId = await this.resolveApproverStationId(actor, requestedStationId);
     let query = this.col()
@@ -345,6 +369,29 @@ export class SalesService {
       // Actor has no accessible station at all (not RTSM/Admin, not a
       // supervisor, no active delegation) — an empty page, not an error.
       return { items: [], page: pagination.page, pageSize: pagination.pageSize, total: 0, nextCursor: null };
+    }
+
+    const needle = search?.trim().toLowerCase();
+    if (needle) {
+      // Same rationale as list()'s search branch — matched against every
+      // pending sale at this station, not just the current cursor page.
+      const [snap, customerNameById] = await Promise.all([query.get(), this.customers.allNamesById()]);
+      const matches = snap.docs.map((d) => fromDoc<Sale>(d)).filter((s) => {
+        const name = customerNameById.get(s.customerId) ?? '';
+        return (
+          name.toLowerCase().includes(needle) ||
+          s.customerPhoneAtSale.toLowerCase().includes(needle) ||
+          s.attendantNameAtSale.toLowerCase().includes(needle)
+        );
+      });
+      const start = (pagination.page - 1) * pagination.pageSize;
+      return {
+        items: matches.slice(start, start + pagination.pageSize),
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total: matches.length,
+        nextCursor: null,
+      };
     }
 
     const countSnap = await query.count().get();

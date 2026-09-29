@@ -27,8 +27,9 @@ export class FraudFlagsController {
     @Query('stationId') stationId?: string,
     @Query('customerId') customerId?: string,
     @Query('cursor') cursor?: string,
+    @Query('search') search?: string,
   ) {
-    return this.flags.list({ type, status, stationId, customerId }, cursor);
+    return this.flags.list({ type, status, stationId, customerId, search }, cursor);
   }
 
   @Get(':id')

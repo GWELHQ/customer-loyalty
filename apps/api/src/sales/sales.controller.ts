@@ -31,8 +31,8 @@ export class SalesController {
   @Get()
   @RequireAnyPermission(Permission.SALES_VIEW_ALL, Permission.SALES_VIEW_OWN_STATION)
   list(@CurrentUser() user: StaffPrincipal, @Query() query: ListSalesQueryDto) {
-    const { stationId, product, from, to, ...pagination } = query;
-    return this.sales.list(pagination, { stationId: resolveStationScope(user, stationId), product, from, to });
+    const { stationId, product, from, to, search, ...pagination } = query;
+    return this.sales.list(pagination, { stationId: resolveStationScope(user, stationId), product, from, to, search });
   }
 
   @Get('monthly-summary')
@@ -51,8 +51,8 @@ export class SalesController {
    */
   @Get('pending-approval')
   listPendingApproval(@CurrentUser() actor: StaffPrincipal, @Query() query: ListSalesQueryDto) {
-    const { stationId, ...pagination } = query;
-    return this.sales.listPendingApproval(stationId, pagination, actor);
+    const { stationId, search, ...pagination } = query;
+    return this.sales.listPendingApproval(stationId, pagination, actor, search);
   }
 
   @Post('approve-batch')

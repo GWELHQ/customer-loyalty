@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
-import { useTextFilter } from '../data/useTextFilter';
 import { useCustomersCache } from '../data/useCustomersCache';
 import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
@@ -16,9 +15,11 @@ import { Badge, Button, Card, EmptyState, Pagination, Table, Td, Th, Tr, inputSt
 
 const PAGE_SIZE = 25;
 
-const SALE_COLUMNS: ExportColumn<Sale>[] = [
+function makeSaleColumns(customerName: (s: Sale) => string): ExportColumn<Sale>[] { return [
   { header: 'Date', value: (s) => formatNairobiDateTime(s.saleDate) },
   { header: 'Station', value: (s) => s.stationNameAtSale },
+  { header: 'Customer', value: (s) => customerName(s) },
+  { header: 'Customer phone', value: (s) => s.customerPhoneAtSale },
   { header: 'Sales Assistant', value: (s) => s.attendantNameAtSale },
   { header: 'Product', value: (s) => s.product },
   { header: 'Amount paid (KSh)', value: (s) => s.amountPaid },
@@ -27,7 +28,7 @@ const SALE_COLUMNS: ExportColumn<Sale>[] = [
   { header: 'Cashback earned (KSh)', value: (s) => s.snapshot.cashbackEarned },
   { header: 'SMS status', value: (s) => s.smsStatus },
   { header: 'Source', value: (s) => s.source },
-];
+]; }
 
 export function SalesList() {
   const api = useApi();
@@ -52,29 +53,36 @@ export function SalesList() {
   function customerName(s: Sale): string {
     return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
   }
+  const saleColumns = useMemo(() => makeSaleColumns(customerName), [customerNames]);
 
-  // Free-text search only narrows the already-loaded page — sales list has
-  // no backend search endpoint, so this isn't a whole-dataset search.
-  const { search, setSearch, filtered: filteredSales } = useTextFilter(sales, (s) => `${customerName(s)} ${s.customerPhoneAtSale}`);
+  // Matched server-side against every sale, not just the currently-loaded
+  // page — see SalesService.list()'s search branch. Debounced so typing
+  // doesn't fire a request per keystroke.
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   function reload() {
     setLoading(true);
     api.sales
-      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined, product: (product as Product) || undefined })
+      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined })
       .then((res) => {
         setSales(res.items);
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, stationId, product, page]);
+  useEffect(reload, [api, stationId, product, page, search]);
   useRealtimeRefresh(['sales'], reload);
-  useEffect(() => setPage(1), [stationId, product]);
+  useEffect(() => setPage(1), [stationId, product, search]);
 
   async function fetchAllForExport(): Promise<Sale[]> {
     const all: Sale[] = [];
     for (let p = 1; ; p++) {
-      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined });
+      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined });
       all.push(...res.items);
       if (res.items.length < 100 || all.length >= res.total) break;
     }
@@ -102,9 +110,9 @@ export function SalesList() {
     <AppShell title="Sales activity" subtitle="Every sale keeps a snapshot of how its cashback was calculated">
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
-          placeholder="Search this page by customer or phone…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by customer or phone…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           style={{ ...inputStyle, maxWidth: 260 }}
         />
         {stations.length > 0 && (
@@ -126,7 +134,7 @@ export function SalesList() {
           ))}
         </select>
         <div style={{ flex: 1 }} />
-        <ExportButtons filename="sales" title="Sales activity" columns={SALE_COLUMNS} rows={fetchAllForExport} />
+        <ExportButtons filename="sales" title="Sales activity" columns={saleColumns} rows={fetchAllForExport} />
         {hasPermission(Permission.SALES_CREATE_MANUAL) && (
           <Button variant="primary" onClick={() => navigate('/sales/new')}>
             Record sale
@@ -137,8 +145,8 @@ export function SalesList() {
       <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
         <Card padding={0}>
           {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-          {!loading && filteredSales.length === 0 && <EmptyState title="No sales found" />}
-          {!loading && filteredSales.length > 0 && (
+          {!loading && sales.length === 0 && <EmptyState title="No sales found" />}
+          {!loading && sales.length > 0 && (
             <Table>
               <thead>
                 <tr>
@@ -153,7 +161,7 @@ export function SalesList() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSales.map((s) => (
+                {sales.map((s) => (
                   <Tr
                     key={s.id}
                     onClick={() => {

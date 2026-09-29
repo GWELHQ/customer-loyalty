@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Permission } from '@loyalty/shared';
+import { Permission, SmsStatus } from '@loyalty/shared';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
 import { SmsService } from './sms.service';
@@ -15,7 +15,7 @@ export class SmsController {
   constructor(private readonly sms: SmsService) {}
 
   @Get()
-  list(@Query('cursor') cursor?: string) {
-    return this.sms.list(cursor);
+  list(@Query('cursor') cursor?: string, @Query('status') status?: SmsStatus, @Query('search') search?: string) {
+    return this.sms.list(cursor, { status, search });
   }
 }

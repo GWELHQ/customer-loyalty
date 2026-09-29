@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useRealtimeRefresh } from '../data/realtime';
-import { useTextFilter } from '../data/useTextFilter';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
@@ -129,11 +128,15 @@ export function FraudGovernance() {
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
   const [stationId, setStationId] = useState('');
-  // Filters this page only — fraud flags have no backend search endpoint.
-  const { search, setSearch, filtered: filteredFlags } = useTextFilter(
-    flags,
-    (f) => `${f.customerNameAtFlag ?? ''} ${f.attendantNameAtFlag ?? ''}`,
-  );
+  // Matched server-side against every flag satisfying the filters above,
+  // not just the current cursor page — see FraudFlagsService.list()'s
+  // search branch. Debounced so typing doesn't fire a request per keystroke.
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   function resetToFirstPage() {
     setCursorStack([undefined]);
@@ -148,6 +151,7 @@ export function FraudGovernance() {
         status: (status || undefined) as FraudFlagStatus | undefined,
         stationId: stationId || undefined,
         cursor: cursorStack[pageIndex],
+        search: search || undefined,
       })
       .then((res) => {
         setFlags(res.items);
@@ -156,8 +160,8 @@ export function FraudGovernance() {
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, type, status, stationId, pageIndex]);
-  useEffect(resetToFirstPage, [type, status, stationId]);
+  useEffect(reload, [api, type, status, stationId, pageIndex, search]);
+  useEffect(resetToFirstPage, [type, status, stationId, search]);
   useRealtimeRefresh(['fraudFlags'], resetToFirstPage);
 
   function goNext() {
@@ -222,9 +226,9 @@ export function FraudGovernance() {
     <AppShell title="Fraud & Governance" subtitle="Irregular fueling activity flagged automatically for review">
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
-          placeholder="Search this page by customer or sales assistant…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by customer or sales assistant…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           style={{ ...inputStyle, maxWidth: 260 }}
         />
         <select style={{ ...inputStyle, maxWidth: 220 }} value={type} onChange={(e) => setType(e.target.value)}>
@@ -293,8 +297,8 @@ export function FraudGovernance() {
       <div className={selected ? 'detail-grid has-detail' : 'detail-grid'}>
         <Card padding={0}>
           {loading && <div style={{ padding: 20, color: 'var(--color-text-secondary)' }}>Loading…</div>}
-          {!loading && filteredFlags.length === 0 && <EmptyState title="No irregularities flagged" body="Nothing to review right now." />}
-          {!loading && filteredFlags.length > 0 && (
+          {!loading && flags.length === 0 && <EmptyState title="No irregularities flagged" body="Nothing to review right now." />}
+          {!loading && flags.length > 0 && (
             <Table>
               <thead>
                 <tr>
@@ -306,7 +310,7 @@ export function FraudGovernance() {
                 </tr>
               </thead>
               <tbody>
-                {filteredFlags.map((f) => (
+                {flags.map((f) => (
                   <Tr key={f.id} onClick={() => setSelected(f)}>
                     <Td>{formatNairobiDateTime(f.createdAt)}</Td>
                     <Td>{TYPE_LABELS[f.type]}</Td>

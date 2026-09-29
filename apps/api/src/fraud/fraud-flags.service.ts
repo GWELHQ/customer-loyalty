@@ -42,7 +42,7 @@ export class FraudFlagsService {
   }
 
   async list(
-    filters: { type?: FraudFlagType; status?: FraudFlagStatus; stationId?: string; customerId?: string },
+    filters: { type?: FraudFlagType; status?: FraudFlagStatus; stationId?: string; customerId?: string; search?: string },
     cursor?: string,
   ): Promise<PaginatedResult<FraudFlag>> {
     let query = this.col().orderBy('createdAt', 'desc') as FirebaseFirestore.Query;
@@ -50,6 +50,19 @@ export class FraudFlagsService {
     if (filters.status) query = query.where('status', '==', filters.status);
     if (filters.stationId) query = query.where('stationId', '==', filters.stationId);
     if (filters.customerId) query = query.where('customerId', '==', filters.customerId);
+
+    const needle = filters.search?.trim().toLowerCase();
+    if (needle) {
+      // Matched against every flag that satisfies the structural filters
+      // above, not just the current cursor page — customerNameAtFlag/
+      // attendantNameAtFlag are already denormalized onto the doc, so no
+      // extra lookups are needed, unlike sales' customer-name search.
+      const snap = await query.get();
+      const matches = snap.docs
+        .map((d) => fromDoc<FraudFlag>(d))
+        .filter((f) => `${f.customerNameAtFlag ?? ''} ${f.attendantNameAtFlag ?? ''}`.toLowerCase().includes(needle));
+      return { items: matches, page: 1, pageSize: matches.length, total: matches.length, nextCursor: null };
+    }
 
     const countSnap = await query.count().get();
     const total = countSnap.data().count;

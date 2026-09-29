@@ -9,6 +9,11 @@ import { SMS_PROVIDER, type SmsProvider } from './sms-provider.interface';
 const COLLECTION = 'smsDeliveries';
 const MAX_RETRIES = 3;
 const PAGE_SIZE = 50;
+// SMS deliveries grow forever, so a text search can't realistically scan the
+// entire history — this caps how far back (by row count, most recent first)
+// a search looks, trading "the whole table" for "everything recent enough
+// to plausibly be what someone's searching for."
+const SEARCH_SCAN_LIMIT = 5000;
 
 /**
  * Canonical sale-confirmation SMS text — shared by the backend send path
@@ -125,8 +130,20 @@ export class SmsService {
   }
 
   /** Every SMS ever sent (or attempted), newest first — powers the Logs page's SMS tab. */
-  async list(cursor?: string): Promise<PaginatedResult<SmsDelivery>> {
+  async list(cursor?: string, filters: { status?: SmsStatus; search?: string } = {}): Promise<PaginatedResult<SmsDelivery>> {
     let query = this.col().orderBy('createdAt', 'desc') as FirebaseFirestore.Query;
+    if (filters.status) query = query.where('status', '==', filters.status);
+
+    const needle = filters.search?.trim().toLowerCase();
+    if (needle) {
+      // Matched against every recent delivery satisfying the status filter
+      // above, not just the current cursor page — see SEARCH_SCAN_LIMIT.
+      const snap = await query.limit(SEARCH_SCAN_LIMIT).get();
+      const matches = snap.docs
+        .map((d) => fromDoc<SmsDelivery>(d))
+        .filter((d) => `${d.customerPhone} ${d.message}`.toLowerCase().includes(needle));
+      return { items: matches, page: 1, pageSize: matches.length, total: matches.length, nextCursor: null };
+    }
 
     const countSnap = await query.count().get();
     const total = countSnap.data().count;
