@@ -11,7 +11,7 @@ const SIZE_PX = SIZE_MM * PX_PER_MM;
 const DESIGN_SIZE = 1254;
 const BADGE_BORDER = '#0B5D2E';
 const BADGE_LABEL_COLOR = '#003A88';
-const ARTWORK_SRC = '/sticker-artwork.png';
+const ARTWORK_SRC = '/sticker-artwork-v2.png';
 
 function mm(value: number): number {
   return value * PX_PER_MM;
