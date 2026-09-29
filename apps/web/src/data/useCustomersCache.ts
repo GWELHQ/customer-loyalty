@@ -18,7 +18,13 @@ async function fetchAll(api: LoyaltyApiClient): Promise<Customer[]> {
   for (let page = 1; ; page++) {
     const res = await api.customers.list({ page, pageSize: FETCH_PAGE_SIZE });
     all.push(...res.items);
-    if (res.items.length < FETCH_PAGE_SIZE || all.length >= res.total) break;
+    // nextCursor reflects whether the underlying (pre-soft-delete-filter) page
+    // was full, not res.items.length — the API filters out deleted customers
+    // after paging, so a page can come back shorter than FETCH_PAGE_SIZE while
+    // more customers still remain further in. Stopping on items.length here
+    // used to silently truncate the cache the moment any page happened to
+    // contain a deleted customer, dropping every customer that sorted after it.
+    if (res.nextCursor == null) break;
   }
   return all;
 }
