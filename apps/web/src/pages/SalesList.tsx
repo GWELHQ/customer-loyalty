@@ -1,5 +1,5 @@
 import { Permission, Product, type Sale } from '@loyalty/shared';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
@@ -53,7 +53,23 @@ export function SalesList() {
   function customerName(s: Sale): string {
     return customerNames.get(s.customerId) ?? s.customerPhoneAtSale;
   }
-  const saleColumns = useMemo(() => makeSaleColumns(customerName), [customerNames]);
+
+  // The on-page customerNames map above can still be mid-fetch (or not yet
+  // started) the moment someone clicks Export — exporting the whole table
+  // often happens right after landing on the page. Rather than race that,
+  // the export columns read from a ref that fetchAllForExport() refreshes
+  // with its own complete, guaranteed-fresh customer fetch before export
+  // runs, regardless of what's happened on screen. A ref (not state) so the
+  // column's `value` closures — created once, deps never change — always
+  // see the latest map without needing to be recreated.
+  const exportCustomerNamesRef = useRef(customerNames);
+  useEffect(() => {
+    exportCustomerNamesRef.current = customerNames;
+  }, [customerNames]);
+  const saleColumns = useMemo(
+    () => makeSaleColumns((s) => exportCustomerNamesRef.current.get(s.customerId) ?? s.customerPhoneAtSale),
+    [],
+  );
 
   // Matched server-side against every sale, not just the currently-loaded
   // page — see SalesService.list()'s search branch. Debounced so typing
@@ -79,14 +95,29 @@ export function SalesList() {
   useRealtimeRefresh(['sales'], reload);
   useEffect(() => setPage(1), [stationId, product, search]);
 
-  async function fetchAllForExport(): Promise<Sale[]> {
-    const all: Sale[] = [];
+  async function fetchAllCustomerNames(): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
     for (let p = 1; ; p++) {
-      const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined });
-      all.push(...res.items);
-      if (res.items.length < 100 || all.length >= res.total) break;
+      const res = await api.customers.list({ page: p, pageSize: 100 });
+      for (const c of res.items) map.set(c.id, c.fullName);
+      if (res.nextCursor == null) break;
     }
-    return all;
+    return map;
+  }
+
+  async function fetchAllForExport(): Promise<Sale[]> {
+    async function fetchAllSales(): Promise<Sale[]> {
+      const all: Sale[] = [];
+      for (let p = 1; ; p++) {
+        const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined });
+        all.push(...res.items);
+        if (res.items.length < 100 || all.length >= res.total) break;
+      }
+      return all;
+    }
+    const [names, allSales] = await Promise.all([fetchAllCustomerNames(), fetchAllSales()]);
+    exportCustomerNamesRef.current = names;
+    return allSales;
   }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
