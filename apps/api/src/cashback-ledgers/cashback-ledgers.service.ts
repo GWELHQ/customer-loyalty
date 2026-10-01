@@ -166,7 +166,12 @@ export class CashbackLedgersService {
       createdAt: existing ? existing.createdAt : now,
       updatedAt: now,
     };
-    await this.col().doc(month).set(doc, { merge: true });
+    // stationReleases is deliberately left out of the write for an existing
+    // doc: this recompute reads sales for a while, and writing back the
+    // releases it read at the start would silently wipe any station that
+    // was released in the meantime (releaseStation owns that field).
+    const { stationReleases: _releases, ...docWithoutReleases } = doc;
+    await this.col().doc(month).set(existing ? docWithoutReleases : doc, { merge: true });
     this.changeEvents.emit(COLLECTION);
     return { ...doc, id: month };
   }
@@ -318,9 +323,6 @@ export class CashbackLedgersService {
     if (ledger.status !== LedgerStatus.OPEN_ACCRUING && ledger.status !== LedgerStatus.READY_FOR_REVIEW) {
       throw new BadRequestException(`Ledger for ${month} cannot be released from status ${ledger.status}`);
     }
-    if (ledger.stationReleases.some((r) => r.stationId === stationId)) {
-      return ledger; // already released — idempotent
-    }
     const station = await this.stations.findById(stationId);
     if (!station) throw new NotFoundException('Station not found');
 
@@ -332,9 +334,15 @@ export class CashbackLedgersService {
       releasedByName: actor.fullName,
       releasedAt: now,
     };
-    await this.col()
-      .doc(month)
-      .set({ stationReleases: [...ledger.stationReleases, release], updatedAt: now }, { merge: true });
+    // Transactional append so concurrent releases (several supervisors
+    // signing off at the 1st-of-month rush) can't overwrite each other.
+    const ref = this.col().doc(month);
+    await this.firestore.instance.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const current = (snap.data()?.stationReleases ?? []) as MonthlyCashbackLedgerStationRelease[];
+      if (current.some((r) => r.stationId === stationId)) return; // already released — idempotent
+      tx.set(ref, { stationReleases: [...current, release], updatedAt: now }, { merge: true });
+    });
     this.changeEvents.emit(COLLECTION);
     return this.findByMonth(month);
   }
