@@ -313,7 +313,7 @@ export class CashbackLedgersService {
    * ledger's overall status; only submit() below does that.
    */
   async releaseStation(month: string, stationId: string, actor: StaffPrincipal): Promise<MonthlyCashbackLedger> {
-    assertWithinReleaseWindow(actor);
+    assertWithinReleaseWindow(actor, month);
     const ledger = await this.getOrCreate(month);
     if (ledger.status !== LedgerStatus.OPEN_ACCRUING && ledger.status !== LedgerStatus.READY_FOR_REVIEW) {
       throw new BadRequestException(`Ledger for ${month} cannot be released from status ${ledger.status}`);
@@ -346,7 +346,7 @@ export class CashbackLedgersService {
    * Finance Approver review in one action.
    */
   async submit(month: string, actor: StaffPrincipal): Promise<MonthlyCashbackLedger> {
-    assertWithinReleaseWindow(actor);
+    assertWithinReleaseWindow(actor, month);
     const ledger = await this.getOrCreate(month);
     if (
       ledger.status !== LedgerStatus.OPEN_ACCRUING &&
@@ -429,7 +429,13 @@ export class CashbackLedgersService {
 }
 
 /** Admin can release any day of the month; every other role (RTSM, Station Supervisor) only on the 1st or 2nd (Nairobi calendar day) — release is meant to happen right after the prior month closes. */
-function assertWithinReleaseWindow(actor: StaffPrincipal): void {
+function assertWithinReleaseWindow(actor: StaffPrincipal, month: string): void {
+  // Every role, Admin included, can only release the month that just closed.
+  const [year, m] = nairobiToday().slice(0, 7).split('-').map(Number) as [number, number];
+  const lastMonth = m === 1 ? `${year - 1}-12` : `${year}-${String(m - 1).padStart(2, '0')}`;
+  if (month !== lastMonth) {
+    throw new ForbiddenException('Only last month can be released');
+  }
   if (actor.role === Role.ADMIN) return;
   const dayOfMonth = Number(nairobiToday().slice(8, 10));
   if (dayOfMonth !== 1 && dayOfMonth !== 2) {
