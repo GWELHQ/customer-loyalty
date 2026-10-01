@@ -9,7 +9,7 @@ import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
-import { formatNairobiDate, formatNairobiDateTime, nairobiThisMonth, NAIROBI_TZ } from '../lib/time';
+import { formatNairobiDate, formatNairobiDateTime, nairobiLastMonth, nairobiThisMonth, NAIROBI_TZ } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, CardHeader, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
@@ -165,12 +165,17 @@ function MyStationReleaseView() {
                 </>
               ) : (
                 <>
-                  <Button variant="primary" onClick={release} disabled={busy || !withinWindow} style={{ width: '100%' }}>
+                  <Button variant="primary" onClick={release}
+                    disabled={busy || !withinWindow || month !== nairobiLastMonth()}
+                    style={{ width: '100%' }}
+                  >
                     {busy ? 'Releasing…' : `Release ${status.stationName} for ${formatMonthLabel(month)}`}
                   </Button>
-                  {!withinWindow && (
+                  {(month !== nairobiLastMonth() || !withinWindow) && (
                     <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 8 }}>
-                      Only available on the 1st or 2nd of the month.
+                      {month !== nairobiLastMonth()
+                        ? 'Only last month can be released.'
+                        : 'Only available on the 1st or 2nd of the month.'}
                     </div>
                   )}
                 </>
@@ -254,7 +259,15 @@ function FullLedgerView() {
           {ledger && <Badge tone={STATUS_TONE[ledger.status]}>{ledger.status.replace(/_/g, ' ')}</Badge>}
           <div style={{ flex: 1 }} />
           {canRelease && canManage && (
-            <Button variant="primary" onClick={submit} disabled={busy || !withinWindow} title={!withinWindow ? 'Only available on the 1st or 2nd of the month' : undefined}>
+            <Button variant="primary" onClick={submit} disabled={busy || !withinWindow || month !== nairobiLastMonth()}
+              title={
+                month !== nairobiLastMonth()
+                  ? 'Only last month can be released for approval'
+                  : !withinWindow
+                    ? 'Only available on the 1st or 2nd of the month'
+                    : undefined
+              }
+            >
               Release for approval
             </Button>
           )}
