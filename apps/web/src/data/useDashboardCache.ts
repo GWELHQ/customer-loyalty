@@ -13,6 +13,11 @@ export interface DashboardStationTotal {
   value: number;
 }
 
+export interface DashboardStationTrend {
+  stations: { id: string; name: string }[];
+  days: { date: string; label: string; values: Record<string, number> }[];
+}
+
 export type DashboardPeriod = 'today' | 'week' | 'month' | 'year';
 
 export interface DashboardData {
@@ -24,6 +29,8 @@ export interface DashboardData {
   uniqueCustomers: number;
   reconciliationRecordsNeedingAttention: number;
   trend: DashboardTrendDay[];
+  /** Absent when talking to an API build older than the per-station trend. */
+  stationTrend?: DashboardStationTrend;
   stationTotals: DashboardStationTotal[] | null;
 }
 

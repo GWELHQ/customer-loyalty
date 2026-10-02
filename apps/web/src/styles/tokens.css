@@ -84,6 +84,17 @@
   --color-fuel-pms: var(--gw-coral-500);
   --color-fuel-ago: var(--color-primary);
 
+  /* Categorical chart series, in fixed order (one per station). Never cycled; extras fold into "Other". */
+  --color-viz-1: #2a78d6;
+  --color-viz-2: #eb6834;
+  --color-viz-3: #1baf7a;
+  --color-viz-4: #eda100;
+  --color-viz-5: #e87ba4;
+  --color-viz-6: #008300;
+  --color-viz-7: #4a3aa7;
+  --color-viz-8: #e34948;
+  --color-viz-other: var(--gw-gray-500);
+
   --shadow-sm: 0 1px 2px rgba(12, 16, 16, 0.06);
   --shadow-md: 0 4px 12px rgba(12, 16, 16, 0.08);
   --shadow-lg: 0 12px 32px rgba(12, 16, 16, 0.12);
