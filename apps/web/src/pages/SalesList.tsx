@@ -8,7 +8,7 @@ import { useRealtimeRefresh } from '../data/realtime';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
-import { formatNairobiDateTime } from '../lib/time';
+import { formatNairobiDateTime, nairobiDayRangeToIso, nairobiOneMonthAgo, nairobiToday } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { PlateCheckPhoto } from '../ui/PlateCheckPhoto';
 import { Badge, Button, Card, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
@@ -40,6 +40,8 @@ export function SalesList() {
   const { stations } = useStations();
   const [stationId, setStationId] = useState('');
   const [product, setProduct] = useState('');
+  const [fromDate, setFromDate] = useState(nairobiOneMonthAgo);
+  const [toDate, setToDate] = useState(nairobiToday);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sale | null>(null);
@@ -81,19 +83,21 @@ export function SalesList() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  const dateRange = useMemo(() => nairobiDayRangeToIso(fromDate, toDate), [fromDate, toDate]);
+
   function reload() {
     setLoading(true);
     api.sales
-      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined })
+      .list({ page, pageSize: PAGE_SIZE, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined, ...dateRange })
       .then((res) => {
         setSales(res.items);
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
   }
-  useEffect(reload, [api, stationId, product, page, search]);
+  useEffect(reload, [api, stationId, product, page, search, dateRange]);
   useRealtimeRefresh(['sales'], reload);
-  useEffect(() => setPage(1), [stationId, product, search]);
+  useEffect(() => setPage(1), [stationId, product, search, dateRange]);
 
   async function fetchAllCustomerNames(): Promise<Map<string, string>> {
     const map = new Map<string, string>();
@@ -109,7 +113,7 @@ export function SalesList() {
     async function fetchAllSales(): Promise<Sale[]> {
       const all: Sale[] = [];
       for (let p = 1; ; p++) {
-        const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined });
+        const res = await api.sales.list({ page: p, pageSize: 100, stationId: stationId || undefined, product: (product as Product) || undefined, search: search || undefined, ...dateRange });
         all.push(...res.items);
         if (res.items.length < 100 || all.length >= res.total) break;
       }
@@ -164,6 +168,14 @@ export function SalesList() {
             </option>
           ))}
         </select>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+          From
+          <input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
+        </label>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+          To
+          <input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
+        </label>
         <div style={{ flex: 1 }} />
         <ExportButtons filename="sales" title="Sales activity" columns={saleColumns} rows={fetchAllForExport} />
         {hasPermission(Permission.SALES_CREATE_MANUAL) && (
