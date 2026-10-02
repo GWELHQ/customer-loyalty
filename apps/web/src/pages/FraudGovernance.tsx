@@ -306,7 +306,8 @@ export function FraudGovernance() {
                   <Th>Type</Th>
                   <Th>Severity</Th>
                   <Th>Status</Th>
-                  <Th>Subject</Th>
+                  <Th>Customer</Th>
+                  <Th>Sales Assistant</Th>
                 </tr>
               </thead>
               <tbody>
@@ -322,7 +323,8 @@ export function FraudGovernance() {
                     <Td>
                       <Badge tone={STATUS_TONE[f.status]}>{f.status.replace('_', ' ')}</Badge>
                     </Td>
-                    <Td>{f.customerNameAtFlag ?? f.attendantNameAtFlag ?? '—'}</Td>
+                    <Td>{f.customerNameAtFlag ?? '—'}</Td>
+                    <Td>{f.attendantNameAtFlag ?? '—'}</Td>
                   </Tr>
                 ))}
               </tbody>

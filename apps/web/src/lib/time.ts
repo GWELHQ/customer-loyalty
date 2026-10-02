@@ -25,3 +25,20 @@ export function formatNairobiDateTime(iso: string): string {
 export function formatNairobiDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-KE', { timeZone: NAIROBI_TZ });
 }
+
+/** The same Nairobi calendar day one month ago (YYYY-MM-DD), clamped to the month's last day (e.g. 31 Mar → 28/29 Feb). */
+export function nairobiOneMonthAgo(): string {
+  const [year, month, day] = nairobiToday().split('-').map(Number) as [number, number, number];
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const lastDay = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+  return `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
+
+/** Start/end instants (UTC ISO) of a Nairobi calendar-day range, both days inclusive. */
+export function nairobiDayRangeToIso(fromDate: string, toDate: string): { from?: string; to?: string } {
+  return {
+    from: fromDate ? new Date(`${fromDate}T00:00:00+03:00`).toISOString() : undefined,
+    to: toDate ? new Date(`${toDate}T23:59:59.999+03:00`).toISOString() : undefined,
+  };
+}

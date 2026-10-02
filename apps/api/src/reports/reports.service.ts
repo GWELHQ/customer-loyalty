@@ -52,7 +52,7 @@ export class ReportsService {
 
   /**
    * `period` scopes only the sales-derived totals (cashback/amount/count/
-   * customers) — the trend chart (fixed last-7-days), today's per-station
+   * customers) — the trend chart (fixed last-30-days), today's per-station
    * totals, and reconciliation-needs-attention (always "today") are the
    * same regardless of period, matching what the dashboard's KPI row vs.
    * the rest of the page are each meant to show.
@@ -118,11 +118,11 @@ export class ReportsService {
     return nairobiMonthBoundsUtc(nairobiMonthKey(today)).startUtc;
   }
 
-  /** Last 7 Nairobi calendar days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
+  /** Last 30 Nairobi calendar days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
   private async salesTrend(stationId?: string): Promise<Array<{ date: string; label: string; pms: number; ago: number }>> {
     const today = nairobiToday();
     const dayKeys: string[] = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 29; i >= 0; i--) {
       const d = new Date(`${today}T00:00:00.000Z`);
       d.setUTCDate(d.getUTCDate() - i);
       dayKeys.push(d.toISOString().slice(0, 10));
@@ -145,7 +145,7 @@ export class ReportsService {
 
     return [...byDay.entries()].map(([date, v]) => ({
       date,
-      label: new Date(`${date}T00:00:00.000Z`).toLocaleDateString('en-KE', { weekday: 'short', timeZone: 'UTC' }),
+      label: new Date(`${date}T00:00:00.000Z`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
       pms: round2(v.pms),
       ago: round2(v.ago),
     }));
