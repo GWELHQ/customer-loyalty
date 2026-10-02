@@ -410,6 +410,9 @@ export interface FraudFlag extends BaseDoc {
   stationNameAtFlag?: string;
   attendantId?: string;
   attendantNameAtFlag?: string;
+  /** Every sales assistant behind the flag's related sales (de-duplicated) — unlike attendantId, which is only the single primary subject of attendant-centric flags. */
+  attendantIds?: string[];
+  attendantNamesAtFlag?: string[];
   /** Sale ids that triggered/support this flag. */
   relatedSaleIds: string[];
   /** Calendar window the check covered (the scanned day, or the rolling window). */

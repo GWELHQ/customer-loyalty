@@ -96,6 +96,12 @@ const STATUS_TONE: Record<FraudFlagStatus, 'neutral' | 'success' | 'warning' | '
   [FraudFlagStatus.DISMISSED]: 'neutral',
 };
 
+/** All sales assistants behind a flag; falls back to the single primary one for flags that predate the list. */
+function attendantNames(f: FraudFlag): string {
+  const names = f.attendantNamesAtFlag?.length ? f.attendantNamesAtFlag : f.attendantNameAtFlag ? [f.attendantNameAtFlag] : [];
+  return names.join(', ');
+}
+
 const FLAG_COLUMNS: ExportColumn<FraudFlag>[] = [
   { header: 'Detected', value: (f) => formatNairobiDateTime(f.createdAt) },
   { header: 'Type', value: (f) => TYPE_LABELS[f.type] },
@@ -103,7 +109,7 @@ const FLAG_COLUMNS: ExportColumn<FraudFlag>[] = [
   { header: 'Status', value: (f) => f.status },
   { header: 'Customer', value: (f) => f.customerNameAtFlag ?? '' },
   { header: 'Station', value: (f) => f.stationNameAtFlag ?? '' },
-  { header: 'Sales Assistant', value: (f) => f.attendantNameAtFlag ?? '' },
+  { header: 'Sales Assistant(s)', value: (f) => attendantNames(f) },
   { header: 'Detection mode', value: (f) => f.detectionMode },
 ];
 
@@ -307,7 +313,7 @@ export function FraudGovernance() {
                   <Th>Severity</Th>
                   <Th>Status</Th>
                   <Th>Customer</Th>
-                  <Th>Sales Assistant</Th>
+                  <Th>Sales Assistant(s)</Th>
                 </tr>
               </thead>
               <tbody>
@@ -324,7 +330,7 @@ export function FraudGovernance() {
                       <Badge tone={STATUS_TONE[f.status]}>{f.status.replace('_', ' ')}</Badge>
                     </Td>
                     <Td>{f.customerNameAtFlag ?? '—'}</Td>
-                    <Td>{f.attendantNameAtFlag ?? '—'}</Td>
+                    <Td>{attendantNames(f) || '—'}</Td>
                   </Tr>
                 ))}
               </tbody>
@@ -375,7 +381,7 @@ export function FraudGovernance() {
             <DetailRow label="Detected" value={formatNairobiDateTime(selected.createdAt)} />
             {selected.customerNameAtFlag && <DetailRow label="Customer" value={selected.customerNameAtFlag} />}
             {selected.stationNameAtFlag && <DetailRow label="Station" value={selected.stationNameAtFlag} />}
-            {selected.attendantNameAtFlag && <DetailRow label="Sales Assistant" value={selected.attendantNameAtFlag} />}
+            {attendantNames(selected) && <DetailRow label="Sales Assistant(s)" value={attendantNames(selected)} />}
             <DetailRow label="Detection mode" value={selected.detectionMode} />
             <DetailRow label="Related sales" value={`${selected.relatedSaleIds.length}`} />
 

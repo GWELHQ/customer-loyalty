@@ -5,6 +5,7 @@ import {
   type FraudFlagSeverity,
   type FraudFlagType,
   type PaginatedResult,
+  type Sale,
 } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
@@ -58,9 +59,12 @@ export class FraudFlagsService {
       // attendantNameAtFlag are already denormalized onto the doc, so no
       // extra lookups are needed, unlike sales' customer-name search.
       const snap = await query.get();
-      const matches = snap.docs
-        .map((d) => fromDoc<FraudFlag>(d))
-        .filter((f) => `${f.customerNameAtFlag ?? ''} ${f.attendantNameAtFlag ?? ''}`.toLowerCase().includes(needle));
+      const all = await this.withAttendants(snap.docs.map((d) => fromDoc<FraudFlag>(d)));
+      const matches = all.filter((f) =>
+        `${f.customerNameAtFlag ?? ''} ${f.attendantNameAtFlag ?? ''} ${(f.attendantNamesAtFlag ?? []).join(' ')}`
+          .toLowerCase()
+          .includes(needle),
+      );
       return { items: matches, page: 1, pageSize: matches.length, total: matches.length, nextCursor: null };
     }
 
@@ -73,7 +77,7 @@ export class FraudFlagsService {
     }
 
     const snap = await query.limit(PAGE_SIZE).get();
-    const items = snap.docs.map((d) => fromDoc<FraudFlag>(d));
+    const items = await this.withAttendants(snap.docs.map((d) => fromDoc<FraudFlag>(d)));
 
     return {
       items,
@@ -87,7 +91,45 @@ export class FraudFlagsService {
   async findById(id: string): Promise<FraudFlag> {
     const snap = await this.col().doc(id).get();
     if (!snap.exists) throw new NotFoundException('Fraud flag not found');
-    return fromDoc<FraudFlag>(snap);
+    const [flag] = await this.withAttendants([fromDoc<FraudFlag>(snap)]);
+    return flag!;
+  }
+
+  /** De-duplicated sales assistants across the given sales, in first-seen order. */
+  private async attendantsForSales(saleIds: string[]): Promise<{ ids: string[]; names: string[] }> {
+    const unique = [...new Set(saleIds)];
+    const sales = (
+      await Promise.all(unique.map((id) => this.firestore.collection('sales').doc(id).get()))
+    )
+      .filter((d) => d.exists)
+      .map((d) => fromDoc<Sale>(d));
+    const byId = new Map<string, string>();
+    for (const sale of sales) if (!byId.has(sale.attendantId)) byId.set(sale.attendantId, sale.attendantNameAtSale);
+    return { ids: [...byId.keys()], names: [...byId.values()] };
+  }
+
+  /**
+   * Flags created before attendants were tracked on every flag type lack
+   * attendantNamesAtFlag; derive it from their related sales and persist it
+   * so each legacy flag is only resolved once.
+   */
+  private async withAttendants(flags: FraudFlag[]): Promise<FraudFlag[]> {
+    const legacy = flags.filter((f) => f.attendantNamesAtFlag === undefined && f.relatedSaleIds.length > 0);
+    for (let i = 0; i < legacy.length; i += 5) {
+      await Promise.all(
+        legacy.slice(i, i + 5).map(async (flag) => {
+          try {
+            const { ids, names } = await this.attendantsForSales(flag.relatedSaleIds);
+            flag.attendantIds = ids;
+            flag.attendantNamesAtFlag = names;
+            await this.col().doc(flag.id).update({ attendantIds: ids, attendantNamesAtFlag: names });
+          } catch {
+            // Best effort — the flag still renders with its single attendantNameAtFlag.
+          }
+        }),
+      );
+    }
+    return flags;
   }
 
   /**
@@ -136,8 +178,11 @@ export class FraudFlagsService {
 
   async create(input: CreateFraudFlagInput): Promise<FraudFlag> {
     const now = nowIso();
+    const { ids, names } = await this.attendantsForSales(input.relatedSaleIds).catch(() => ({ ids: [], names: [] }));
     const doc: Omit<FraudFlag, 'id'> = {
       ...input,
+      attendantIds: ids,
+      attendantNamesAtFlag: names,
       status: FraudFlagStatus.OPEN,
       createdAt: now,
       updatedAt: now,
