@@ -145,6 +145,8 @@ export function Dashboard() {
             <TopAttendantsCard />
           </div>
 
+          <TrendAnalysisCard trend={data.trend} />
+
           <RecentSalesCard />
         </div>
       )}
@@ -284,6 +286,179 @@ function TopAttendantsCard() {
   );
 }
 
+function TrendCard({
+  trend,
+  stationTotals,
+}: {
+  trend: DashboardTrendDay[];
+  stationTotals: DashboardStationTotal[] | null;
+}) {
+  const week = trend.slice(-7).map((d) => ({
+    ...d,
+    label: new Date(`${d.date}T00:00:00.000Z`).toLocaleDateString('en-KE', { weekday: 'short', timeZone: 'UTC' }),
+  }));
+  const [animate, setAnimate] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const max = Math.max(1, ...week.flatMap((d) => [d.pms, d.ago]));
+  const barHeight = (v: number) => `${Math.max(v > 0 ? 3 : 0, (v / max) * 100)}%`;
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>
+          Loyalty sales by product · last 7 days
+        </div>
+        <div
+          style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--color-text-secondary)' }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-pms)' }}
+            />
+            Petrol (PMS)
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span
+              style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-ago)' }}
+            />
+            Diesel (AGO)
+          </span>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 14,
+          height: 168,
+          marginTop: 18,
+          paddingBottom: 4,
+        }}
+      >
+        {week.map((d, i) => (
+          <div
+            key={d.date}
+            onMouseEnter={() => setHovered(d.date)}
+            onMouseLeave={() => setHovered((h) => (h === d.date ? null : h))}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              position: 'relative',
+            }}
+          >
+            {hovered === d.date && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginBottom: 8,
+                  background: 'var(--color-text)',
+                  color: 'var(--color-surface)',
+                  borderRadius: 8,
+                  padding: '8px 11px',
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 6px 16px rgba(0,0,0,.18)',
+                  zIndex: 2,
+                  pointerEvents: 'none',
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 3 }}>{d.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-pms)' }} />
+                  Petrol: KSh {format(d.pms)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-ago)' }} />
+                  Diesel: KSh {format(d.ago)}
+                </div>
+              </div>
+            )}
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                gap: 3,
+                height: 140,
+              }}
+            >
+              <div
+                style={{
+                  width: '40%',
+                  height: animate ? barHeight(d.pms) : '0%',
+                  background: 'var(--color-fuel-pms)',
+                  borderRadius: '3px 3px 0 0',
+                  transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms`,
+                  opacity: hovered && hovered !== d.date ? 0.45 : 1,
+                }}
+              />
+              <div
+                style={{
+                  width: '40%',
+                  height: animate ? barHeight(d.ago) : '0%',
+                  background: 'var(--color-fuel-ago)',
+                  borderRadius: '3px 3px 0 0',
+                  transition: `height 600ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45 + 60}ms`,
+                  opacity: hovered && hovered !== d.date ? 0.45 : 1,
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', fontWeight: hovered === d.date ? 800 : 400 }}>
+              {d.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {stationTotals && stationTotals.length > 0 && (
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--color-text-secondary)',
+              marginBottom: 10,
+            }}
+          >
+            Today's sales by station
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${stationTotals.length}, 1fr)`,
+              gap: 10,
+              background: 'var(--color-surface-sunken)',
+              borderRadius: 8,
+              padding: 10,
+            }}
+          >
+            {stationTotals.map((st) => (
+              <div key={st.stationId}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
+                <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
+                  KSh {format(st.value)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 const CHART_W = 640;
 const CHART_H = 220;
 const PAD = { top: 12, right: 12, bottom: 26, left: 48 };
@@ -299,13 +474,7 @@ function compact(n: number): string {
   return n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : String(n);
 }
 
-function TrendCard({
-  trend,
-  stationTotals,
-}: {
-  trend: DashboardTrendDay[];
-  stationTotals: DashboardStationTotal[] | null;
-}) {
+function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const n = trend.length;
@@ -454,40 +623,6 @@ function TrendCard({
           </div>
         )}
       </div>
-
-      {stationTotals && stationTotals.length > 0 && (
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--color-text-secondary)',
-              marginBottom: 10,
-            }}
-          >
-            Today's sales by station
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${stationTotals.length}, 1fr)`,
-              gap: 10,
-              background: 'var(--color-surface-sunken)',
-              borderRadius: 8,
-              padding: 10,
-            }}
-          >
-            {stationTotals.map((st) => (
-              <div key={st.stationId}>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{st.name}</div>
-                <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
-                  KSh {format(st.value)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </Card>
   );
 }
