@@ -95,7 +95,7 @@ export class ReportsService {
       return status === ReconciliationStatus.EXCEEDED || status === ReconciliationStatus.NEEDS_REVIEW;
     }).length;
 
-    const trend = await this.salesTrend(stationId);
+    const { trend, stationTrend } = await this.salesTrend(stationId);
     const stationTotals = stationId ? null : await this.todayStationTotals(monthToDateSales, today);
 
     return {
@@ -107,6 +107,7 @@ export class ReportsService {
       uniqueCustomers,
       reconciliationRecordsNeedingAttention: needsAttention,
       trend,
+      stationTrend,
       stationTotals,
     };
   }
@@ -118,8 +119,14 @@ export class ReportsService {
     return nairobiMonthBoundsUtc(nairobiMonthKey(today)).startUtc;
   }
 
-  /** Last 30 Nairobi calendar days of loyalty sales amount, split by product — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
-  private async salesTrend(stationId?: string): Promise<Array<{ date: string; label: string; pms: number; ago: number }>> {
+  /** Last 30 Nairobi calendar days of loyalty sales amount, split by product (`trend`) and by station (`stationTrend`) — a fixed rolling window, independent of the calendar month boundary the rest of `dashboard()` uses. */
+  private async salesTrend(stationId?: string): Promise<{
+    trend: Array<{ date: string; label: string; pms: number; ago: number }>;
+    stationTrend: {
+      stations: Array<{ id: string; name: string }>;
+      days: Array<{ date: string; label: string; values: Record<string, number> }>;
+    };
+  }> {
     const today = nairobiToday();
     const dayKeys: string[] = [];
     for (let i = 29; i >= 0; i--) {
@@ -134,21 +141,40 @@ export class ReportsService {
     const snap = await query.get();
     const sales = snap.docs.map((d) => fromDoc<Sale>(d));
 
-    const byDay = new Map<string, { pms: number; ago: number }>();
-    for (const key of dayKeys) byDay.set(key, { pms: 0, ago: 0 });
+    const stationsSnap = await this.firestore.collection('stations').orderBy('name').get();
+    const stations = stationsSnap.docs
+      .map((d) => fromDoc<Station>(d))
+      .filter((st) => !stationId || st.id === stationId)
+      .map((st) => ({ id: st.id, name: st.name }));
+
+    const byDay = new Map<string, { pms: number; ago: number; stations: Record<string, number> }>();
+    for (const key of dayKeys) byDay.set(key, { pms: 0, ago: 0, stations: {} });
     for (const sale of sales) {
       const bucket = byDay.get(nairobiDateKey(sale.saleDate));
       if (!bucket) continue;
       if (sale.product === Product.PMS) bucket.pms += sale.amountPaid;
       else if (sale.product === Product.AGO) bucket.ago += sale.amountPaid;
+      bucket.stations[sale.stationId] = (bucket.stations[sale.stationId] ?? 0) + sale.amountPaid;
     }
 
-    return [...byDay.entries()].map(([date, v]) => ({
-      date,
-      label: new Date(`${date}T00:00:00.000Z`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
-      pms: round2(v.pms),
-      ago: round2(v.ago),
-    }));
+    const dayLabel = (date: string) =>
+      new Date(`${date}T00:00:00.000Z`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    return {
+      trend: [...byDay.entries()].map(([date, v]) => ({
+        date,
+        label: dayLabel(date),
+        pms: round2(v.pms),
+        ago: round2(v.ago),
+      })),
+      stationTrend: {
+        stations,
+        days: [...byDay.entries()].map(([date, v]) => ({
+          date,
+          label: dayLabel(date),
+          values: Object.fromEntries(stations.map((st) => [st.id, round2(v.stations[st.id] ?? 0)])),
+        })),
+      },
+    };
   }
 
   /** Today's (Nairobi calendar day) loyalty sales amount per station — only meaningful for an unscoped (all-stations) view. */

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { useCustomersCache } from '../data/useCustomersCache';
-import type { DashboardData, DashboardPeriod, DashboardStationTotal, DashboardTrendDay } from '../data/useDashboardCache';
+import type { DashboardData, DashboardPeriod, DashboardStationTotal, DashboardStationTrend, DashboardTrendDay } from '../data/useDashboardCache';
 import { useRealtimeRefresh } from '../data/realtime';
 import { AppShell } from '../layout/AppShell';
 import { formatNairobiDateTime } from '../lib/time';
@@ -145,7 +145,7 @@ export function Dashboard() {
             <TopAttendantsCard />
           </div>
 
-          <TrendAnalysisCard trend={data.trend} />
+          <TrendAnalysisCard stationTrend={data.stationTrend} />
 
           <RecentSalesCard />
         </div>
@@ -474,19 +474,52 @@ function compact(n: number): string {
   return n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : String(n);
 }
 
-function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
-  const [hovered, setHovered] = useState<number | null>(null);
+interface TrendSeries {
+  key: string;
+  name: string;
+  color: string;
+  values: number[];
+}
 
-  const n = trend.length;
-  const yMax = niceMax(Math.max(0, ...trend.flatMap((d) => [d.pms, d.ago])));
+/** One line per station, in the API's fixed (name-sorted) order so a station keeps its color; stations past the 8th fold into "Other". */
+function buildStationSeries(stationTrend: DashboardStationTrend): TrendSeries[] {
+  const { stations, days } = stationTrend;
+  const maxSlots = 8;
+  const named = stations.length > maxSlots ? stations.slice(0, maxSlots - 1) : stations;
+  const series: TrendSeries[] = named.map((st, i) => ({
+    key: st.id,
+    name: st.name,
+    color: `var(--color-viz-${i + 1})`,
+    values: days.map((d) => d.values[st.id] ?? 0),
+  }));
+  if (stations.length > named.length) {
+    const rest = stations.slice(named.length);
+    series.push({
+      key: '__other',
+      name: 'Other stations',
+      color: 'var(--color-viz-other)',
+      values: days.map((d) => rest.reduce((sum, st) => sum + (d.values[st.id] ?? 0), 0)),
+    });
+  }
+  return series;
+}
+
+function TrendAnalysisCard({ stationTrend }: { stationTrend?: DashboardStationTrend }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const series = useMemo(() => (stationTrend ? buildStationSeries(stationTrend) : []), [stationTrend]);
+  if (!stationTrend || series.length === 0) return null;
+
+  const days = stationTrend.days;
+  const n = days.length;
+  const yMax = niceMax(Math.max(0, ...series.flatMap((s) => s.values)));
   const plotW = CHART_W - PAD.left - PAD.right;
   const plotH = CHART_H - PAD.top - PAD.bottom;
   const x = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
   const y = (v: number) => PAD.top + plotH - (v / yMax) * plotH;
-  const line = (pick: (d: DashboardTrendDay) => number) =>
-    trend.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(pick(d)).toFixed(1)}`).join(' ');
+  const path = (values: number[]) =>
+    values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
 
-  const totals = trend.map((d) => d.pms + d.ago);
+  const totals = days.map((_, i) => series.reduce((sum, s) => sum + s.values[i]!, 0));
   const grandTotal = totals.reduce((a, b) => a + b, 0);
   const peakIdx = totals.reduce((best, v, i) => (v > totals[best]! ? i : best), 0);
   const half = Math.floor(n / 2);
@@ -504,53 +537,45 @@ function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
     setHovered(Math.min(n - 1, Math.max(0, i)));
   }
 
-  const h = hovered != null ? trend[hovered] : null;
+  const statValue = { fontWeight: 800, fontSize: 16, color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' } as const;
 
   return (
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15 }}>
-          Loyalty sales trend · last 30 days
+          Loyalty sales trend by station · last {n} days
         </div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-pms)' }} />
-            Petrol (PMS)
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--color-fuel-ago)' }} />
-            Diesel (AGO)
-          </span>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          {series.map((s) => (
+            <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: s.color }} />
+              {s.name}
+            </span>
+          ))}
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>
         <div>
           <div>Total</div>
-          <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
-            KSh {format(grandTotal)}
-          </div>
+          <div style={statValue}>KSh {format(grandTotal)}</div>
         </div>
         <div>
           <div>Daily average</div>
-          <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
-            KSh {format(n ? grandTotal / n : 0)}
-          </div>
+          <div style={statValue}>KSh {format(n ? grandTotal / n : 0)}</div>
         </div>
         <div>
           <div>Peak day</div>
-          <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
-            {grandTotal > 0 ? `${trend[peakIdx]!.label} · KSh ${format(totals[peakIdx]!)}` : '—'}
-          </div>
+          <div style={statValue}>{grandTotal > 0 ? `${days[peakIdx]!.label} · KSh ${format(totals[peakIdx]!)}` : '—'}</div>
         </div>
         <div>
-          <div>Last {n - half} days vs previous {half}</div>
+          <div>
+            Last {n - half} days vs previous {half}
+          </div>
           <div
             style={{
-              fontWeight: 800,
-              fontSize: 16,
-              fontVariantNumeric: 'tabular-nums',
-              color: change == null ? 'var(--color-text)' : change >= 0 ? 'var(--color-success, var(--color-primary))' : 'var(--color-danger)',
+              ...statValue,
+              color: change == null ? 'var(--color-text)' : change >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
             }}
           >
             {change == null ? '—' : `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%`}
@@ -563,7 +588,7 @@ function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
           viewBox={`0 0 ${CHART_W} ${CHART_H}`}
           width="100%"
           role="img"
-          aria-label="Daily petrol and diesel loyalty sales amount over the last 30 days"
+          aria-label={`Daily loyalty sales amount per station over the last ${n} days`}
           onMouseMove={onMove}
           onMouseLeave={() => setHovered(null)}
           style={{ display: 'block', overflow: 'visible' }}
@@ -576,24 +601,26 @@ function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
               </text>
             </g>
           ))}
-          {trend.map((d, i) =>
+          {days.map((d, i) =>
             i % xTickEvery === 0 || i === n - 1 ? (
               <text key={d.date} x={x(i)} y={CHART_H - 6} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)">
                 {d.label}
               </text>
             ) : null,
           )}
-          <path d={line((d) => d.pms)} fill="none" stroke="var(--color-fuel-pms)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          <path d={line((d) => d.ago)} fill="none" stroke="var(--color-fuel-ago)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          {hovered != null && h && (
+          {series.map((s) => (
+            <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+          {hovered != null && (
             <g pointerEvents="none">
               <line x1={x(hovered)} x2={x(hovered)} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--color-text-muted)" strokeWidth={1} strokeDasharray="3 3" />
-              <circle cx={x(hovered)} cy={y(h.pms)} r={4.5} fill="var(--color-fuel-pms)" stroke="var(--color-surface)" strokeWidth={2} />
-              <circle cx={x(hovered)} cy={y(h.ago)} r={4.5} fill="var(--color-fuel-ago)" stroke="var(--color-surface)" strokeWidth={2} />
+              {series.map((s) => (
+                <circle key={s.key} cx={x(hovered)} cy={y(s.values[hovered]!)} r={4.5} fill={s.color} stroke="var(--color-surface)" strokeWidth={2} />
+              ))}
             </g>
           )}
         </svg>
-        {h && hovered != null && (
+        {hovered != null && (
           <div
             style={{
               position: 'absolute',
@@ -611,14 +638,17 @@ function TrendAnalysisCard({ trend }: { trend: DashboardTrendDay[] }) {
               pointerEvents: 'none',
             }}
           >
-            <div style={{ fontWeight: 800, marginBottom: 3 }}>{h.label}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-pms)' }} />
-              Petrol: KSh {format(h.pms)}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--color-fuel-ago)' }} />
-              Diesel: KSh {format(h.ago)}
+            <div style={{ fontWeight: 800, marginBottom: 3 }}>{days[hovered]!.label}</div>
+            {[...series]
+              .sort((a, b) => b.values[hovered]! - a.values[hovered]!)
+              .map((s) => (
+                <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
+                  {s.name}: KSh {format(s.values[hovered]!)}
+                </div>
+              ))}
+            <div style={{ marginTop: 5, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,.25)', fontWeight: 800 }}>
+              Total: KSh {format(totals[hovered]!)}
             </div>
           </div>
         )}
