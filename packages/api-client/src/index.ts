@@ -14,6 +14,7 @@ import type {
   ImportJob,
   ImportRow,
   MonthlyCashbackLedger,
+  MonthlyCashbackLedgerEntry,
   Notification,
   PaginatedResult,
   Permission,
@@ -277,7 +278,7 @@ export class LoyaltyApiClient {
   cashbackLedgers = {
     list: () => this.http.get<MonthlyCashbackLedger[]>('/cashback-ledgers'),
     get: (month: string) => this.http.get<MonthlyCashbackLedger>(`/cashback-ledgers/${month}`),
-    /** Station Supervisor's narrow view — whether their own station is released for the month, without the org-wide entries LEDGERS_VIEW would expose. */
+    /** Station Supervisor's narrow view — release status plus only their own station's ledger entries, without the org-wide entries LEDGERS_VIEW would expose. */
     myStationStatus: (month: string) =>
       this.http.get<{
         month: string;
@@ -287,6 +288,8 @@ export class LoyaltyApiClient {
         released: boolean;
         releasedByName?: string;
         releasedAt?: string;
+        entries: MonthlyCashbackLedgerEntry[];
+        totalCashback: number;
       }>(`/cashback-ledgers/${month}/my-station`),
     /** Station Supervisor releases their own station — idempotent. */
     releaseStation: (month: string, stationId: string) =>

@@ -252,9 +252,9 @@ const STATION_SUPERVISOR_PERMISSIONS: Permission[] = [
   Permission.SHIFTS_VIEW_OWN_STATION,
   Permission.SHIFTS_MANAGE,
   // Deliberately not LEDGERS_VIEW — a supervisor never sees the org-wide
-  // customer cashback ledger (it isn't broken out per station), only
-  // whether their own station has signed off for the month. See
-  // CashbackLedgersController's my-station endpoint.
+  // customer cashback ledger, only their own station's entries and whether
+  // it has signed off for the month. See CashbackLedgersController's
+  // my-station endpoint.
   Permission.LEDGERS_RELEASE_OWN_STATION,
 ];
 

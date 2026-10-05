@@ -295,11 +295,15 @@ export class CashbackLedgersService {
     released: boolean;
     releasedByName?: string;
     releasedAt?: string;
+    entries: MonthlyCashbackLedgerEntry[];
+    totalCashback: number;
   }> {
     const ledger = await this.getOrCreate(month);
     const station = await this.stations.findById(stationId);
     if (!station) throw new NotFoundException('Station not found');
     const release = ledger.stationReleases.find((r) => r.stationId === stationId);
+    // Only this station's rows — the org-wide ledger isn't a supervisor's to see.
+    const entries = ledger.entries.filter((e) => e.stationId === stationId);
     return {
       month,
       status: ledger.status,
@@ -308,6 +312,8 @@ export class CashbackLedgersService {
       released: !!release,
       releasedByName: release?.releasedByName,
       releasedAt: release?.releasedAt,
+      entries,
+      totalCashback: round2(entries.reduce((sum, e) => sum + e.totalCashback, 0)),
     };
   }
 

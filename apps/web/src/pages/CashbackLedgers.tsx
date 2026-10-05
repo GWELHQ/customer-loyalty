@@ -102,9 +102,9 @@ export function CashbackLedgers() {
 }
 
 /**
- * What a Station Supervisor sees — just whether their own station has
- * signed off for the month, never the org-wide customer ledger (they
- * don't hold LEDGERS_VIEW).
+ * What a Station Supervisor sees — their own station's ledger entries for
+ * the month and whether it has signed off, never the org-wide customer
+ * ledger (they don't hold LEDGERS_VIEW).
  */
 function MyStationReleaseView() {
   const api = useApi();
@@ -121,6 +121,9 @@ function MyStationReleaseView() {
   useRealtimeRefresh(['monthlyCashbackLedgers'], reload);
 
   const withinWindow = isWithinReleaseWindow(user?.role ?? '');
+  const entries = status?.entries ?? [];
+  const { search, setSearch, filtered } = useTextFilter(entries, (e) => `${e.customerName} ${e.customerPhone}`);
+  const { page, setPage, pageCount, paged } = usePagedRows(filtered);
 
   async function release() {
     if (!status) return;
@@ -137,8 +140,8 @@ function MyStationReleaseView() {
   }
 
   return (
-    <AppShell title="Cashback ledger" subtitle="Release your station's monthly sales for disbursement">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 480 }}>
+    <AppShell title="Cashback ledger" subtitle="Your station's cashback for the month, and its release for disbursement">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Month" required>
           <input type="month" style={{ ...inputStyle, maxWidth: 180 }} value={month} onChange={(e) => setMonth(e.target.value)} />
         </Field>
@@ -181,6 +184,70 @@ function MyStationReleaseView() {
                 </>
               )}
             </div>
+            <div style={{ display: 'flex', gap: 24, marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+              <div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Total cashback</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>
+                  KSh {status.totalCashback.toLocaleString('en-KE')}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Customers</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26 }}>
+                  {new Set(entries.map((e) => e.customerId)).size}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {entries.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              placeholder="Search by customer or phone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 260 }}
+            />
+            <div style={{ flex: 1 }} />
+            <ExportButtons
+              filename={`cashback-ledger-${month}-${status?.stationName ?? 'station'}`}
+              title={`Cashback ledger — ${status?.stationName ?? ''} — ${month}`}
+              columns={LEDGER_ENTRY_COLUMNS}
+              rows={filtered}
+            />
+          </div>
+        )}
+
+        {status && (
+          <Card padding={0}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 20, fontSize: 13, color: 'var(--color-text-secondary)' }}>No eligible sales for this month yet.</div>
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Customer</Th>
+                    <Th>Phone</Th>
+                    <Th align="right">Eligible sales</Th>
+                    <Th align="right">Total cashback</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((e) => (
+                    <Tr key={e.customerId}>
+                      <Td>{e.customerName}</Td>
+                      <Td>{e.customerPhone}</Td>
+                      <Td align="right">{e.eligibleSalesCount}</Td>
+                      <Td align="right">
+                        <strong>KSh {e.totalCashback.toLocaleString('en-KE')}</strong>
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalLabel={`${filtered.length} entries`} />
           </Card>
         )}
       </div>
