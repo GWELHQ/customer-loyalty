@@ -134,11 +134,12 @@ function badgeGeometry(): BadgeGeometry {
  * in the bulk PDF below — JPEG has no alpha channel, and would otherwise
  * flatten transparent corners to black instead of matching the page.
  */
-function renderBackgroundCanvas(artwork: HTMLImageElement): HTMLCanvasElement {
+function renderBackgroundCanvas(artwork: HTMLImageElement, scale = 1): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = SIZE_PX;
-  canvas.height = SIZE_PX;
+  canvas.width = SIZE_PX * scale;
+  canvas.height = SIZE_PX * scale;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(scale, scale);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, SIZE_PX, SIZE_PX);
   roundedRectPath(ctx, 0, 0, SIZE_PX, SIZE_PX, mm(3.2));
@@ -206,15 +207,14 @@ async function renderBadgeCanvas(
   return { canvas, pad };
 }
 
-/** Generates and downloads an 80mm x 80mm, ~300 DPI PNG windshield sticker for a customer, with their QR code embedded. */
-export async function generateCustomerStickerPdf(customer: Customer): Promise<void> {
+async function downloadStickerPng(qrValue: string, fileName: string, scale: number): Promise<void> {
   const artwork = await loadImage(ARTWORK_SRC);
   await document.fonts.load('800 40px "DM Sans"');
 
   const geo = badgeGeometry();
-  const canvas = renderBackgroundCanvas(artwork);
-  const { canvas: badge, pad } = await renderBadgeCanvas(`${window.location.origin}/qr/${customer.id}`, geo);
-  canvas.getContext('2d')!.drawImage(badge, geo.badgeX - pad, geo.badgeY - pad);
+  const canvas = renderBackgroundCanvas(artwork, scale);
+  const { canvas: badge, pad } = await renderBadgeCanvas(qrValue, geo, true, scale);
+  canvas.getContext('2d')!.drawImage(badge, (geo.badgeX - pad) * scale, (geo.badgeY - pad) * scale);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1));
   if (!blob) throw new Error('Could not render the sticker image');
@@ -222,11 +222,28 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${customer.fullName.replace(/\s+/g, '-')}-sticker.png`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Generates and downloads an 80mm x 80mm, ~400 DPI PNG windshield sticker for a customer, with their QR code embedded. */
+export async function generateCustomerStickerPdf(customer: Customer): Promise<void> {
+  await downloadStickerPng(`${window.location.origin}/qr/${customer.id}`, `${customer.fullName.replace(/\s+/g, '-')}-sticker.png`, 1);
+}
+
+// Same page /qr/** redirects to (firebase.json). Not an app URL, so the POS
+// scanner never mistakes it for a customer — any phone just opens the site.
+const GENERAL_QR_URL = 'https://greenwellsenergies.com/our-products-services/';
+
+/**
+ * Downloads one sticker image with a general (non-customer) QR code. Rendered
+ * at 2x the artwork's pixel density so the badge stays crisp in print.
+ */
+export async function generateGeneralStickerPng(): Promise<void> {
+  await downloadStickerPng(GENERAL_QR_URL, 'Green-Wells-general-sticker.png', 2);
 }
 
 const PT_PER_MM = 72 / 25.4;

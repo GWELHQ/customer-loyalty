@@ -9,7 +9,7 @@ import { useCustomersCache } from '../../data/useCustomersCache';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import type { ExportColumn } from '../../lib/exportTable';
-import { exportCustomerQrCodesPdf } from '../../lib/customerSticker';
+import { exportCustomerQrCodesPdf, generateGeneralStickerPng } from '../../lib/customerSticker';
 import { ExportButtons } from '../../ui/ExportButtons';
 import { Button, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
 
@@ -40,6 +40,7 @@ export function CustomersList() {
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportingQr, setExportingQr] = useState(false);
+  const [downloadingGeneral, setDownloadingGeneral] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
 
   function toggleOne(id: string) {
@@ -74,6 +75,18 @@ export function CustomersList() {
     }
   }
 
+  async function downloadGeneralQr() {
+    setQrError(null);
+    setDownloadingGeneral(true);
+    try {
+      await generateGeneralStickerPng();
+    } catch (err) {
+      setQrError(err instanceof Error ? err.message : 'Could not generate the general QR code');
+    } finally {
+      setDownloadingGeneral(false);
+    }
+  }
+
   return (
     <AppShell title="Customers" subtitle={`${customers.length} centralised across every station`}>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -96,6 +109,9 @@ export function CustomersList() {
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={exportQrCodes} disabled={exportingQr || filtered.length === 0}>
           {exportingQr ? 'Generating…' : selected.size > 0 ? `Export ${selected.size} QR code(s)` : 'Export all QR codes'}
+        </Button>
+        <Button variant="secondary" onClick={downloadGeneralQr} disabled={downloadingGeneral}>
+          {downloadingGeneral ? 'Generating…' : 'General QR code'}
         </Button>
         <ExportButtons filename="customers" title="Customers" columns={customerColumns(stations)} rows={filtered} />
         {hasPermission(Permission.CUSTOMERS_IMPORT) && (
