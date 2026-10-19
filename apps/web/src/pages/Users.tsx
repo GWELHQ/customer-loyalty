@@ -10,6 +10,7 @@ import { useRoles } from '../data/useRoles';
 import { useStations } from '../data/useStations';
 import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
+import { formatNairobiDateTime } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import {
   Badge,
@@ -35,6 +36,7 @@ function userColumns(stations: Station[], roleLabel: Map<string, string>): Expor
       value: (u) => stations.find((s) => s.id === u.assignedStationId)?.name ?? '',
     },
     { header: 'Status', value: (u) => u.status },
+    { header: 'Last login', value: (u) => (u.lastLoginAt ? formatNairobiDateTime(u.lastLoginAt) : 'Never') },
   ];
 }
 
@@ -172,6 +174,7 @@ export function Users() {
                 <Th>Role</Th>
                 <Th>Station</Th>
                 <Th>Status</Th>
+                <Th>Last login</Th>
                 <Th align="right">Actions</Th>
               </tr>
             </thead>
@@ -186,6 +189,13 @@ export function Users() {
                     <Badge tone={u.status === UserStatus.ACTIVE ? 'success' : 'neutral'}>
                       {u.status}
                     </Badge>
+                  </Td>
+                  <Td>
+                    {u.lastLoginAt ? (
+                      <span style={{ whiteSpace: 'nowrap' }}>{formatNairobiDateTime(u.lastLoginAt)}</span>
+                    ) : (
+                      <span style={{ color: 'var(--color-text-muted)' }}>Never</span>
+                    )}
                   </Td>
                   <Td align="right">
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
