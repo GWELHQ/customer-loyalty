@@ -67,7 +67,7 @@ export function CustomersList() {
     setQrError(null);
     setExportingQr(true);
     try {
-      await exportCustomerQrCodesPdf(customers);
+      await exportCustomerQrCodesPdf(customers, stations.find((s) => s.id === stationId)?.name);
     } catch (err) {
       setQrError(err instanceof Error ? err.message : 'Could not generate the QR code PDF');
     } finally {

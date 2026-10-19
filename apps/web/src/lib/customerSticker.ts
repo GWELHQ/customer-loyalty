@@ -268,12 +268,18 @@ function helveticaWidthMm(text: string, sizePt: number): number {
  * is its own lossless image. The PDF is streamed to disk object by object by
  * StreamingPdf rather than built in memory, so there is no size ceiling —
  * multi-GB exports work. Call from a click handler (the save dialog needs the
- * user gesture).
+ * user gesture). `scopeLabel` (the home station, or 'All') starts the file name.
  */
-export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<void> {
+export async function exportCustomerQrCodesPdf(customers: Customer[], scopeLabel = 'All'): Promise<void> {
   if (customers.length === 0) throw new Error('No customers to export');
 
-  const sink = await openPdfSink(`customer-stickers-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  // "<Home station | All> Customer QR Codes - DD-MM-YYYY.pdf"; strip characters
+  // that aren't allowed in file names.
+  const label = scopeLabel.replace(/[\\/:*?"<>|]/g, '').trim() || 'All';
+  const sink = await openPdfSink(`${label} Customer QR Codes - ${dd}-${month}-${now.getFullYear()}.pdf`);
   if (!sink) return; // user cancelled the save dialog
 
   const artwork = await loadImage(ARTWORK_SRC);
