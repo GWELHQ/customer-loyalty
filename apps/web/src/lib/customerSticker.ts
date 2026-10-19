@@ -97,7 +97,7 @@ interface BadgeGeometry {
   labelHeight: number;
   badgeWidth: number;
   badgeHeight: number;
-  /** Position within the full SIZE_PX sticker canvas (centred on the shield). */
+  /** Position within the full SIZE_PX sticker canvas (bottom-right corner). */
   badgeX: number;
   badgeY: number;
   badgeRadius: number;
@@ -109,6 +109,7 @@ function badgeGeometry(): BadgeGeometry {
   const padTop = s(20);
   const padBottom = s(16);
   const gap = s(12);
+  const margin = s(40);
   const labelHeight = s(26);
   const badgeWidth = qrPanelSize + padX * 2;
   const badgeHeight = padTop + qrPanelSize + gap + labelHeight + padBottom;
@@ -120,9 +121,8 @@ function badgeGeometry(): BadgeGeometry {
     labelHeight,
     badgeWidth,
     badgeHeight,
-    // Sits on the artwork's blue shield, over the car icon.
-    badgeX: s(922) - badgeWidth / 2,
-    badgeY: s(468),
+    badgeX: SIZE_PX - margin - badgeWidth,
+    badgeY: SIZE_PX - margin - badgeHeight,
     badgeRadius: s(22),
   };
 }
@@ -154,29 +154,32 @@ function renderBackgroundCanvas(artwork: HTMLImageElement): HTMLCanvasElement {
  * because this is the only part of the sticker that differs per customer.
  *
  * The shadow is on by default; the bulk PDF embeds the badge losslessly with an
- * alpha mask, so it keeps the shadow too. Returns the padding used so the
+ * alpha mask, so it keeps the shadow too. `scale` supersamples the badge (the
+ * PDF uses 4x so the QR and label stay crisp at print size). Returns the padding used so the
  * caller can position the badge correctly.
  */
 async function renderBadgeCanvas(
   qrValue: string,
   geo: BadgeGeometry,
   includeShadow = true,
+  scale = 1,
 ): Promise<{ canvas: HTMLCanvasElement; pad: number }> {
   const qrImage = await loadQrImage(qrValue, geo.qrPanelSize);
   const pad = includeShadow ? BADGE_SHADOW_PAD : 0;
 
   const canvas = document.createElement('canvas');
-  canvas.width = geo.badgeWidth + pad * 2;
-  canvas.height = geo.badgeHeight + pad * 2;
+  canvas.width = Math.ceil((geo.badgeWidth + pad * 2) * scale);
+  canvas.height = Math.ceil((geo.badgeHeight + pad * 2) * scale);
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(scale, scale);
   const x = pad;
   const y = pad;
 
   ctx.save();
   if (includeShadow) {
     ctx.shadowColor = 'rgba(0, 24, 58, 0.28)';
-    ctx.shadowBlur = s(28);
-    ctx.shadowOffsetY = s(10);
+    ctx.shadowBlur = s(28) * scale;
+    ctx.shadowOffsetY = s(10) * scale;
   }
   roundedRectPath(ctx, x, y, geo.badgeWidth, geo.badgeHeight, geo.badgeRadius);
   ctx.fillStyle = '#ffffff';
@@ -227,6 +230,8 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
 }
 
 const PT_PER_MM = 72 / 25.4;
+// Badge is rasterised at 4x the artwork's pixel density in the PDF.
+const BADGE_PDF_SCALE = 4;
 
 // Helvetica and Arial share glyph metrics, so a canvas measurement in Arial
 // gives the PDF's built-in Helvetica text width for centring.
@@ -307,7 +312,12 @@ export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<v
       content += `q ${place(stickerX, stickerY, stickerSize, stickerSize)} /Bg Do Q
 `;
 
-      const { canvas: badge } = await renderBadgeCanvas(`${window.location.origin}/qr/${customer.id}`, geo);
+      const { canvas: badge } = await renderBadgeCanvas(
+        `${window.location.origin}/qr/${customer.id}`,
+        geo,
+        true,
+        BADGE_PDF_SCALE,
+      );
       const badgeId = await pdf.imageFromCanvas(badge);
       xObjects.push(`/B${posOnPage} ${badgeId} 0 R`);
       content += `q ${place(
