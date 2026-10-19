@@ -65,9 +65,12 @@ async function qrDataUrl(value: string, sizePx: number, margin = 24): Promise<st
   });
 }
 
-async function loadQrImage(value: string, displaySizePx: number): Promise<HTMLImageElement> {
+async function loadQrImage(value: string, displaySizePx: number, scale = 1): Promise<HTMLImageElement> {
   // Rendered well above final display size for crisp downscaling.
-  const dataUrl = await qrDataUrl(value, displaySizePx * 4);
+  // At least 4x for crisp downscaling; at higher badge scales match it 1:1.
+  // The quiet-zone margin (24px at 4x) scales with it so the QR looks the same.
+  const factor = Math.max(4, scale);
+  const dataUrl = await qrDataUrl(value, displaySizePx * factor, 6 * factor);
   const img = new Image();
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();
@@ -158,7 +161,7 @@ function renderBackgroundCanvas(artwork: HTMLImageElement, scale = 1): HTMLCanva
  *
  * The shadow is on by default; the bulk PDF embeds the badge losslessly with an
  * alpha mask, so it keeps the shadow too. `scale` supersamples the badge (the
- * PDF uses 4x so the QR and label stay crisp at print size). Returns the padding used so the
+ * PDFs use 8x so the QR and label stay crisp at print size). Returns the padding used so the
  * caller can position the badge correctly.
  */
 async function renderBadgeCanvas(
@@ -167,7 +170,7 @@ async function renderBadgeCanvas(
   includeShadow = true,
   scale = 1,
 ): Promise<{ canvas: HTMLCanvasElement; pad: number }> {
-  const qrImage = await loadQrImage(qrValue, geo.qrPanelSize);
+  const qrImage = await loadQrImage(qrValue, geo.qrPanelSize, scale);
   const pad = includeShadow ? BADGE_SHADOW_PAD : 0;
 
   const canvas = document.createElement('canvas');
@@ -241,8 +244,8 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
 const GENERAL_QR_URL = 'https://greenwellsenergies.com/our-products-services/';
 
 const PT_PER_MM = 72 / 25.4;
-// Badge is rasterised at 4x the artwork's pixel density in the PDF.
-const BADGE_PDF_SCALE = 4;
+// Badge is rasterised at 8x the artwork's pixel density in the PDFs.
+const BADGE_PDF_SCALE = 8;
 
 // Helvetica and Arial share glyph metrics, so a canvas measurement in Arial
 // gives the PDF's built-in Helvetica text width for centring.
@@ -369,7 +372,7 @@ export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<v
 /**
  * Downloads a single-page, 80mm x 80mm PDF of the sticker with a general
  * (non-customer) QR code. Full quality like the bulk export: artwork embedded
- * losslessly at native resolution, badge rasterised at 4x. Call from a click
+ * losslessly at native resolution, badge rasterised at 8x. Call from a click
  * handler (the save dialog needs the user gesture).
  */
 export async function generateGeneralStickerPdf(): Promise<void> {
