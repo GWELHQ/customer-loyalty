@@ -9,7 +9,7 @@ import { useCustomersCache } from '../../data/useCustomersCache';
 import { useStations } from '../../data/useStations';
 import { AppShell } from '../../layout/AppShell';
 import type { ExportColumn } from '../../lib/exportTable';
-import { exportCustomerQrCodesPdf, generateGeneralStickerPng } from '../../lib/customerSticker';
+import { exportCustomerQrCodesPdf, generateGeneralStickerPdf } from '../../lib/customerSticker';
 import { ExportButtons } from '../../ui/ExportButtons';
 import { Button, EmptyState, Pagination, Table, Td, Th, Tr, inputStyle } from '../../ui/primitives';
 
@@ -79,7 +79,7 @@ export function CustomersList() {
     setQrError(null);
     setDownloadingGeneral(true);
     try {
-      await generateGeneralStickerPng();
+      await generateGeneralStickerPdf();
     } catch (err) {
       setQrError(err instanceof Error ? err.message : 'Could not generate the general QR code');
     } finally {

@@ -145,6 +145,8 @@ function renderBackgroundCanvas(artwork: HTMLImageElement, scale = 1): HTMLCanva
   roundedRectPath(ctx, 0, 0, SIZE_PX, SIZE_PX, mm(3.2));
   ctx.clip();
   ctx.drawImage(artwork, 0, 0, SIZE_PX, SIZE_PX);
+  // Callers composite onto this canvas in raw pixels — drop the scale transform.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   return canvas;
 }
 
@@ -237,14 +239,6 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
 // Same page /qr/** redirects to (firebase.json). Not an app URL, so the POS
 // scanner never mistakes it for a customer — any phone just opens the site.
 const GENERAL_QR_URL = 'https://greenwellsenergies.com/our-products-services/';
-
-/**
- * Downloads one sticker image with a general (non-customer) QR code. Rendered
- * at 2x the artwork's pixel density so the badge stays crisp in print.
- */
-export async function generateGeneralStickerPng(): Promise<void> {
-  await downloadStickerPng(GENERAL_QR_URL, 'Green-Wells-general-sticker.png', 2);
-}
 
 const PT_PER_MM = 72 / 25.4;
 // Badge is rasterised at 4x the artwork's pixel density in the PDF.
@@ -368,6 +362,56 @@ export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<v
   }
 
   await pdf.object(pagesId, `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`);
+  await pdf.object(rootId, `<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  await pdf.finish(rootId);
+}
+
+/**
+ * Downloads a single-page, 80mm x 80mm PDF of the sticker with a general
+ * (non-customer) QR code. Full quality like the bulk export: artwork embedded
+ * losslessly at native resolution, badge rasterised at 4x. Call from a click
+ * handler (the save dialog needs the user gesture).
+ */
+export async function generateGeneralStickerPdf(): Promise<void> {
+  const sink = await openPdfSink('Green-Wells-general-sticker.pdf');
+  if (!sink) return; // user cancelled the save dialog
+
+  const artwork = await loadImage(ARTWORK_SRC);
+  await document.fonts.load('800 40px "DM Sans"');
+
+  const pdf = new StreamingPdf(sink);
+  await pdf.begin();
+
+  const geo = badgeGeometry();
+  const pad = BADGE_SHADOW_PAD;
+  const px2pt = (px: number) => (px / PX_PER_MM) * PT_PER_MM;
+  const n = (value: number) => value.toFixed(3);
+  const sizePt = SIZE_MM * PT_PER_MM;
+
+  const rootId = pdf.allocate();
+  const pagesId = pdf.allocate();
+  const pageId = pdf.allocate();
+  const contentId = pdf.allocate();
+  const backgroundId = await pdf.imageFromCanvas(renderBackgroundCanvas(artwork));
+  const { canvas: badge } = await renderBadgeCanvas(GENERAL_QR_URL, geo, true, BADGE_PDF_SCALE);
+  const badgeId = await pdf.imageFromCanvas(badge);
+
+  const badgeW = px2pt(geo.badgeWidth + pad * 2);
+  const badgeH = px2pt(geo.badgeHeight + pad * 2);
+  const badgeX = px2pt(geo.badgeX - pad);
+  const badgeY = sizePt - px2pt(geo.badgeY - pad) - badgeH;
+  const content =
+    `q ${n(sizePt)} 0 0 ${n(sizePt)} 0 0 cm /Bg Do Q
+` + `q ${n(badgeW)} 0 0 ${n(badgeH)} ${n(badgeX)} ${n(badgeY)} cm /B Do Q
+`;
+
+  await pdf.streamObject(contentId, '', new TextEncoder().encode(content));
+  await pdf.object(
+    pageId,
+    `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${n(sizePt)} ${n(sizePt)}] ` +
+      `/Resources << /XObject << /Bg ${backgroundId} 0 R /B ${badgeId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+  );
+  await pdf.object(pagesId, `<< /Type /Pages /Kids [${pageId} 0 R] /Count 1 >>`);
   await pdf.object(rootId, `<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
   await pdf.finish(rootId);
 }
