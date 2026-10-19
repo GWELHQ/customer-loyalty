@@ -1,17 +1,18 @@
 import type { Customer } from '@loyalty/shared';
-import { jsPDF } from 'jspdf';
+import { StreamingPdf, openPdfSink, pdfString } from './streamingPdf';
 
-// 80mm x 80mm sticker at ~300 DPI print quality: 12px per mm -> 960x960px.
+// 80mm x 80mm sticker rendered at the artwork's native 1254px (~398 DPI), so
+// the artwork is drawn 1:1 with no resampling.
 const SIZE_MM = 80;
-const PX_PER_MM = 12;
-const SIZE_PX = SIZE_MM * PX_PER_MM;
+const SIZE_PX = 1254;
+const PX_PER_MM = SIZE_PX / SIZE_MM;
 
 // Reference pixel size the Green Wells Sticker design was authored at — the
 // badge's own px values (padding, radius, QR size, margins) scale off this.
 const DESIGN_SIZE = 1254;
 const BADGE_BORDER = '#0B5D2E';
 const BADGE_LABEL_COLOR = '#003A88';
-const ARTWORK_SRC = '/sticker-artwork-v2.png';
+const ARTWORK_SRC = '/sticker-artwork-v3.png';
 
 function mm(value: number): number {
   return value * PX_PER_MM;
@@ -96,7 +97,7 @@ interface BadgeGeometry {
   labelHeight: number;
   badgeWidth: number;
   badgeHeight: number;
-  /** Position within the full SIZE_PX sticker canvas (bottom-right corner). */
+  /** Position within the full SIZE_PX sticker canvas (centred on the shield). */
   badgeX: number;
   badgeY: number;
   badgeRadius: number;
@@ -111,7 +112,6 @@ function badgeGeometry(): BadgeGeometry {
   const labelHeight = s(26);
   const badgeWidth = qrPanelSize + padX * 2;
   const badgeHeight = padTop + qrPanelSize + gap + labelHeight + padBottom;
-  const margin = s(40);
   return {
     qrPanelSize,
     padX,
@@ -120,8 +120,9 @@ function badgeGeometry(): BadgeGeometry {
     labelHeight,
     badgeWidth,
     badgeHeight,
-    badgeX: SIZE_PX - margin - badgeWidth,
-    badgeY: SIZE_PX - margin - badgeHeight,
+    // Sits on the artwork's blue shield, over the car icon.
+    badgeX: s(922) - badgeWidth / 2,
+    badgeY: s(468),
     badgeRadius: s(22),
   };
 }
@@ -152,16 +153,9 @@ function renderBackgroundCanvas(artwork: HTMLImageElement): HTMLCanvasElement {
  * every side so a shadow isn't clipped. Kept separate from the background
  * because this is the only part of the sticker that differs per customer.
  *
- * `includeShadow` defaults on for the single-sticker PNG download. The bulk
- * PDF export passes false, which also drops the shadow's blur padding —
- * jsPDF fully decodes and re-compresses every embedded PNG itself (unlike
- * JPEG, which it passes through as-is), so both the shadow's soft alpha
- * gradient and the extra padding pixels it required were measured
- * contributors to a 599-customer export blowing past a V8 "Invalid string
- * length": a flat card at native size compresses far better under jsPDF's
- * own re-encoding, and is barely noticeable on a sheet meant to be cut
- * apart anyway. Returns the actual padding used so the caller can position
- * the (now smaller, unpadded) badge correctly.
+ * The shadow is on by default; the bulk PDF embeds the badge losslessly with an
+ * alpha mask, so it keeps the shadow too. Returns the padding used so the
+ * caller can position the badge correctly.
  */
 async function renderBadgeCanvas(
   qrValue: string,
@@ -232,35 +226,45 @@ export async function generateCustomerStickerPdf(customer: Customer): Promise<vo
   URL.revokeObjectURL(url);
 }
 
+const PT_PER_MM = 72 / 25.4;
+
+// Helvetica and Arial share glyph metrics, so a canvas measurement in Arial
+// gives the PDF's built-in Helvetica text width for centring.
+let measureCtx: CanvasRenderingContext2D | null = null;
+function helveticaWidthMm(text: string, sizePt: number): number {
+  measureCtx ??= document.createElement('canvas').getContext('2d')!;
+  measureCtx.font = '1000px Arial, Helvetica, sans-serif';
+  return ((measureCtx.measureText(text).width / 1000) * sizePt) / PT_PER_MM;
+}
+
 /**
- * Generates and downloads a single A4 PDF with every customer's full Green
- * Wells sticker (same artwork + QR badge as `generateCustomerStickerPdf`,
- * one per customer) — 2 per row x 3 per page at true 80mm print size, name
- * and phone underneath each so a sheet can be cut apart and handed out to
- * the right person.
+ * Generates a single A4 PDF with every customer's full Green Wells sticker
+ * (same artwork + QR badge as `generateCustomerStickerPdf`, one per customer)
+ * — 2 per row x 3 per page at true 80mm print size, name and phone underneath
+ * each so a sheet can be cut apart and handed out to the right person.
  *
- * The background artwork is byte-identical for every customer — only the
- * QR badge differs — so it's re-embedded per placement as a compressed
- * JPEG rather than a lossless PNG (jsPDF's addImage `alias` looks like it
- * should de-duplicate identical repeated images, but empirically doesn't:
- * a naive per-customer PNG embed of this same photographic artwork blew up
- * to multiple GB and hit a V8 "Invalid string length" past a few hundred
- * customers). The QR itself lives only in the separate lossless badge PNG
- * below, so this JPEG's lossy compression never touches anything that
- * needs to stay scannable. The badge is rendered without its shadow (see
- * renderBadgeCanvas) since jsPDF fully re-compresses every embedded PNG
- * itself, and that gradient was a large, avoidable contributor to the size
- * blowup above.
+ * Output is full quality: the artwork is embedded losslessly at its native
+ * resolution, and because it is identical for every customer it is written
+ * once and referenced from every page, while each badge (QR, shadow, label)
+ * is its own lossless image. The PDF is streamed to disk object by object by
+ * StreamingPdf rather than built in memory, so there is no size ceiling —
+ * multi-GB exports work. Call from a click handler (the save dialog needs the
+ * user gesture).
  */
 export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<void> {
   if (customers.length === 0) throw new Error('No customers to export');
 
+  const sink = await openPdfSink(`customer-stickers-${new Date().toISOString().slice(0, 10)}.pdf`);
+  if (!sink) return; // user cancelled the save dialog
+
   const artwork = await loadImage(ARTWORK_SRC);
   await document.fonts.load('800 40px "DM Sans"');
 
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pdf = new StreamingPdf(sink);
+  await pdf.begin();
+
   const geo = badgeGeometry();
-  const backgroundDataUrl = renderBackgroundCanvas(artwork).toDataURL('image/jpeg', 0.85);
+  const pad = BADGE_SHADOW_PAD;
   const px2mm = (px: number) => px / PX_PER_MM;
 
   const pageWidth = 210;
@@ -274,33 +278,69 @@ export async function exportCustomerQrCodesPdf(customers: Customer[]): Promise<v
   const stickerSize = SIZE_MM;
   const textBlockHeight = 9;
 
-  for (const [i, customer] of customers.entries()) {
-    const posOnPage = i % perPage;
-    if (i > 0 && posOnPage === 0) doc.addPage();
-    const col = posOnPage % cols;
-    const row = Math.floor(posOnPage / cols);
+  const rootId = pdf.allocate();
+  const pagesId = pdf.allocate();
+  const fontId = pdf.allocate();
+  const backgroundId = await pdf.imageFromCanvas(renderBackgroundCanvas(artwork));
+  await pdf.object(fontId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
 
-    const cellX = margin + col * cellW;
-    const cellY = margin + row * cellH;
-    const stickerX = cellX + (cellW - stickerSize) / 2;
-    const stickerY = cellY + (cellH - stickerSize - textBlockHeight) / 2;
-    doc.addImage(backgroundDataUrl, 'JPEG', stickerX, stickerY, stickerSize, stickerSize, 'sticker-artwork-bg');
+  const pageIds: number[] = [];
+  const n = (value: number) => value.toFixed(3);
 
-    const { canvas: badge, pad } = await renderBadgeCanvas(`${window.location.origin}/qr/${customer.id}`, geo, false);
-    const badgeDataUrl = badge.toDataURL('image/png', 1);
-    const badgeX = stickerX + px2mm(geo.badgeX - pad);
-    const badgeY = stickerY + px2mm(geo.badgeY - pad);
-    const badgeSize = px2mm(geo.badgeWidth + pad * 2);
-    const badgeSizeH = px2mm(geo.badgeHeight + pad * 2);
-    doc.addImage(badgeDataUrl, 'PNG', badgeX, badgeY, badgeSize, badgeSizeH);
+  for (let start = 0; start < customers.length; start += perPage) {
+    const pageCustomers = customers.slice(start, start + perPage);
+    const xObjects: string[] = [`/Bg ${backgroundId} 0 R`];
+    let content = '';
 
-    doc.setFontSize(9);
-    doc.setTextColor(20, 20, 20);
-    doc.text(customer.fullName, cellX + cellW / 2, stickerY + stickerSize + 5, { align: 'center', maxWidth: cellW - 4 });
-    doc.setFontSize(8);
-    doc.setTextColor(120);
-    doc.text(customer.phoneNumber, cellX + cellW / 2, stickerY + stickerSize + 9, { align: 'center' });
+    for (const [posOnPage, customer] of pageCustomers.entries()) {
+      const col = posOnPage % cols;
+      const row = Math.floor(posOnPage / cols);
+      const cellX = margin + col * cellW;
+      const cellY = margin + row * cellH;
+      const stickerX = cellX + (cellW - stickerSize) / 2;
+      const stickerY = cellY + (cellH - stickerSize - textBlockHeight) / 2;
+
+      // Placement helpers: top-left mm coordinates -> PDF points from the bottom-left.
+      const place = (xMm: number, yMm: number, wMm: number, hMm: number) =>
+        `${n(wMm * PT_PER_MM)} 0 0 ${n(hMm * PT_PER_MM)} ${n(xMm * PT_PER_MM)} ${n((pageHeight - yMm - hMm) * PT_PER_MM)} cm`;
+
+      content += `q ${place(stickerX, stickerY, stickerSize, stickerSize)} /Bg Do Q
+`;
+
+      const { canvas: badge } = await renderBadgeCanvas(`${window.location.origin}/qr/${customer.id}`, geo);
+      const badgeId = await pdf.imageFromCanvas(badge);
+      xObjects.push(`/B${posOnPage} ${badgeId} 0 R`);
+      content += `q ${place(
+        stickerX + px2mm(geo.badgeX - pad),
+        stickerY + px2mm(geo.badgeY - pad),
+        px2mm(geo.badgeWidth + pad * 2),
+        px2mm(geo.badgeHeight + pad * 2),
+      )} /B${posOnPage} Do Q
+`;
+
+      const centreX = cellX + cellW / 2;
+      const text = (value: string, sizePt: number, gray: number, baselineMm: number) => {
+        const x = centreX - helveticaWidthMm(value, sizePt) / 2;
+        return `BT /F1 ${sizePt} Tf ${gray} g ${n(x * PT_PER_MM)} ${n((pageHeight - baselineMm) * PT_PER_MM)} Td ${pdfString(value)} Tj ET
+`;
+      };
+      content += text(customer.fullName, 9, 0.08, stickerY + stickerSize + 5);
+      content += text(customer.phoneNumber, 8, 0.47, stickerY + stickerSize + 9);
+    }
+
+    const contentId = pdf.allocate();
+    const pageId = pdf.allocate();
+    const bytes = new TextEncoder().encode(content);
+    await pdf.streamObject(contentId, '', bytes);
+    await pdf.object(
+      pageId,
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${n(pageWidth * PT_PER_MM)} ${n(pageHeight * PT_PER_MM)}] ` +
+        `/Resources << /Font << /F1 ${fontId} 0 R >> /XObject << ${xObjects.join(' ')} >> >> /Contents ${contentId} 0 R >>`,
+    );
+    pageIds.push(pageId);
   }
 
-  doc.save(`customer-stickers-${new Date().toISOString().slice(0, 10)}.pdf`);
+  await pdf.object(pagesId, `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`);
+  await pdf.object(rootId, `<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  await pdf.finish(rootId);
 }
