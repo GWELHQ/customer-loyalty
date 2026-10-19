@@ -67,6 +67,10 @@ export function Reports() {
   useEffect(reload, [api, stationId, groupBy, range, from, to]);
 
   const maxAmount = Math.max(1, ...groups.map((g) => g.amount));
+  const totals = groups.reduce(
+    (acc, g) => ({ count: acc.count + g.count, amount: acc.amount + g.amount, cashback: acc.cashback + g.cashback }),
+    { count: 0, amount: 0, cashback: 0 },
+  );
 
   return (
     <AppShell title="Reports" subtitle="Sales broken down by sales assistant, station, shift, or product, over any date range">
@@ -113,7 +117,13 @@ export function Reports() {
               </select>
             )}
             <div style={{ flex: 1 }} />
-            <ExportButtons filename={`sales-by-${groupBy}`} title={`Sales by ${GROUP_LABEL[groupBy]}`} columns={groupColumns(groupBy)} rows={groups} />
+            <ExportButtons
+              filename={`sales-by-${groupBy}`}
+              title={`Sales by ${GROUP_LABEL[groupBy]}`}
+              columns={groupColumns(groupBy)}
+              rows={groups}
+              totals={groups.length > 0 ? ['Total', totals.count, totals.amount, totals.cashback] : undefined}
+            />
             <Button variant="secondary" size="sm" onClick={() => setShowEmailModal(true)}>
               Send email
             </Button>
@@ -156,6 +166,14 @@ export function Reports() {
                   </Tr>
                 ))}
               </tbody>
+              <tfoot>
+                <Tr style={{ background: 'var(--color-surface-sunken)', fontWeight: 700, borderTop: '2px solid var(--color-border)' }}>
+                  <Td>Total</Td>
+                  <Td align="right">{totals.count.toLocaleString('en-KE')}</Td>
+                  <Td align="right">KSh {totals.amount.toLocaleString('en-KE')}</Td>
+                  <Td align="right">KSh {totals.cashback.toLocaleString('en-KE')}</Td>
+                </Tr>
+              </tfoot>
             </Table>
           )}
         </Card>

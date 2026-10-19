@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { exportToPdf, exportToXlsx, type ExportColumn } from '../lib/exportTable';
+import { exportToPdf, exportToXlsx, type ExportColumn, type ExportTotals } from '../lib/exportTable';
 import { Button } from './primitives';
 
 /**
@@ -12,11 +12,14 @@ export function ExportButtons<T>({
   title,
   columns,
   rows,
+  totals,
 }: {
   filename: string;
   title: string;
   columns: ExportColumn<T>[];
   rows: T[] | (() => Promise<T[]>);
+  /** Optional totals row appended to both exports. */
+  totals?: ExportTotals;
 }) {
   const [busy, setBusy] = useState<'xlsx' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +29,8 @@ export function ExportButtons<T>({
     setBusy(kind);
     try {
       const data = typeof rows === 'function' ? await rows() : rows;
-      if (kind === 'xlsx') exportToXlsx(filename, columns, data);
-      else exportToPdf(filename, title, columns, data);
+      if (kind === 'xlsx') exportToXlsx(filename, columns, data, totals);
+      else exportToPdf(filename, title, columns, data, totals);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not export this table');
     } finally {
