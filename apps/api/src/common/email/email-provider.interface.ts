@@ -7,6 +7,8 @@ export interface EmailAttachment {
   filename: string;
   contentType: string;
   contentBytes: Buffer;
+  /** Set to embed the file in the HTML body via `<img src="cid:...">` instead of showing it as a download. */
+  inlineContentId?: string;
 }
 
 export interface SendEmailInput {

@@ -19,6 +19,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { StorageModule } from './common/storage/storage.module';
 import { TokenModule } from './common/token/token.module';
 import { CustomersModule } from './customers/customers.module';
+import { CashbackTrendModule } from './cashback-trend/cashback-trend.module';
 import { DisbursementBatchesModule } from './disbursement-batches/disbursement-batches.module';
 import { EventsModule } from './events/events.module';
 import { FraudModule } from './fraud/fraud.module';
@@ -67,6 +68,7 @@ import { VehiclePlateChecksModule } from './vehicle-plate-checks/vehicle-plate-c
     CashbackLedgersModule,
     DisbursementBatchesModule,
     ReportsModule,
+    CashbackTrendModule,
     NotificationsModule,
     AuditEventsModule,
     SmsModule,

@@ -71,6 +71,7 @@ export class MicrosoftGraphEmailProvider implements EmailProvider {
                       name: a.filename,
                       contentType: a.contentType,
                       contentBytes: a.contentBytes.toString('base64'),
+                      ...(a.inlineContentId ? { isInline: true, contentId: a.inlineContentId } : {}),
                     })),
                   }
                 : {}),

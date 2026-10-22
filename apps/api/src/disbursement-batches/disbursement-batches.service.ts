@@ -7,6 +7,7 @@ import {
   type DisbursementEntry,
   type MonthlyCashbackLedgerEntry,
 } from '@loyalty/shared';
+import { CashbackTrendService } from '../cashback-trend/cashback-trend.service';
 import { CashbackLedgersService } from '../cashback-ledgers/cashback-ledgers.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
@@ -23,6 +24,7 @@ export class DisbursementBatchesService {
     private readonly ledgers: CashbackLedgersService,
     private readonly changeEvents: ChangeEventsService,
     private readonly disbursementSettings: DisbursementSettingsService,
+    private readonly cashbackTrend: CashbackTrendService,
   ) {}
 
   private col() {
@@ -200,7 +202,8 @@ export class DisbursementBatchesService {
       .filter((e) => e.status === DisbursementEntryStatus.PAID)
       .map((e) => ({ customerId: e.customerId, stationId: batch.stationId, amount: e.amount }));
     await this.ledgers.recordDisbursedAmounts(batch.month, paid);
-    await this.recomputeLedgerDisbursementStatus(batch.month);
+    const ledgerStatus = await this.recomputeLedgerDisbursementStatus(batch.month);
+    if (ledgerStatus === LedgerStatus.DISBURSED) await this.reportDisbursedMonth(batch.month);
     this.changeEvents.emit(COLLECTION);
     return this.findById(id);
   }
@@ -221,9 +224,9 @@ export class DisbursementBatchesService {
    * failed, then still-in-flight, and only once every station's batch has
    * completed does the whole month read as disbursed.
    */
-  private async recomputeLedgerDisbursementStatus(month: string): Promise<void> {
+  private async recomputeLedgerDisbursementStatus(month: string): Promise<LedgerStatus | null> {
     const batches = await this.list(month);
-    if (batches.length === 0) return;
+    if (batches.length === 0) return null;
     const status = batches.some((b) => b.status === DisbursementBatchStatus.HELD)
       ? LedgerStatus.HELD
       : batches.some((b) => b.status === DisbursementBatchStatus.FAILED)
@@ -232,6 +235,25 @@ export class DisbursementBatchesService {
           ? LedgerStatus.DISBURSED
           : LedgerStatus.DISBURSEMENT_IN_PROGRESS;
     await this.ledgers.setStatus(month, status);
+    return status;
+  }
+
+  /**
+   * Feeds the year-to-date cashback trend report: the month is now fully
+   * disbursed, so what was actually paid per station is final. Sums only
+   * confirmed-paid entries (a station can have several batches in a month).
+   */
+  private async reportDisbursedMonth(month: string): Promise<void> {
+    const batches = await this.list(month);
+    const paidByStation = new Map<string, number>();
+    for (const b of batches) {
+      const paid = b.entries.filter((e) => e.status === DisbursementEntryStatus.PAID).reduce((sum, e) => sum + e.amount, 0);
+      paidByStation.set(b.stationId, round2((paidByStation.get(b.stationId) ?? 0) + paid));
+    }
+    await this.cashbackTrend.onMonthDisbursed(
+      month,
+      [...paidByStation.entries()].map(([stationId, amount]) => ({ stationId, amount })),
+    );
   }
 }
 

@@ -471,3 +471,40 @@ export interface ImportedCollection {
   customers: Customer[];
   sales: Sale[];
 }
+
+/** 'seed' = loaded from the pre-system history, 'system' = recorded automatically when a month's disbursement completed, 'manual' = corrected by an admin. */
+export type CashbackMonthlyTotalSource = 'seed' | 'system' | 'manual';
+
+/** Cashback actually paid out to one station's customers in one month. Doc id is `${month}_${stationId}`. */
+export interface CashbackMonthlyTotal extends BaseDoc {
+  /** 'YYYY-MM'. */
+  month: string;
+  stationId: string;
+  stationName: string;
+  amount: number;
+  source: CashbackMonthlyTotalSource;
+}
+
+export interface CashbackTrendSettings extends BaseDoc {
+  /** Recipients of the automatic email sent when a month's disbursement completes. */
+  autoRecipients: string[];
+}
+
+export interface CashbackTrendRow {
+  stationId: string;
+  stationName: string;
+  /** One entry per `months` entry; null = no data for that station that month (e.g. Rodi before September). */
+  values: (number | null)[];
+  total: number;
+}
+
+/** Year-to-date paid-out cashback trend: January through the latest fully disbursed month. */
+export interface CashbackTrendReport {
+  year: number;
+  /** 'YYYY-MM' keys, January through the latest month. Empty when no month has been disbursed yet. */
+  months: string[];
+  monthLabels: string[];
+  rows: CashbackTrendRow[];
+  monthTotals: number[];
+  grandTotal: number;
+}

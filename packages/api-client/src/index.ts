@@ -4,6 +4,8 @@ import type {
   AttendantLoginInput,
   AuditEvent,
   Customer,
+  CashbackTrendReport,
+  CashbackTrendSettings,
   CustomerInactivitySettings,
   CustomerRegistrationRequest,
   DisbursementBatch,
@@ -311,6 +313,17 @@ export class LoyaltyApiClient {
       this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/complete`, { results }),
     hold: (id: string, reason: string) => this.http.post<DisbursementBatch>(`/disbursement-batches/${id}/hold`, { reason }),
     exportFile: (id: string) => this.http.getBlob(`/disbursement-batches/${id}/export.txt`),
+  };
+
+  cashbackTrend = {
+    report: () => this.http.get<CashbackTrendReport>('/reports/cashback-trend'),
+    chart: () => this.http.getBlob('/reports/cashback-trend/chart.png'),
+    download: (format: 'xlsx' | 'pdf') => this.http.getBlob(`/reports/cashback-trend/export/${format}`),
+    email: (input: { recipients: string[]; cc?: string[]; subject?: string; body?: string }) =>
+      this.http.post<{ success: boolean; errorReason?: string }>('/reports/cashback-trend/email', input),
+    settings: () => this.http.get<CashbackTrendSettings>('/reports/cashback-trend/settings'),
+    updateSettings: (autoRecipients: string[]) =>
+      this.http.patch<CashbackTrendSettings>('/reports/cashback-trend/settings', { autoRecipients }),
   };
 
   reports = {

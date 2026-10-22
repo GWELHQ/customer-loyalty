@@ -1,5 +1,5 @@
 import type { SalesReportGroup, SalesReportGroupBy, Station } from '@loyalty/shared';
-import { Role } from '@loyalty/shared';
+import { Permission, Role } from '@loyalty/shared';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
@@ -11,6 +11,7 @@ import { nairobiToday } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
 import { Card, KpiTile, Table, Td, Th, Tr, inputStyle, Button } from '../ui/primitives';
 import { SendReportEmailModal } from '../ui/SendReportEmailModal';
+import { CashbackTrendSection } from './CashbackTrendSection';
 
 type RangePreset = 'this_month' | 'this_quarter' | 'ytd' | 'custom';
 
@@ -39,7 +40,7 @@ function groupColumns(groupBy: SalesReportGroupBy): ExportColumn<SalesReportGrou
 
 export function Reports() {
   const api = useApi();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const lockedStationId = user?.role === Role.STATION_SUPERVISOR ? user.assignedStationId : undefined;
   const { stations } = useStations();
   const { data: dashboard } = useDashboardSnapshot();
@@ -83,6 +84,8 @@ export function Reports() {
             <KpiTile label="Unique customers" value={dashboard.uniqueCustomers} />
           </div>
         )}
+
+        {hasPermission(Permission.REPORTS_VIEW_ALL) && <CashbackTrendSection />}
 
         <Card padding={0}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: 16, borderBottom: '1px solid var(--color-border)' }}>
