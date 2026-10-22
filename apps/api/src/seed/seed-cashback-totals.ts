@@ -14,9 +14,13 @@
  * stations those customers belong to.
  */
 import 'reflect-metadata';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { CashbackTrendService, stationLabel } from '../cashback-trend/cashback-trend.service';
+
+/** The deployed project (see .firebaserc / backend-deploy.yml). A local .env can point elsewhere, so the script refuses to write anywhere else. */
+const LIVE_PROJECT_ID = 'customer-loyalty-3af1a';
 
 const MONTHS = [
   '2025-12',
@@ -43,6 +47,14 @@ const HISTORY: Record<string, (number | null)[]> = {
 
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule);
+  const projectId = app.get(ConfigService).get<string>('gcpProjectId');
+  if (projectId !== LIVE_PROJECT_ID) {
+    await app.close();
+    throw new Error(
+      `Refusing to seed: GCP_PROJECT_ID is "${projectId}", expected "${LIVE_PROJECT_ID}". Set GCP_PROJECT_ID (and credentials for that project) for this run.`,
+    );
+  }
+  console.log(`Seeding Firestore project ${projectId}`);
   const trend = app.get(CashbackTrendService);
   const stations = await trend.listStations();
   const byCode = new Map(stations.map((s) => [s.code, s]));
