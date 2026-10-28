@@ -136,11 +136,15 @@ export class CashbackLedgersService {
       }
     }
 
-    // Resolve customer names in one batch rather than per-sale.
+    // Resolve customer names in one batch rather than per-sale. The phone
+    // comes from the customer doc too, not the sale snapshot — a Super Admin
+    // phone correction mid-month must redirect the whole month's payout.
     const customerIds = [...new Set([...byKey.values()].map((e) => e.customerId))];
-    const names = await this.resolveCustomerNames(customerIds);
+    const customers = await this.resolveCustomers(customerIds);
     for (const entry of byKey.values()) {
-      entry.customerName = names.get(entry.customerId) ?? entry.customerPhone;
+      const customer = customers.get(entry.customerId);
+      if (customer?.phoneNumber) entry.customerPhone = customer.phoneNumber;
+      entry.customerName = customer?.fullName ?? entry.customerPhone;
     }
 
     const entries = [...byKey.values()].sort((a, b) => b.totalCashback - a.totalCashback);
@@ -266,14 +270,16 @@ export class CashbackLedgersService {
     this.changeEvents.emit(COLLECTION);
   }
 
-  private async resolveCustomerNames(ids: string[]): Promise<Map<string, string>> {
-    const map = new Map<string, string>();
+  private async resolveCustomers(ids: string[]): Promise<Map<string, { fullName: string; phoneNumber?: string }>> {
+    const map = new Map<string, { fullName: string; phoneNumber?: string }>();
     const chunks = chunk(ids, 30);
     for (const c of chunks) {
       if (c.length === 0) continue;
       const snaps = await Promise.all(c.map((id) => this.firestore.collection('customers').doc(id).get()));
       for (const s of snaps) {
-        if (s.exists) map.set(s.id, (s.data()?.fullName as string) ?? '');
+        if (s.exists) {
+          map.set(s.id, { fullName: (s.data()?.fullName as string) ?? '', phoneNumber: s.data()?.phoneNumber as string | undefined });
+        }
       }
     }
     return map;

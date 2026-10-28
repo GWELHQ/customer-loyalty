@@ -153,6 +153,11 @@ export class LoyaltyApiClient {
       id: string,
       input: Partial<{ fullName: string; homeStationId: string; licensePlateNumbers: string[]; nfcTagId: string }>,
     ) => this.http.patch<Customer>(`/customers/${id}`, input),
+    updatePhone: (id: string, phoneNumber: string) =>
+      this.http.patch<{ customer: Customer; previousPhone: string; draftBatchIdsUpdated: string[]; processingBatchIds: string[] }>(
+        `/customers/${id}/phone`,
+        { phoneNumber },
+      ),
     delete: (id: string) => this.http.delete<{ success: boolean }>(`/customers/${id}`),
     uploadImport: (file: File, homeStationId: string) => {
       const form = new FormData();

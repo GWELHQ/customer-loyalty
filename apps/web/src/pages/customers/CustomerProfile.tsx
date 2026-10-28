@@ -34,11 +34,14 @@ export function CustomerProfile() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.CUSTOMERS_MANAGE);
   const canDelete = hasPermission(Permission.CUSTOMERS_DELETE);
+  const canEditPhone = hasPermission(Permission.CUSTOMERS_EDIT_PHONE);
   const { stations } = useStations();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingDetails, setEditingDetails] = useState(false);
+  const [showPhoneChange, setShowPhoneChange] = useState(false);
+  const [phoneChangeNotice, setPhoneChangeNotice] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -162,6 +165,19 @@ export function CustomerProfile() {
               {!editingDetails ? (
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>
                   <div>{customer.fullName}</div>
+                  <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Phone: {customer.phoneNumber}
+                    {canEditPhone && (
+                      <Button variant="secondary" size="sm" onClick={() => setShowPhoneChange(true)}>
+                        Change
+                      </Button>
+                    )}
+                  </div>
+                  {phoneChangeNotice && (
+                    <div style={{ marginTop: 8, fontSize: 12.5, background: 'var(--color-info-tint)', borderRadius: 8, padding: 10 }}>
+                      {phoneChangeNotice}
+                    </div>
+                  )}
                   <div style={{ marginTop: 4 }}>
                     Home station: {stations.find((s) => s.id === customer.homeStationId)?.name ?? 'None set'}
                   </div>
@@ -268,6 +284,19 @@ export function CustomerProfile() {
           )}
         </div>
       </div>
+
+      {showPhoneChange && (
+        <ChangePhoneModal
+          customer={customer}
+          onClose={() => setShowPhoneChange(false)}
+          onChanged={(notice) => {
+            setShowPhoneChange(false);
+            setPhoneChangeNotice(notice);
+            invalidateCustomersCache();
+            reload();
+          }}
+        />
+      )}
 
       {showDeleteConfirm && (
         <Modal title="Delete this customer?" onClose={() => !deleting && setShowDeleteConfirm(false)}>
@@ -417,5 +446,65 @@ function CustomerDetailsForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ChangePhoneModal({
+  customer,
+  onClose,
+  onChanged,
+}: {
+  customer: Customer;
+  onClose: () => void;
+  onChanged: (notice: string) => void;
+}) {
+  const api = useApi();
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await api.customers.updatePhone(customer.id, phoneNumber);
+      let notice = `Phone changed from ${result.previousPhone} to ${result.customer.phoneNumber}. Cashback not yet paid out will go to the new number.`;
+      if (result.processingBatchIds.length) {
+        notice += ` ${result.processingBatchIds.length} disbursement batch(es) already processing still carry the old number — let Finance know before they pay out.`;
+      }
+      onChanged(notice);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the phone number');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Change phone number" onClose={() => !busy && onClose()}>
+      <div style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+        Current number for <strong>{customer.fullName}</strong>: <strong>{customer.phoneNumber}</strong>.
+        <div style={{ marginTop: 8 }}>
+          Any cashback not yet paid out, including this month's, will be paid to the new number. Past sales keep the number they were recorded under.
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <Field label="New phone number" required>
+          <input style={inputStyle} value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="0712345678" autoFocus />
+        </Field>
+      </div>
+      {error && (
+        <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12, marginTop: 12 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <Button variant="primary" onClick={save} disabled={busy || !phoneNumber.trim()}>
+          {busy ? 'Saving…' : 'Change phone number'}
+        </Button>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </Modal>
   );
 }

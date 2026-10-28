@@ -27,6 +27,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { RemapImportDto } from './dto/remap-import.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { UpdateCustomerPhoneDto } from './dto/update-customer-phone.dto';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -161,6 +162,31 @@ export class CustomersController {
       entityLabel: customer.fullName,
     });
     return customer;
+  }
+
+  /** Super Admin correction of a mistyped phone number — cashback not yet paid out moves to the new number (see CustomersService.updatePhone). */
+  @Patch(':id/phone')
+  @RequirePermissions(Permission.CUSTOMERS_EDIT_PHONE)
+  async updatePhone(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerPhoneDto,
+    @CurrentUser() actor: StaffPrincipal,
+  ) {
+    const result = await this.customers.updatePhone(id, dto.phoneNumber);
+    await this.audit.record({
+      actor,
+      action: 'customer.edit_phone',
+      entityType: 'customer',
+      entityId: id,
+      entityLabel: result.customer.fullName,
+      metadata: {
+        previousPhoneNumber: result.previousPhone,
+        newPhoneNumber: result.customer.phoneNumber,
+        draftBatchIdsUpdated: result.draftBatchIdsUpdated,
+        processingBatchIds: result.processingBatchIds,
+      },
+    });
+    return result;
   }
 
   @Delete(':id')

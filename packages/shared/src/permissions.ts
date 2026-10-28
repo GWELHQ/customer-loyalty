@@ -13,6 +13,8 @@ export enum Permission {
   CUSTOMERS_VIEW = 'customers:view',
   CUSTOMERS_MANAGE = 'customers:manage',
   CUSTOMERS_DELETE = 'customers:delete',
+  /** Correct a customer's phone number (e.g. a typo at registration) — also redirects any not-yet-paid cashback to the new number. Granted only to Super Admin — see SUPER_ADMIN_PERMISSIONS. */
+  CUSTOMERS_EDIT_PHONE = 'customers:edit_phone',
   CUSTOMERS_IMPORT = 'customers:import',
   STATIONS_MANAGE = 'stations:manage',
   STATIONS_VIEW = 'stations:view',
@@ -98,8 +100,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   // to users via USERS_MANAGE, just can't change what a role grants.
 ];
 
-// Everything Admin has, plus RBAC_MANAGE, SALES_CREATE_MANUAL, and
-// SALES_EDIT_AMOUNT — what distinguishes Super Admin's permission set from
+// Everything Admin has, plus RBAC_MANAGE, SALES_CREATE_MANUAL,
+// SALES_EDIT_AMOUNT, and CUSTOMERS_EDIT_PHONE — what distinguishes Super Admin's permission set from
 // Admin's. (The other
 // distinguishing behavior, "only a Super Admin can assign the super_admin
 // role," is enforced separately in UsersService against the actor's
@@ -109,6 +111,7 @@ const SUPER_ADMIN_PERMISSIONS: Permission[] = [
   Permission.RBAC_MANAGE,
   Permission.SALES_CREATE_MANUAL,
   Permission.SALES_EDIT_AMOUNT,
+  Permission.CUSTOMERS_EDIT_PHONE,
 ];
 
 const CHAIRMAN_PERMISSIONS: Permission[] = [

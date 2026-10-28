@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { normalizePhoneNumber, type Customer } from '@loyalty/shared';
+import { DisbursementBatchStatus, normalizePhoneNumber, type Customer, type DisbursementBatch } from '@loyalty/shared';
 import { FirestoreService } from '../common/firestore/firestore.service';
 import { fromDoc, nowIso } from '../common/firestore/helpers';
 import { normalizeNfcTagId } from '../common/nfc/normalize-nfc-tag-id';
@@ -229,6 +229,61 @@ export class CustomersService {
     await this.col().doc(id).update(patch);
     this.changeEvents.emit(COLLECTION);
     return this.findById(id);
+  }
+
+  /**
+   * Super Admin correction of a mistyped phone number. Past sales keep the
+   * number they were recorded under (customerPhoneAtSale is a historical
+   * snapshot), but cashback still owed follows the new number: the monthly
+   * ledger re-reads each customer's current phone on every recompute, and
+   * any draft disbursement batch is patched here. A batch already
+   * processing has been exported to the bank, so it's left alone and
+   * reported back for Finance to handle.
+   */
+  async updatePhone(
+    id: string,
+    rawPhone: string,
+  ): Promise<{ customer: Customer; previousPhone: string; draftBatchIdsUpdated: string[]; processingBatchIds: string[] }> {
+    const current = await this.findById(id);
+    let normalized: string;
+    try {
+      normalized = normalizePhoneNumber(rawPhone);
+    } catch {
+      throw new BadRequestException(`Not a valid Kenyan mobile number: "${rawPhone}"`);
+    }
+    if (normalized === current.phoneNumber) {
+      throw new BadRequestException(`${normalized} is already this customer's phone number`);
+    }
+    const existing = await this.findByPhone(normalized);
+    if (existing && existing.id !== id) {
+      throw new ConflictException(`A customer with phone ${normalized} already exists`);
+    }
+
+    await this.col().doc(id).update({ phoneNumber: normalized, updatedAt: nowIso() });
+
+    const batchSnap = await this.firestore
+      .collection('disbursementBatches')
+      .where('status', 'in', [DisbursementBatchStatus.DRAFT, DisbursementBatchStatus.PROCESSING])
+      .get();
+    const draftBatchIdsUpdated: string[] = [];
+    const processingBatchIds: string[] = [];
+    for (const doc of batchSnap.docs) {
+      const batch = fromDoc<DisbursementBatch>(doc);
+      if (!batch.entries.some((e) => e.customerId === id)) continue;
+      if (batch.status === DisbursementBatchStatus.PROCESSING) {
+        processingBatchIds.push(batch.id);
+        continue;
+      }
+      await doc.ref.update({
+        entries: batch.entries.map((e) => (e.customerId === id ? { ...e, customerPhone: normalized } : e)),
+        updatedAt: nowIso(),
+      });
+      draftBatchIdsUpdated.push(batch.id);
+    }
+
+    this.changeEvents.emit(COLLECTION);
+    if (draftBatchIdsUpdated.length) this.changeEvents.emit('disbursementBatches');
+    return { customer: await this.findById(id), previousPhone: current.phoneNumber, draftBatchIdsUpdated, processingBatchIds };
   }
 
   /** Throws if the given NFC tag is already assigned to a different customer. */
