@@ -263,6 +263,7 @@ function FullLedgerView() {
   const { stations: activeStations } = useStations();
   const [month, setMonth] = useState(nairobiThisMonth);
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
+  const [allLedgers, setAllLedgers] = useState<MonthlyCashbackLedger[]>([]);
   const [busy, setBusy] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
@@ -275,6 +276,8 @@ function FullLedgerView() {
 
   function reload() {
     api.cashbackLedgers.get(month).then(setLedger);
+    // Only months that already have a ledger doc — fetching a missing month by key would create one.
+    api.cashbackLedgers.list().then(setAllLedgers);
   }
   useEffect(reload, [api, month]);
   useRealtimeRefresh(['monthlyCashbackLedgers'], reload);
@@ -395,6 +398,8 @@ function FullLedgerView() {
           </Card>
         )}
 
+        {ledger && <StationTrend ledger={ledger} allLedgers={allLedgers} />}
+
         {ledger && (
           <Card>
             {(() => {
@@ -499,6 +504,99 @@ function FullLedgerView() {
         />
       )}
     </AppShell>
+  );
+}
+
+function previousMonthKey(month: string): string {
+  const [year, m] = month.split('-').map(Number) as [number, number];
+  return m === 1 ? `${year - 1}-12` : `${year}-${String(m - 1).padStart(2, '0')}`;
+}
+
+function cashbackByStation(ledger: MonthlyCashbackLedger): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const e of ledger.entries) totals.set(e.stationName, (totals.get(e.stationName) ?? 0) + e.totalCashback);
+  return totals;
+}
+
+function formatKsh(n: number): string {
+  return `KSh ${Math.round(n).toLocaleString('en-KE')}`;
+}
+
+/** Change vs the month before, e.g. "▲ 12%" — blank when there's nothing to compare against. */
+function TrendDelta({ current, previous }: { current: number; previous: number | undefined }) {
+  if (previous === undefined || previous === 0) return null;
+  const pct = Math.round(((current - previous) / previous) * 100);
+  const color = pct > 0 ? 'var(--color-success)' : pct < 0 ? 'var(--color-danger)' : 'var(--color-text-secondary)';
+  return (
+    <div style={{ fontSize: 11.5, fontWeight: 600, color }}>
+      {pct > 0 ? '▲' : pct < 0 ? '▼' : ''} {Math.abs(pct)}%
+    </div>
+  );
+}
+
+/**
+ * Cashback per station for the selected month alongside the two months
+ * before it (whichever of them have a ledger), so approvers can spot a
+ * station whose payout jumped or dropped before approving.
+ */
+function StationTrend({ ledger, allLedgers }: { ledger: MonthlyCashbackLedger; allLedgers: MonthlyCashbackLedger[] }) {
+  const prev1 = previousMonthKey(ledger.month);
+  const prev2 = previousMonthKey(prev1);
+  const months = [
+    allLedgers.find((l) => l.month === prev2),
+    allLedgers.find((l) => l.month === prev1),
+    ledger,
+  ].filter((l): l is MonthlyCashbackLedger => !!l);
+  const byMonth = months.map(cashbackByStation);
+  const stations = [...new Set(byMonth.flatMap((m) => [...m.keys()]))].sort((a, b) => a.localeCompare(b));
+  if (stations.length === 0) return null;
+  const monthTotals = byMonth.map((m) => [...m.values()].reduce((sum, v) => sum + v, 0));
+
+  return (
+    <Card padding={0}>
+      <div style={{ padding: '14px 16px 6px' }}>
+        <CardHeader
+          title="Cashback by station"
+          subtitle={months.length > 1 ? `${formatMonthLabel(ledger.month)} compared with the ${months.length === 3 ? 'two months' : 'month'} before` : 'No earlier months to compare with yet'}
+        />
+      </div>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Station</Th>
+            {months.map((l) => (
+              <Th key={l.month} align="right">
+                {formatMonthLabel(l.month)}
+              </Th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {stations.map((station) => (
+            <Tr key={station}>
+              <Td>{station}</Td>
+              {byMonth.map((m, i) => (
+                <Td key={months[i]!.month} align="right">
+                  {i === byMonth.length - 1 ? <strong>{formatKsh(m.get(station) ?? 0)}</strong> : formatKsh(m.get(station) ?? 0)}
+                  {i > 0 && <TrendDelta current={m.get(station) ?? 0} previous={byMonth[i - 1]!.get(station)} />}
+                </Td>
+              ))}
+            </Tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <Tr style={{ background: 'var(--color-surface-sunken)', fontWeight: 700, borderTop: '2px solid var(--color-border)' }}>
+            <Td>Total</Td>
+            {monthTotals.map((total, i) => (
+              <Td key={months[i]!.month} align="right">
+                {formatKsh(total)}
+                {i > 0 && <TrendDelta current={total} previous={monthTotals[i - 1]} />}
+              </Td>
+            ))}
+          </Tr>
+        </tfoot>
+      </Table>
+    </Card>
   );
 }
 

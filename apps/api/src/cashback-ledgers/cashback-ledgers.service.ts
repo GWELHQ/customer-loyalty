@@ -170,14 +170,26 @@ export class CashbackLedgersService {
       createdAt: existing ? existing.createdAt : now,
       updatedAt: now,
     };
-    // stationReleases is deliberately left out of the write for an existing
-    // doc: this recompute reads sales for a while, and writing back the
-    // releases it read at the start would silently wipe any station that
-    // was released in the meantime (releaseStation owns that field).
-    const { stationReleases: _releases, ...docWithoutReleases } = doc;
-    await this.col().doc(month).set(existing ? docWithoutReleases : doc, { merge: true });
-    this.changeEvents.emit(COLLECTION);
-    return { ...doc, id: month };
+    // For an existing doc only the recomputed sums are written: this
+    // recompute reads sales for a while, and writing back the status,
+    // releases or submission fields it read at the start would silently
+    // undo a release or submit that landed in the meantime. The open-ledger
+    // refresh (getOrCreate) also re-checks inside the transaction that the
+    // ledger is still open_accruing, so it never rewrites a submitted month.
+    const ref = this.col().doc(month);
+    const onlyIfStillOpen = statusOverride.status === LedgerStatus.OPEN_ACCRUING;
+    const written = await this.firestore.instance.runTransaction(async (tx) => {
+      const current = await tx.get(ref);
+      if (!current.exists) {
+        tx.set(ref, doc);
+        return true;
+      }
+      if (onlyIfStillOpen && current.data()?.status !== LedgerStatus.OPEN_ACCRUING) return false;
+      tx.set(ref, { entries, totalCashback, updatedAt: now }, { merge: true });
+      return true;
+    });
+    if (written) this.changeEvents.emit(COLLECTION);
+    return this.findByMonth(month);
   }
 
   /**
