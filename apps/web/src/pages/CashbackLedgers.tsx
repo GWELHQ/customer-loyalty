@@ -1,4 +1,4 @@
-import type { MonthlyCashbackLedger, MonthlyCashbackLedgerEntry, Sale } from '@loyalty/shared';
+import type { CashbackMonthlyTotal, MonthlyCashbackLedger, MonthlyCashbackLedgerEntry, Sale } from '@loyalty/shared';
 import { LedgerStatus, Permission, Role } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -260,10 +260,12 @@ function FullLedgerView() {
   const { user, hasPermission } = useAuth();
   const canManage = hasPermission(Permission.LEDGERS_MANAGE);
   const canApprove = hasPermission(Permission.LEDGERS_APPROVE);
+  const canViewReports = hasPermission(Permission.REPORTS_VIEW_ALL);
   const { stations: activeStations } = useStations();
   const [month, setMonth] = useState(nairobiThisMonth);
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
   const [allLedgers, setAllLedgers] = useState<MonthlyCashbackLedger[]>([]);
+  const [monthlyTotals, setMonthlyTotals] = useState<CashbackMonthlyTotal[]>([]);
   const [busy, setBusy] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
@@ -284,6 +286,8 @@ function FullLedgerView() {
     api.cashbackLedgers.get(month).then(setLedger);
     // Only months that already have a ledger doc — fetching a missing month by key would create one.
     api.cashbackLedgers.list().then(setAllLedgers);
+    // The trend table still works from ledgers alone if this fails or isn't permitted.
+    if (canViewReports) api.cashbackTrend.totals().then(setMonthlyTotals, () => setMonthlyTotals([]));
   }
   useEffect(reload, [api, month]);
   useRealtimeRefresh(['monthlyCashbackLedgers'], reload);
@@ -404,7 +408,7 @@ function FullLedgerView() {
           </Card>
         )}
 
-        {ledger && <StationTrend ledger={ledger} allLedgers={allLedgers} stationNames={stationNames} />}
+        {ledger && <StationTrend ledger={ledger} allLedgers={allLedgers} monthlyTotals={monthlyTotals} stationNames={stationNames} />}
 
         {ledger && (
           <Card>
@@ -541,32 +545,62 @@ function TrendDelta({ current, previous }: { current: number; previous: number |
   );
 }
 
+interface TrendMonth {
+  month: string;
+  byStation: Map<string, number>;
+  /** Figures come from the Reports page's paid-out history rather than this system's ledger. */
+  fromHistory: boolean;
+}
+
+/**
+ * One month's per-station figures. A month with seeded or manually corrected
+ * totals (the paid-out history finance reconciled, up to and including the
+ * September 2026 cut-over) uses those, so it matches /reports; otherwise the
+ * month's ledger. Auto-recorded ('system') totals are ignored here — they're
+ * just the ledger paid out, and the ledger is what's being approved.
+ */
+function trendMonth(
+  month: string,
+  ledger: MonthlyCashbackLedger | undefined,
+  monthlyTotals: CashbackMonthlyTotal[],
+): TrendMonth | null {
+  const history = monthlyTotals.filter((t) => t.month === month && t.source !== 'system');
+  if (history.length > 0) {
+    const byStation = new Map<string, number>();
+    for (const t of history) byStation.set(t.stationId, (byStation.get(t.stationId) ?? 0) + t.amount);
+    return { month, byStation, fromHistory: true };
+  }
+  return ledger ? { month, byStation: cashbackByStation(ledger), fromHistory: false } : null;
+}
+
 /**
  * Cashback per station for the selected month alongside the two months
- * before it (whichever of them have a ledger), so approvers can spot a
+ * before it (whichever of them have figures), so approvers can spot a
  * station whose payout jumped or dropped before approving.
  */
 function StationTrend({
   ledger,
   allLedgers,
+  monthlyTotals,
   stationNames,
 }: {
   ledger: MonthlyCashbackLedger;
   allLedgers: MonthlyCashbackLedger[];
+  monthlyTotals: CashbackMonthlyTotal[];
   stationNames: Map<string, string>;
 }) {
   const prev1 = previousMonthKey(ledger.month);
   const prev2 = previousMonthKey(prev1);
   const months = [
-    allLedgers.find((l) => l.month === prev2),
-    allLedgers.find((l) => l.month === prev1),
-    ledger,
-  ].filter((l): l is MonthlyCashbackLedger => !!l);
-  const byMonth = months.map(cashbackByStation);
-  // Current station name wins; a station no longer in the list falls back to its most recent name on a ledger entry.
+    trendMonth(prev2, allLedgers.find((l) => l.month === prev2), monthlyTotals),
+    trendMonth(prev1, allLedgers.find((l) => l.month === prev1), monthlyTotals),
+    trendMonth(ledger.month, ledger, monthlyTotals),
+  ].filter((m): m is TrendMonth => !!m);
+  const byMonth = months.map((m) => m.byStation);
+  // Current station name wins; a station no longer in the list falls back to its most recent recorded name.
   const nameOf = (stationId: string) =>
     stationNames.get(stationId) ??
-    [...months].reverse().flatMap((l) => l.entries).find((e) => e.stationId === stationId)?.stationName ??
+    [...allLedgers.flatMap((l) => l.entries), ...monthlyTotals].reverse().find((e) => e.stationId === stationId)?.stationName ??
     stationId;
   const stations = [...new Set(byMonth.flatMap((m) => [...m.keys()]))]
     .map((id) => ({ id, name: nameOf(id) }))
@@ -586,9 +620,12 @@ function StationTrend({
         <thead>
           <tr>
             <Th>Station</Th>
-            {months.map((l) => (
-              <Th key={l.month} align="right">
-                {formatMonthLabel(l.month)}
+            {months.map((m) => (
+              <Th key={m.month} align="right">
+                {formatMonthLabel(m.month)}
+                {m.fromHistory && (
+                  <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>paid out · from Reports</div>
+                )}
               </Th>
             ))}
           </tr>

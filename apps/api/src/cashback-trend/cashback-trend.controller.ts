@@ -27,6 +27,13 @@ export class CashbackTrendController {
     return this.trend.buildReport();
   }
 
+  /** The raw per-station monthly figures — the ledger page uses the seeded/manual ones for months that predate this system. */
+  @Get('totals')
+  @RequirePermissions(Permission.REPORTS_VIEW_ALL)
+  totals() {
+    return this.trend.listTotals();
+  }
+
   @Get('chart.png')
   @RequirePermissions(Permission.REPORTS_VIEW_ALL)
   async chart(@Res() res: Response) {

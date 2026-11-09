@@ -4,6 +4,7 @@ import type {
   AttendantLoginInput,
   AuditEvent,
   Customer,
+  CashbackMonthlyTotal,
   CashbackTrendReport,
   CashbackTrendSettings,
   CustomerInactivitySettings,
@@ -322,6 +323,7 @@ export class LoyaltyApiClient {
 
   cashbackTrend = {
     report: () => this.http.get<CashbackTrendReport>('/reports/cashback-trend'),
+    totals: () => this.http.get<CashbackMonthlyTotal[]>('/reports/cashback-trend/totals'),
     chart: () => this.http.getBlob('/reports/cashback-trend/chart.png'),
     download: (format: 'xlsx' | 'pdf') => this.http.getBlob(`/reports/cashback-trend/export/${format}`),
     email: (input: { recipients: string[]; cc?: string[]; subject?: string; body?: string }) =>
