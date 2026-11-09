@@ -1,6 +1,6 @@
 import type { MonthlyCashbackLedger, MonthlyCashbackLedgerEntry, Sale } from '@loyalty/shared';
 import { LedgerStatus, Permission, Role } from '@loyalty/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { usePagedRows } from '../data/usePagedRows';
@@ -268,8 +268,14 @@ function FullLedgerView() {
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
   const [showReject, setShowReject] = useState(false);
+  // Entries carry the station name snapshotted at sale time — show the current one so a renamed station reads consistently.
+  const stationNames = useMemo(() => new Map(activeStations.map((s) => [s.id, s.name])), [activeStations]);
+  const entries = useMemo(
+    () => (ledger?.entries ?? []).map((e) => ({ ...e, stationName: stationNames.get(e.stationId) ?? e.stationName })),
+    [ledger, stationNames],
+  );
   const { search, setSearch, filtered } = useTextFilter(
-    ledger?.entries ?? [],
+    entries,
     (e) => `${e.customerName} ${e.customerPhone} ${e.stationName}`,
   );
   const { paged, page, pageCount, setPage } = usePagedRows(filtered);
@@ -398,7 +404,7 @@ function FullLedgerView() {
           </Card>
         )}
 
-        {ledger && <StationTrend ledger={ledger} allLedgers={allLedgers} />}
+        {ledger && <StationTrend ledger={ledger} allLedgers={allLedgers} stationNames={stationNames} />}
 
         {ledger && (
           <Card>
@@ -512,9 +518,10 @@ function previousMonthKey(month: string): string {
   return m === 1 ? `${year - 1}-12` : `${year}-${String(m - 1).padStart(2, '0')}`;
 }
 
+/** Keyed by stationId, not the name snapshotted on each sale, so a renamed station's months stay on one row. */
 function cashbackByStation(ledger: MonthlyCashbackLedger): Map<string, number> {
   const totals = new Map<string, number>();
-  for (const e of ledger.entries) totals.set(e.stationName, (totals.get(e.stationName) ?? 0) + e.totalCashback);
+  for (const e of ledger.entries) totals.set(e.stationId, (totals.get(e.stationId) ?? 0) + e.totalCashback);
   return totals;
 }
 
@@ -539,7 +546,15 @@ function TrendDelta({ current, previous }: { current: number; previous: number |
  * before it (whichever of them have a ledger), so approvers can spot a
  * station whose payout jumped or dropped before approving.
  */
-function StationTrend({ ledger, allLedgers }: { ledger: MonthlyCashbackLedger; allLedgers: MonthlyCashbackLedger[] }) {
+function StationTrend({
+  ledger,
+  allLedgers,
+  stationNames,
+}: {
+  ledger: MonthlyCashbackLedger;
+  allLedgers: MonthlyCashbackLedger[];
+  stationNames: Map<string, string>;
+}) {
   const prev1 = previousMonthKey(ledger.month);
   const prev2 = previousMonthKey(prev1);
   const months = [
@@ -548,7 +563,14 @@ function StationTrend({ ledger, allLedgers }: { ledger: MonthlyCashbackLedger; a
     ledger,
   ].filter((l): l is MonthlyCashbackLedger => !!l);
   const byMonth = months.map(cashbackByStation);
-  const stations = [...new Set(byMonth.flatMap((m) => [...m.keys()]))].sort((a, b) => a.localeCompare(b));
+  // Current station name wins; a station no longer in the list falls back to its most recent name on a ledger entry.
+  const nameOf = (stationId: string) =>
+    stationNames.get(stationId) ??
+    [...months].reverse().flatMap((l) => l.entries).find((e) => e.stationId === stationId)?.stationName ??
+    stationId;
+  const stations = [...new Set(byMonth.flatMap((m) => [...m.keys()]))]
+    .map((id) => ({ id, name: nameOf(id) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   if (stations.length === 0) return null;
   const monthTotals = byMonth.map((m) => [...m.values()].reduce((sum, v) => sum + v, 0));
 
@@ -573,12 +595,12 @@ function StationTrend({ ledger, allLedgers }: { ledger: MonthlyCashbackLedger; a
         </thead>
         <tbody>
           {stations.map((station) => (
-            <Tr key={station}>
-              <Td>{station}</Td>
+            <Tr key={station.id}>
+              <Td>{station.name}</Td>
               {byMonth.map((m, i) => (
                 <Td key={months[i]!.month} align="right">
-                  {i === byMonth.length - 1 ? <strong>{formatKsh(m.get(station) ?? 0)}</strong> : formatKsh(m.get(station) ?? 0)}
-                  {i > 0 && <TrendDelta current={m.get(station) ?? 0} previous={byMonth[i - 1]!.get(station)} />}
+                  {i === byMonth.length - 1 ? <strong>{formatKsh(m.get(station.id) ?? 0)}</strong> : formatKsh(m.get(station.id) ?? 0)}
+                  {i > 0 && <TrendDelta current={m.get(station.id) ?? 0} previous={byMonth[i - 1]!.get(station.id)} />}
                 </Td>
               ))}
             </Tr>
