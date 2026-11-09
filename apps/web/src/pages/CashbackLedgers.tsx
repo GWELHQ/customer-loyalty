@@ -35,9 +35,9 @@ const STATUS_TONE: Record<LedgerStatus, 'neutral' | 'success' | 'warning' | 'dan
   [LedgerStatus.HELD]: 'danger',
 };
 
-/** Release is only open on the 1st/2nd of the month (Nairobi time) for everyone except Admin — see assertWithinReleaseWindow on the API. */
+/** Release is only open on the 1st/2nd of the month (Nairobi time) for everyone except Admin and Super Admin — see assertWithinReleaseWindow on the API. */
 function isWithinReleaseWindow(role: string): boolean {
-  if (role === Role.ADMIN) return true;
+  if (role === Role.ADMIN || role === Role.SUPER_ADMIN) return true;
   const dayOfMonth = Number(new Date().toLocaleDateString('en-CA', { timeZone: NAIROBI_TZ }).slice(8, 10));
   return dayOfMonth === 1 || dayOfMonth === 2;
 }

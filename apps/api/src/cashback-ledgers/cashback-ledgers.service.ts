@@ -448,7 +448,7 @@ export class CashbackLedgersService {
   }
 }
 
-/** Admin can release any day of the month; every other role (RTSM, Station Supervisor) only on the 1st or 2nd (Nairobi calendar day) — release is meant to happen right after the prior month closes. */
+/** Admin and Super Admin can release any day of the month; every other role (RTSM, Station Supervisor) only on the 1st or 2nd (Nairobi calendar day) — release is meant to happen right after the prior month closes. */
 function assertWithinReleaseWindow(actor: StaffPrincipal, month: string): void {
   // Every role, Admin included, can only release the month that just closed.
   const [year, m] = nairobiToday().slice(0, 7).split('-').map(Number) as [number, number];
@@ -456,7 +456,7 @@ function assertWithinReleaseWindow(actor: StaffPrincipal, month: string): void {
   if (month !== lastMonth) {
     throw new ForbiddenException('Only last month can be released');
   }
-  if (actor.role === Role.ADMIN) return;
+  if (actor.role === Role.ADMIN || actor.role === Role.SUPER_ADMIN) return;
   const dayOfMonth = Number(nairobiToday().slice(8, 10));
   if (dayOfMonth !== 1 && dayOfMonth !== 2) {
     throw new ForbiddenException('The monthly ledger can only be released on the 1st or 2nd of the month');
