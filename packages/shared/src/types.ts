@@ -311,6 +311,20 @@ export interface MonthlyCashbackLedger extends BaseDoc {
   rejectedByName?: string;
   rejectedAt?: ISODateString;
   rejectionReason?: string;
+  /** Set when Finance Disburser / Super Admin marks the approved ledger as disbursed from the ledger page. */
+  disbursedByUserId?: string;
+  disbursedByName?: string;
+  disbursedAt?: ISODateString;
+  /** Exactly what was in the combined payment file when the ledger was marked disbursed — one row per customer, all stations summed. Lets the file be re-downloaded afterwards. */
+  payoutRows?: LedgerPayoutRow[];
+}
+
+/** One line of the combined monthly bank payment file. */
+export interface LedgerPayoutRow {
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  amount: number;
 }
 
 export interface DisbursementEntry {

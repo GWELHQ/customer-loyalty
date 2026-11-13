@@ -96,8 +96,8 @@ export class CashbackLedgersController {
 
     await this.notifyRole(Role.FINANCE_DISBURSER, {
       title: `Cashback ledger for ${month} approved — ready to disburse`,
-      body: `${actor.fullName} approved the ${month} ledger. It's ready for disbursement.`,
-      linkPath: `/disbursements`,
+      body: `${actor.fullName} approved the ${month} ledger. Download the payment file from the ledger page, and mark it disbursed once paid.`,
+      linkPath: `/cashback-ledgers`,
       subject: `Green Wells: ledger for ${month} ready to disburse`,
     });
     if (ledger.submittedByUserId) {

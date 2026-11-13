@@ -11,6 +11,7 @@ import { AppShell } from '../layout/AppShell';
 import type { ExportColumn } from '../lib/exportTable';
 import { formatNairobiDate, formatNairobiDateTime, nairobiLastMonth, nairobiThisMonth, NAIROBI_TZ } from '../lib/time';
 import { ExportButtons } from '../ui/ExportButtons';
+import { Icon } from '../ui/Icon';
 import { PromptModal } from '../ui/PromptModal';
 import { Badge, Button, Card, CardHeader, Field, Pagination, Table, Td, Th, Tr, inputStyle } from '../ui/primitives';
 import { StepIndicator, type StepIndicatorStep, type StepState } from '../ui/StepIndicator';
@@ -89,7 +90,11 @@ function ledgerSteps(ledger: MonthlyCashbackLedger): StepIndicatorStep[] {
             ? `${ledger.approvedByName ?? 'Unknown'} · ${formatNairobiDate(ledger.approvedAt)}`
             : undefined,
     },
-    { label: 'Disbursed', state: disbursedState },
+    {
+      label: 'Disbursed',
+      state: disbursedState,
+      subtext: ledger.disbursedAt ? `${ledger.disbursedByName ?? 'Unknown'} · ${formatNairobiDate(ledger.disbursedAt)}` : undefined,
+    },
   ];
 }
 
@@ -261,6 +266,8 @@ function FullLedgerView() {
   const canManage = hasPermission(Permission.LEDGERS_MANAGE);
   const canApprove = hasPermission(Permission.LEDGERS_APPROVE);
   const canViewReports = hasPermission(Permission.REPORTS_VIEW_ALL);
+  const canExportPaymentFile = hasPermission(Permission.LEDGERS_EXPORT_PAYMENT_FILE);
+  const canMarkDisbursed = hasPermission(Permission.LEDGERS_MARK_DISBURSED);
   const { stations: activeStations } = useStations();
   const [month, setMonth] = useState(nairobiThisMonth);
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
@@ -270,6 +277,8 @@ function FullLedgerView() {
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonthlyCashbackLedgerEntry | null>(null);
   const [showReject, setShowReject] = useState(false);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [confirmDisburse, setConfirmDisburse] = useState(false);
   // Entries carry the station name snapshotted at sale time — show the current one so a renamed station reads consistently.
   const stationNames = useMemo(() => new Map(activeStations.map((s) => [s.id, s.name])), [activeStations]);
   const entries = useMemo(
@@ -290,6 +299,10 @@ function FullLedgerView() {
     if (canViewReports) api.cashbackTrend.totals().then(setMonthlyTotals, () => setMonthlyTotals([]));
   }
   useEffect(reload, [api, month]);
+  useEffect(() => {
+    setConfirmDisburse(false);
+    setPayoutError(null);
+  }, [month]);
   useRealtimeRefresh(['monthlyCashbackLedgers'], reload);
 
   const canRelease = ledger && (ledger.status === LedgerStatus.OPEN_ACCRUING || ledger.status === LedgerStatus.READY_FOR_REVIEW);
@@ -314,6 +327,35 @@ function FullLedgerView() {
     try {
       await api.cashbackLedgers.approve(month);
       reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function downloadPaymentFile() {
+    setPayoutError(null);
+    try {
+      const { blob, filename } = await api.cashbackLedgers.paymentFile(month);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? `green-wells-${month}-all-stations-disbursement.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setPayoutError(err instanceof Error ? err.message : 'Could not download the payment file');
+    }
+  }
+  async function markDisbursed() {
+    setPayoutError(null);
+    setConfirmDisburse(false);
+    setBusy(true);
+    try {
+      await api.cashbackLedgers.markDisbursed(month);
+      reload();
+    } catch (err) {
+      setPayoutError(err instanceof Error ? err.message : 'Could not mark this month as disbursed');
     } finally {
       setBusy(false);
     }
@@ -361,7 +403,42 @@ function FullLedgerView() {
               </Button>
             </>
           )}
+          {ledger &&
+            canExportPaymentFile &&
+            (ledger.status === LedgerStatus.APPROVED || (ledger.status === LedgerStatus.DISBURSED && ledger.payoutRows)) && (
+              <Button variant="secondary" onClick={downloadPaymentFile} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="download" size={13} />
+                Download payment file (.txt)
+              </Button>
+            )}
+          {ledger && canMarkDisbursed && ledger.status === LedgerStatus.APPROVED && !confirmDisburse && (
+            <Button variant="primary" onClick={() => setConfirmDisburse(true)} disabled={busy}>
+              Mark as disbursed
+            </Button>
+          )}
+          {ledger && canMarkDisbursed && ledger.status === LedgerStatus.APPROVED && confirmDisburse && (
+            <>
+              <Button variant="primary" onClick={markDisbursed} disabled={busy}>
+                Confirm — all paid
+              </Button>
+              <Button variant="secondary" onClick={() => setConfirmDisburse(false)} disabled={busy}>
+                Cancel
+              </Button>
+            </>
+          )}
         </div>
+
+        {confirmDisburse && ledger?.status === LedgerStatus.APPROVED && (
+          <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: -8 }}>
+            Only confirm once the bank has paid every customer in the payment file. Customers under the minimum payout are carried into next month.
+          </div>
+        )}
+
+        {payoutError && (
+          <div style={{ fontSize: 13, color: 'var(--color-danger)', background: 'var(--color-danger-tint)', borderRadius: 8, padding: 12 }}>
+            {payoutError}
+          </div>
+        )}
 
         {canRelease && canManage && !withinWindow && (
           <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: -8 }}>

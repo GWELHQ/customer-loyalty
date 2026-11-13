@@ -1,4 +1,4 @@
-import type { DisbursementBatch } from '@loyalty/shared';
+import type { DisbursementBatch, LedgerPayoutRow } from '@loyalty/shared';
 
 /**
  * Tab-delimited bulk-payment file, matching the bank's own upload template.
@@ -32,39 +32,49 @@ function padRow(cells: string[]): string {
   return row.join('\t');
 }
 
-function monthTitle(month: string, stationName: string): string {
+function monthTitle(month: string, scopeLabel: string): string {
   const [year, monthNum] = month.split('-').map(Number) as [number, number];
   const monthName = new Date(Date.UTC(year, monthNum - 1, 1))
     .toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })
     .toUpperCase();
-  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER LOYALTY CASHBACK - ${stationName.toUpperCase()}`;
+  return `GREEN WELLS ENERGIES LTD - ${monthName} ${year} CUSTOMER LOYALTY CASHBACK - ${scopeLabel.toUpperCase()}`;
 }
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function buildDisbursementExportText(batch: DisbursementBatch): string {
-  const lines: string[] = [padRow([monthTitle(batch.month, batch.stationName)]), padRow(HEADER), padRow([])];
+function buildPaymentFileText(title: string, rows: { customerName: string; customerPhone: string; amount: number }[]): string {
+  const lines: string[] = [padRow([title]), padRow(HEADER), padRow([])];
 
-  const sortedEntries = [...batch.entries].sort((a, b) => a.customerName.localeCompare(b.customerName));
+  const sortedRows = [...rows].sort((a, b) => a.customerName.localeCompare(b.customerName));
   let total = 0;
-  for (const entry of sortedEntries) {
-    total += entry.amount;
+  for (const row of sortedRows) {
+    total += row.amount;
     lines.push(
       padRow([
         DEBIT_ACCOUNT,
         BRANCH_BIC_SORT_CODE,
-        entry.customerName,
+        row.customerName,
         BANK,
         BRANCH,
         MPESA_BIC,
-        entry.customerPhone.replace(/^\+/, ''),
-        `${entry.amount.toFixed(2)} `,
+        row.customerPhone.replace(/^\+/, ''),
+        `${row.amount.toFixed(2)} `,
       ]),
     );
   }
 
   lines.push(padRow(['', '', '', '', '', '', '', round2(total).toFixed(2)]));
   return lines.join('\r\n') + '\r\n';
+}
+
+/** One station's batch file (legacy per-station batch flow). */
+export function buildDisbursementExportText(batch: DisbursementBatch): string {
+  return buildPaymentFileText(monthTitle(batch.month, batch.stationName), batch.entries);
+}
+
+/** The month's single combined payment file — every station, one row per customer. */
+export function buildLedgerPaymentFileText(month: string, rows: LedgerPayoutRow[]): string {
+  return buildPaymentFileText(monthTitle(month, 'All stations'), rows);
 }

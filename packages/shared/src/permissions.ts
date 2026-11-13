@@ -37,6 +37,10 @@ export enum Permission {
   LEDGERS_APPROVE = 'ledgers:approve',
   /** Sign off that one's own station's sales are ready for the monthly disbursement release — Station Supervisor's narrower, station-scoped counterpart to LEDGERS_MANAGE's org-wide "Release for approval". */
   LEDGERS_RELEASE_OWN_STATION = 'ledgers:release_own_station',
+  /** Download the month's combined (all-stations) bank payment .txt once the ledger is approved — see LedgerPayoutController. */
+  LEDGERS_EXPORT_PAYMENT_FILE = 'ledgers:export_payment_file',
+  /** Mark an approved ledger as disbursed (after the payment file was paid at the bank) — Finance Disburser and Super Admin only. */
+  LEDGERS_MARK_DISBURSED = 'ledgers:mark_disbursed',
   DISBURSEMENTS_MANAGE = 'disbursements:manage',
   DISBURSEMENTS_VIEW = 'disbursements:view',
   REPORTS_VIEW_ALL = 'reports:view_all',
@@ -81,6 +85,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.RECONCILIATION_MANAGE,
   Permission.LEDGERS_VIEW,
   Permission.LEDGERS_MANAGE,
+  Permission.LEDGERS_EXPORT_PAYMENT_FILE,
   Permission.REPORTS_VIEW_ALL,
   Permission.IMPORTS_VIEW,
   Permission.NOTIFICATIONS_VIEW_OWN,
@@ -112,6 +117,7 @@ const SUPER_ADMIN_PERMISSIONS: Permission[] = [
   Permission.SALES_CREATE_MANUAL,
   Permission.SALES_EDIT_AMOUNT,
   Permission.CUSTOMERS_EDIT_PHONE,
+  Permission.LEDGERS_MARK_DISBURSED,
 ];
 
 const CHAIRMAN_PERMISSIONS: Permission[] = [
@@ -127,6 +133,7 @@ const CHAIRMAN_PERMISSIONS: Permission[] = [
   Permission.SPECIAL_RATES_REQUEST,
   Permission.RECONCILIATION_VIEW_ALL,
   Permission.LEDGERS_VIEW,
+  Permission.LEDGERS_EXPORT_PAYMENT_FILE,
   Permission.DISBURSEMENTS_VIEW,
   Permission.REPORTS_VIEW_ALL,
   Permission.NOTIFICATIONS_VIEW_OWN,
@@ -163,6 +170,7 @@ const FINANCE_APPROVER_PERMISSIONS: Permission[] = [
   Permission.RECONCILIATION_VIEW_ALL,
   Permission.LEDGERS_VIEW,
   Permission.LEDGERS_APPROVE,
+  Permission.LEDGERS_EXPORT_PAYMENT_FILE,
   Permission.DISBURSEMENTS_VIEW,
   Permission.REPORTS_VIEW_ALL,
   Permission.NOTIFICATIONS_VIEW_OWN,
@@ -175,6 +183,8 @@ const FINANCE_APPROVER_PERMISSIONS: Permission[] = [
 // itself (no LEDGERS_APPROVE).
 const FINANCE_DISBURSER_PERMISSIONS: Permission[] = [
   Permission.LEDGERS_VIEW,
+  Permission.LEDGERS_EXPORT_PAYMENT_FILE,
+  Permission.LEDGERS_MARK_DISBURSED,
   Permission.DISBURSEMENTS_VIEW,
   Permission.DISBURSEMENTS_MANAGE,
   Permission.NOTIFICATIONS_VIEW_OWN,

@@ -70,6 +70,10 @@ export class DisbursementBatchesService {
       LedgerStatus.REJECTED,
     ]);
     let ledger = await this.ledgers.findByMonth(month);
+    if (ledger.disbursedAt) {
+      // Paid via the combined payment file on the ledger page — a batch now would pay it twice.
+      throw new BadRequestException(`The ${month} ledger was already marked disbursed from the ledger page`);
+    }
     if (priorBatches.length === 0 && NEVER_APPROVED_STATUSES.has(ledger.status)) {
       throw new BadRequestException(
         `Ledger for ${month} must be approved before a disbursement batch can be created (status: ${ledger.status})`,

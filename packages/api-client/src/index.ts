@@ -306,6 +306,10 @@ export class LoyaltyApiClient {
     approve: (month: string) => this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/approve`),
     reject: (month: string, reason: string) =>
       this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/reject`, { reason }),
+    /** Combined (all-stations) bank payment .txt — available once the ledger is approved. */
+    paymentFile: (month: string) => this.http.getBlob(`/cashback-ledgers/${month}/payment-file.txt`),
+    /** Finance Disburser / Super Admin — moves an approved ledger to disbursed. */
+    markDisbursed: (month: string) => this.http.post<MonthlyCashbackLedger>(`/cashback-ledgers/${month}/mark-disbursed`),
   };
 
   disbursementBatches = {
