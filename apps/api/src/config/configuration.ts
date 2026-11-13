@@ -2,6 +2,8 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   corsOrigin: string;
+  /** Public web app address, for links in emails (e.g. the ledger page in the approval email). */
+  webAppUrl: string;
   gcpProjectId: string;
   firestoreDatabaseId: string;
   gcsBucketName: string;
@@ -43,6 +45,7 @@ export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 8080),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  webAppUrl: (process.env.WEB_APP_URL ?? 'https://customer-loyalty-3af1a.web.app').replace(/\/+$/, ''),
   gcpProjectId: process.env.GCP_PROJECT_ID ?? '',
   firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID ?? '(default)',
   gcsBucketName: process.env.GCS_BUCKET_NAME ?? '',

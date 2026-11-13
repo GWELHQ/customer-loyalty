@@ -1,10 +1,16 @@
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { NotificationType, Permission, Role, type User } from '@loyalty/shared';
+import { NotificationType, Permission, Role, type MonthlyCashbackLedger, type User } from '@loyalty/shared';
 import { assertStationAccessible } from '../common/access/station-scope';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { EmailAttachment } from '../common/email/email-provider.interface';
 import { EmailService } from '../common/email/email.service';
+import type { AppConfig } from '../config/configuration';
+import { buildLedgerPaymentFileText } from '../disbursement-batches/disbursement-export';
+import { planPayout } from '../disbursement-batches/ledger-payout-plan';
+import { DisbursementSettingsService } from '../settings/disbursement-settings.service';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { StaffOnly } from '../common/decorators/staff_only.decorator';
 import type { StaffPrincipal } from '../common/types/principal';
@@ -18,12 +24,16 @@ import { RejectLedgerDto } from './dto/reject-ledger.dto';
 @StaffOnly()
 @Controller('cashback-ledgers')
 export class CashbackLedgersController {
+  private readonly logger = new Logger('CashbackLedgersController');
+
   constructor(
     private readonly ledgers: CashbackLedgersService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly users: UsersService,
     private readonly email: EmailService,
+    private readonly disbursementSettings: DisbursementSettingsService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   @Get()
@@ -87,19 +97,14 @@ export class CashbackLedgersController {
     return ledger;
   }
 
-  /** Finance Approver approves — Finance Disburser is notified it's ready to pay out, and the releasing RTSM is notified it was approved. */
+  /** Finance Approver approves — Finance Disburser is emailed the payment file, and the releasing RTSM is notified it was approved. */
   @Post(':month/approve')
   @RequirePermissions(Permission.LEDGERS_APPROVE)
   async approve(@Param('month') month: string, @CurrentUser() actor: StaffPrincipal) {
     const ledger = await this.ledgers.approve(month, actor);
     await this.audit.record({ actor, action: 'ledger.approve', entityType: 'monthlyCashbackLedger', entityId: month });
 
-    await this.notifyRole(Role.FINANCE_DISBURSER, {
-      title: `Cashback ledger for ${month} approved — ready to disburse`,
-      body: `${actor.fullName} approved the ${month} ledger. Download the payment file from the ledger page, and mark it disbursed once paid.`,
-      linkPath: `/cashback-ledgers`,
-      subject: `Green Wells: ledger for ${month} ready to disburse`,
-    });
+    await this.notifyDisbursersOfApproval(ledger);
     if (ledger.submittedByUserId) {
       await this.notifyUserIds([ledger.submittedByUserId], {
         title: `Cashback ledger for ${month} approved`,
@@ -138,6 +143,81 @@ export class CashbackLedgersController {
     return ledger;
   }
 
+  /**
+   * Emails every Finance Disburser the combined payment file with
+   * instructions to mark the ledger disbursed once the bank has paid —
+   * the same file the ledger page's download button gives. Deliberately
+   * names no one. Never fails the approval: if the file can't be built the
+   * email still goes out, pointing at the download button instead.
+   */
+  private async notifyDisbursersOfApproval(ledger: MonthlyCashbackLedger): Promise<void> {
+    const recipients = (await this.users.list()).filter((u) => u.role === Role.FINANCE_DISBURSER);
+    if (recipients.length === 0) return;
+
+    const { month } = ledger;
+    const label = monthLabel(month);
+    const linkPath = `/cashback-ledgers?month=${month}`;
+    const ledgerUrl = `${this.config.get('webAppUrl', { infer: true })}${linkPath}`;
+
+    let attachments: EmailAttachment[] | undefined;
+    let fileLines: string[];
+    try {
+      const { minDisbursementAmount } = await this.disbursementSettings.get();
+      const { rows } = planPayout(ledger, minDisbursementAmount);
+      const total = rows.reduce((sum, r) => sum + r.amount, 0);
+      if (rows.length === 0) {
+        fileLines = [
+          `No customer meets the minimum payout for ${label}, so there is nothing to pay on the bank system.`,
+          `Open the cashback ledger page using the button below, select ${label}, then click the green 'Mark as disbursed' button so the balances carry forward to next month.`,
+        ];
+      } else {
+        attachments = [
+          {
+            filename: `green-wells-${month}-all-stations-disbursement.txt`,
+            contentType: 'text/plain',
+            contentBytes: Buffer.from(buildLedgerPaymentFileText(month, rows), 'utf-8'),
+          },
+        ];
+        fileLines = [
+          `Kindly use the attached file to disburse the ${label} loyalty payments. It covers ${rows.length.toLocaleString('en-KE')} customer${rows.length === 1 ? '' : 's'} across all stations, totalling KSh ${formatKsh(total)}.`,
+          `Once disbursed on the bank system, open the cashback ledger page using the button below, select ${label}, then click the green 'Mark as disbursed' button.`,
+        ];
+      }
+    } catch (err) {
+      this.logger.error(`Could not build the ${month} payment file for the approval email`, err instanceof Error ? err.stack : err);
+      fileLines = [
+        `The ${label} loyalty payments are ready to disburse. Open the cashback ledger page using the button below, select ${label}, and click 'Download payment file (.txt)'.`,
+        `Once disbursed on the bank system, click the green 'Mark as disbursed' button on the same page.`,
+      ];
+    }
+
+    const title = `Loyalty disbursements ${label}`;
+    await this.notifications.notifyMany(
+      recipients.map((u) => u.id),
+      {
+        type: NotificationType.LEDGER_STATE_CHANGE,
+        title: `${title} ready to disburse`,
+        body: `The ${label} ledger is approved. Download the payment file, disburse on the bank system, then mark it as disbursed.`,
+        linkPath,
+      },
+    );
+    await this.email.send(
+      recipients.map((u) => u.email),
+      title,
+      {
+        title,
+        bodyLines: [
+          `${nairobiGreeting()},`,
+          ...fileLines,
+          'Contact the system administrator if you have any challenge accessing the system.',
+        ],
+        ctaLabel: 'Open cashback ledger',
+        ctaHref: ledgerUrl,
+      },
+      { attachments },
+    );
+  }
+
   private async notifyRole(
     role: Role,
     input: { title: string; body: string; linkPath: string; subject: string },
@@ -168,4 +248,20 @@ export class CashbackLedgersController {
       bodyLines: [input.body],
     });
   }
+}
+
+/** "2026-10" -> "October 2026" */
+function monthLabel(month: string): string {
+  const [year, m] = month.split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function formatKsh(amount: number): string {
+  return amount.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Good morning / afternoon / evening by the Nairobi clock (fixed UTC+3). */
+function nairobiGreeting(now: Date = new Date()): string {
+  const hour = (now.getUTCHours() + 3) % 24;
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 }

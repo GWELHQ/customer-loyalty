@@ -1,6 +1,7 @@
 import type { CashbackMonthlyTotal, MonthlyCashbackLedger, MonthlyCashbackLedgerEntry, Sale } from '@loyalty/shared';
 import { LedgerStatus, Permission, Role } from '@loyalty/shared';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../data/client';
 import { usePagedRows } from '../data/usePagedRows';
@@ -269,7 +270,10 @@ function FullLedgerView() {
   const canExportPaymentFile = hasPermission(Permission.LEDGERS_EXPORT_PAYMENT_FILE);
   const canMarkDisbursed = hasPermission(Permission.LEDGERS_MARK_DISBURSED);
   const { stations: activeStations } = useStations();
-  const [month, setMonth] = useState(nairobiThisMonth);
+  // The approval email links to ?month=YYYY-MM so the disburser lands on the approved month.
+  const [searchParams] = useSearchParams();
+  const linkedMonth = searchParams.get('month');
+  const [month, setMonth] = useState(() => (linkedMonth && /^\d{4}-\d{2}$/.test(linkedMonth) ? linkedMonth : nairobiThisMonth()));
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
   const [allLedgers, setAllLedgers] = useState<MonthlyCashbackLedger[]>([]);
   const [monthlyTotals, setMonthlyTotals] = useState<CashbackMonthlyTotal[]>([]);
