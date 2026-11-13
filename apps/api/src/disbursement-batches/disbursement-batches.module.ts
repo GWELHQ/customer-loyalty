@@ -4,10 +4,12 @@ import { CashbackLedgersModule } from '../cashback-ledgers/cashback-ledgers.modu
 import { SettingsModule } from '../settings/settings.module';
 import { DisbursementBatchesController } from './disbursement-batches.controller';
 import { DisbursementBatchesService } from './disbursement-batches.service';
+import { LedgerPayoutController } from './ledger-payout.controller';
+import { LedgerPayoutService } from './ledger-payout.service';
 
 @Module({
   imports: [CashbackLedgersModule, CashbackTrendModule, SettingsModule],
-  controllers: [DisbursementBatchesController],
-  providers: [DisbursementBatchesService],
+  controllers: [DisbursementBatchesController, LedgerPayoutController],
+  providers: [DisbursementBatchesService, LedgerPayoutService],
 })
 export class DisbursementBatchesModule {}
