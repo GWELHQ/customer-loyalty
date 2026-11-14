@@ -261,7 +261,47 @@ function MyStationReleaseView() {
   );
 }
 
+/**
+ * Opens on the month that needs attention: a month named in the link (the
+ * approval email links to ?month=YYYY-MM), else the most recent closed
+ * month while it isn't disbursed yet, else the current accruing month.
+ * Only the latest closed month is checked — months before the September
+ * 2026 cut-over were paid in the previous system and never read as
+ * disbursed here.
+ */
 function FullLedgerView() {
+  const api = useApi();
+  const [searchParams] = useSearchParams();
+  const linkedMonth = searchParams.get('month');
+  const [initialMonth, setInitialMonth] = useState<string | null>(() =>
+    linkedMonth && /^\d{4}-\d{2}$/.test(linkedMonth) ? linkedMonth : null,
+  );
+
+  useEffect(() => {
+    if (initialMonth) return;
+    const thisMonth = nairobiThisMonth();
+    api.cashbackLedgers.list().then(
+      (ledgers) => {
+        const latestClosed = ledgers.filter((l) => l.month < thisMonth).sort((a, b) => b.month.localeCompare(a.month))[0];
+        setInitialMonth(latestClosed && latestClosed.status !== LedgerStatus.DISBURSED ? latestClosed.month : thisMonth);
+      },
+      () => setInitialMonth(thisMonth),
+    );
+    // Decided once on open; later status changes don't move the month out from under the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api]);
+
+  if (!initialMonth) {
+    return (
+      <AppShell title="Monthly cashback ledger" subtitle="Supervisors release their own station, RTSM releases the rest, Finance Approver checks and approves, Finance Disburser pays out">
+        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Loading…</div>
+      </AppShell>
+    );
+  }
+  return <LedgerMonthView initialMonth={initialMonth} />;
+}
+
+function LedgerMonthView({ initialMonth }: { initialMonth: string }) {
   const api = useApi();
   const { user, hasPermission } = useAuth();
   const canManage = hasPermission(Permission.LEDGERS_MANAGE);
@@ -270,10 +310,7 @@ function FullLedgerView() {
   const canExportPaymentFile = hasPermission(Permission.LEDGERS_EXPORT_PAYMENT_FILE);
   const canMarkDisbursed = hasPermission(Permission.LEDGERS_MARK_DISBURSED);
   const { stations: activeStations } = useStations();
-  // The approval email links to ?month=YYYY-MM so the disburser lands on the approved month.
-  const [searchParams] = useSearchParams();
-  const linkedMonth = searchParams.get('month');
-  const [month, setMonth] = useState(() => (linkedMonth && /^\d{4}-\d{2}$/.test(linkedMonth) ? linkedMonth : nairobiThisMonth()));
+  const [month, setMonth] = useState(initialMonth);
   const [ledger, setLedger] = useState<MonthlyCashbackLedger | null>(null);
   const [allLedgers, setAllLedgers] = useState<MonthlyCashbackLedger[]>([]);
   const [monthlyTotals, setMonthlyTotals] = useState<CashbackMonthlyTotal[]>([]);
