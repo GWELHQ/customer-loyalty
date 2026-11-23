@@ -24,6 +24,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: 'Stations', path: '/stations', icon: 'stations', permission: Permission.STATIONS_VIEW },
   { label: 'Logs', path: '/logs', icon: 'audit', permission: Permission.AUDIT_VIEW },
   { label: 'Fraud & Governance', path: '/fraud', icon: 'shield', permission: Permission.FRAUD_VIEW },
+  { label: 'Email recipients', path: '/email-recipients', icon: 'mail', permission: Permission.EMAIL_RECIPIENTS_MANAGE },
   { label: 'Mobile App', path: '/apk-versions', icon: 'upload', permission: Permission.APK_MANAGE },
 ];
 

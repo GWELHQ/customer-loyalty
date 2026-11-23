@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { NotificationType, Permission, Role, type MonthlyCashbackLedger, type User } from '@loyalty/shared';
+import { NotificationType, Permission, Role, SystemEmailType, type MonthlyCashbackLedger, type User } from '@loyalty/shared';
 import { assertStationAccessible } from '../common/access/station-scope';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -93,6 +93,7 @@ export class CashbackLedgersController {
       body: `${actor.fullName} released the ${month} ledger — please review and approve or reject it.`,
       linkPath: `/cashback-ledgers`,
       subject: `Green Wells: ledger for ${month} awaiting your approval`,
+      emailType: SystemEmailType.LEDGER_SUBMITTED,
     });
     return ledger;
   }
@@ -111,6 +112,7 @@ export class CashbackLedgersController {
         body: `${actor.fullName} approved the ${month} ledger you released.`,
         linkPath: `/cashback-ledgers`,
         subject: `Green Wells: ledger for ${month} was approved`,
+        emailType: SystemEmailType.LEDGER_APPROVED,
       });
     }
     return ledger;
@@ -138,6 +140,7 @@ export class CashbackLedgersController {
         body: `${actor.fullName} rejected the ${month} ledger: "${dto.reason}"`,
         linkPath: `/cashback-ledgers`,
         subject: `Green Wells: ledger for ${month} was rejected`,
+        emailType: SystemEmailType.LEDGER_REJECTED,
       });
     }
     return ledger;
@@ -151,8 +154,9 @@ export class CashbackLedgersController {
    * email still goes out, pointing at the download button instead.
    */
   private async notifyDisbursersOfApproval(ledger: MonthlyCashbackLedger): Promise<void> {
+    // No early return when there's no Finance Disburser: extra recipients
+    // set on the Email recipients settings page still get the file.
     const recipients = (await this.users.list()).filter((u) => u.role === Role.FINANCE_DISBURSER);
-    if (recipients.length === 0) return;
 
     const { month } = ledger;
     const label = monthLabel(month);
@@ -192,7 +196,7 @@ export class CashbackLedgersController {
     }
 
     const title = `Loyalty disbursements ${label}`;
-    await this.notifications.notifyMany(
+    if (recipients.length > 0) await this.notifications.notifyMany(
       recipients.map((u) => u.id),
       {
         type: NotificationType.LEDGER_STATE_CHANGE,
@@ -214,13 +218,13 @@ export class CashbackLedgersController {
         ctaLabel: 'Open cashback ledger',
         ctaHref: ledgerUrl,
       },
-      { attachments },
+      { attachments, type: SystemEmailType.LEDGER_READY_TO_DISBURSE },
     );
   }
 
   private async notifyRole(
     role: Role,
-    input: { title: string; body: string; linkPath: string; subject: string },
+    input: { title: string; body: string; linkPath: string; subject: string; emailType: SystemEmailType },
   ): Promise<void> {
     const recipients = (await this.users.list()).filter((u) => u.role === role);
     await this.notifyUsers(recipients, input);
@@ -228,7 +232,7 @@ export class CashbackLedgersController {
 
   private async notifyUserIds(
     userIds: string[],
-    input: { title: string; body: string; linkPath: string; subject: string },
+    input: { title: string; body: string; linkPath: string; subject: string; emailType: SystemEmailType },
   ): Promise<void> {
     const recipients = (await this.users.list()).filter((u) => userIds.includes(u.id));
     await this.notifyUsers(recipients, input);
@@ -236,17 +240,21 @@ export class CashbackLedgersController {
 
   private async notifyUsers(
     recipients: User[],
-    input: { title: string; body: string; linkPath: string; subject: string },
+    input: { title: string; body: string; linkPath: string; subject: string; emailType: SystemEmailType },
   ): Promise<void> {
-    if (recipients.length === 0) return;
-    await this.notifications.notifyMany(
-      recipients.map((u) => u.id),
-      { type: NotificationType.LEDGER_STATE_CHANGE, title: input.title, body: input.body, linkPath: input.linkPath },
+    if (recipients.length > 0) {
+      await this.notifications.notifyMany(
+        recipients.map((u) => u.id),
+        { type: NotificationType.LEDGER_STATE_CHANGE, title: input.title, body: input.body, linkPath: input.linkPath },
+      );
+    }
+    // Sent even with no automatic recipients, so the extra ones still get it.
+    await this.email.send(
+      recipients.map((u) => u.email),
+      input.subject,
+      { title: input.title, bodyLines: [input.body] },
+      { type: input.emailType },
     );
-    await this.email.send(recipients.map((u) => u.email), input.subject, {
-      title: input.title,
-      bodyLines: [input.body],
-    });
   }
 }
 

@@ -6,6 +6,7 @@ import type {
   CashbackTrendSettings,
   Station,
 } from '@loyalty/shared';
+import { SystemEmailType } from '@loyalty/shared';
 import type { EmailAttachment, EmailSendResult } from '../common/email/email-provider.interface';
 import { EmailService } from '../common/email/email.service';
 import { FirestoreService } from '../common/firestore/firestore.service';
@@ -216,7 +217,7 @@ export class CashbackTrendService {
 
   async sendReport(
     recipients: string[],
-    opts: { cc?: string[]; replyTo?: string; subject?: string; body?: string } = {},
+    opts: { cc?: string[]; replyTo?: string; subject?: string; body?: string; type?: SystemEmailType } = {},
   ): Promise<EmailSendResult> {
     const report = await this.buildReport();
     if (report.months.length === 0) return { success: false, errorReason: 'No disbursed months to report yet' };
@@ -243,7 +244,7 @@ export class CashbackTrendService {
       recipients,
       opts.subject?.trim() || title,
       { title, bodyLines: [intro], bodyHtml: trendTableHtml(report, chart ? { cid: TREND_CHART_CID } : null) },
-      { cc: opts.cc, replyTo: opts.replyTo, attachments },
+      { cc: opts.cc, replyTo: opts.replyTo, attachments, type: opts.type },
     );
   }
 
@@ -280,11 +281,11 @@ export class CashbackTrendService {
       const sentRef = this.firestore.collection(EMAILS_COLLECTION).doc(month);
       if ((await sentRef.get()).exists) return;
       const { autoRecipients } = await this.getSettings();
-      if (autoRecipients.length === 0) {
+      const result = await this.sendReport(autoRecipients, { type: SystemEmailType.CASHBACK_TREND_AUTO });
+      if (!result.success && result.errorReason === 'No recipients') {
         this.logger.warn(`Cashback trend for ${month} recorded, but no automatic recipients are configured - not emailed`);
         return;
       }
-      const result = await this.sendReport(autoRecipients);
       if (result.success) {
         await sentRef.set({ month, recipients: autoRecipients, sentAt: nowIso() });
       } else {

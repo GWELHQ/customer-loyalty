@@ -86,6 +86,15 @@ describe('RBAC permission matrix', () => {
     expect(superAdminOnly.sort()).toEqual(adminOnly.sort());
   });
 
+  it('only Admin and Super Admin can manage email recipients', () => {
+    for (const role of Object.values(Role)) {
+      expect([role, roleHasPermission(role, Permission.EMAIL_RECIPIENTS_MANAGE)]).toEqual([
+        role,
+        role === Role.ADMIN || role === Role.SUPER_ADMIN,
+      ]);
+    }
+  });
+
   it('every role is present in the permission matrix', () => {
     for (const role of Object.values(Role)) {
       expect(roleHasPermission(role, Permission.PRICES_VIEW) !== undefined).toBe(true);

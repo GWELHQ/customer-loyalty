@@ -6,6 +6,7 @@ module.exports = {
   transform: { '^.+\\.(t|j)s$': 'ts-jest' },
   moduleNameMapper: {
     '^@loyalty/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
