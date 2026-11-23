@@ -1,6 +1,6 @@
 import { Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { LedgerStatus, NotificationType, Product, Role, UserStatus } from '@loyalty/shared';
+import { LedgerStatus, NotificationType, Product, Role, SystemEmailType, UserStatus } from '@loyalty/shared';
 import { CashbackLedgersService } from '../cashback-ledgers/cashback-ledgers.service';
 import { Public } from '../common/decorators/public.decorator';
 import { EmailService } from '../common/email/email.service';
@@ -51,10 +51,6 @@ export class JobsController {
     if (new Date(settings.nextReminderAt) > new Date()) {
       return { sent: false, reason: 'not due yet', nextReminderAt: settings.nextReminderAt };
     }
-    if (settings.recipientEmails.length === 0) {
-      return { sent: false, reason: 'no recipients configured' };
-    }
-
     const allStations = await this.prices.getCurrentForAllStations();
     const lines = allStations.flatMap(({ station, prices }) =>
       Object.values(Product).map((product) => {
@@ -65,10 +61,21 @@ export class JobsController {
       }),
     );
 
-    await this.email.send(settings.recipientEmails, 'Green Wells: monthly fuel price update reminder', {
-      title: 'Monthly fuel price update reminder',
-      bodyLines: ["It's time to review next month's PMS/AGO prices.", 'Current prices by station:', ...lines],
-    });
+    // The reminder list on the Prices page and any extra recipients from
+    // the Email recipients settings page are both honoured — "no
+    // recipients" only when both are empty, and then it stays due.
+    const result = await this.email.send(
+      settings.recipientEmails,
+      'Green Wells: monthly fuel price update reminder',
+      {
+        title: 'Monthly fuel price update reminder',
+        bodyLines: ["It's time to review next month's PMS/AGO prices.", 'Current prices by station:', ...lines],
+      },
+      { type: SystemEmailType.PRICE_REMINDER },
+    );
+    if (!result.success && result.errorReason === 'No recipients') {
+      return { sent: false, reason: 'no recipients configured' };
+    }
     await this.reminders.markSent();
 
     return { sent: true };
@@ -192,56 +199,60 @@ export class JobsController {
       const supervisors = allUsers.filter(
         (u) => u.status === UserStatus.ACTIVE && u.role === Role.STATION_SUPERVISOR && u.assignedStationId === station.id,
       );
-      if (supervisors.length === 0) continue;
-
       const body = `${station.name}'s cashback ledger for ${month} is still awaiting release for disbursement.`;
-      await this.notifications.notifyMany(
-        supervisors.map((u) => u.id),
-        {
-          type: NotificationType.LEDGER_STATE_CHANGE,
-          title: `Release ${station.name}'s ${month} sales`,
-          body: isSecondReminder ? `${body} ${disableWarning}` : body,
-          linkPath: '/cashback-ledgers',
-        },
-      );
-      await this.email.send(
+      if (supervisors.length > 0) {
+        await this.notifications.notifyMany(
+          supervisors.map((u) => u.id),
+          {
+            type: NotificationType.LEDGER_STATE_CHANGE,
+            title: `Release ${station.name}'s ${month} sales`,
+            body: isSecondReminder ? `${body} ${disableWarning}` : body,
+            linkPath: '/cashback-ledgers',
+          },
+        );
+      }
+      // Without a supervisor this still reaches any extra To recipients (Admin
+      // CC alone doesn't count — EmailService needs someone in To).
+      const stationResult = await this.email.send(
         supervisors.map((u) => u.email),
         `Green Wells: release ${station.name}'s ${month} sales for disbursement`,
         {
           title: `Release ${station.name} for ${month}`,
           bodyLines: isSecondReminder ? [body, disableWarning] : [body],
         },
-        { cc: adminEmails },
+        { cc: adminEmails, type: SystemEmailType.LEDGER_STATION_RELEASE_REMINDER },
       );
-      remindersSent += 1;
+      if (supervisors.length > 0 || stationResult.success) remindersSent += 1;
     }
 
     const rtsmUsers = allUsers.filter((u) => u.status === UserStatus.ACTIVE && u.role === Role.RTSM);
-    if (rtsmUsers.length > 0) {
+    {
       const pendingNote =
         pendingStations.length > 0
           ? `${pendingStations.length} station(s) still need releasing: ${pendingStations.map((s) => s.name).join(', ')}.`
           : 'Every station has already released — you just need to submit the month for approval.';
       const body = `${month}'s cashback ledger is still awaiting release for approval. ${pendingNote}`;
-      await this.notifications.notifyMany(
-        rtsmUsers.map((u) => u.id),
-        {
-          type: NotificationType.LEDGER_STATE_CHANGE,
-          title: `Release ${month} for approval`,
-          body: isSecondReminder ? `${body} ${disableWarning}` : body,
-          linkPath: '/cashback-ledgers',
-        },
-      );
-      await this.email.send(
+      if (rtsmUsers.length > 0) {
+        await this.notifications.notifyMany(
+          rtsmUsers.map((u) => u.id),
+          {
+            type: NotificationType.LEDGER_STATE_CHANGE,
+            title: `Release ${month} for approval`,
+            body: isSecondReminder ? `${body} ${disableWarning}` : body,
+            linkPath: '/cashback-ledgers',
+          },
+        );
+      }
+      const rtsmResult = await this.email.send(
         rtsmUsers.map((u) => u.email),
         `Green Wells: release ${month} for approval`,
         {
           title: `Release ${month} for approval`,
           bodyLines: isSecondReminder ? [body, disableWarning] : [body],
         },
-        { cc: adminEmails },
+        { cc: adminEmails, type: SystemEmailType.LEDGER_RTSM_RELEASE_REMINDER },
       );
-      remindersSent += 1;
+      if (rtsmUsers.length > 0 || rtsmResult.success) remindersSent += 1;
     }
 
     return { sent: true, remindersSent, month, dayOfMonth };

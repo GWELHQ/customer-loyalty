@@ -12,6 +12,7 @@ import { CustomersList } from './pages/customers/CustomersList';
 import { CustomerRegistrations } from './pages/CustomerRegistrations';
 import { Dashboard } from './pages/Dashboard';
 import { Disbursements } from './pages/Disbursements';
+import { EmailRecipients } from './pages/EmailRecipients';
 import { FraudGovernance } from './pages/FraudGovernance';
 import { Logs } from './pages/Logs';
 import { PendingActivation } from './pages/PendingActivation';
@@ -104,6 +105,7 @@ export function App() {
       <Route path="/roles" element={<RequireStaff permission={Permission.RBAC_MANAGE}><RolesAdmin /></RequireStaff>} />
       <Route path="/attendants" element={<RequireStaff permission={Permission.ATTENDANTS_MANAGE}><Attendants /></RequireStaff>} />
       <Route path="/stations" element={<RequireStaff permission={Permission.STATIONS_VIEW}><Stations /></RequireStaff>} />
+      <Route path="/email-recipients" element={<RequireStaff permission={Permission.EMAIL_RECIPIENTS_MANAGE}><EmailRecipients /></RequireStaff>} />
       <Route path="/apk-versions" element={<RequireStaff permission={Permission.APK_MANAGE}><ApkVersions /></RequireStaff>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

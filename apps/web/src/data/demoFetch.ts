@@ -1,4 +1,4 @@
-import { Permission, SYSTEM_ROLE_DEFINITIONS } from '@loyalty/shared';
+import { Permission, SYSTEM_EMAIL_DEFINITIONS, SYSTEM_ROLE_DEFINITIONS } from '@loyalty/shared';
 import {
   demoCustomers,
   demoLedger,
@@ -94,6 +94,9 @@ export async function demoFetch(url: string | URL, init?: RequestInit): Promise<
   if (path === '/audit-events') return json({ items: [], page: 1, pageSize: 50, total: 0, nextCursor: null });
   if (path.startsWith('/reconciliation/daily')) return json([]);
   if (path === '/disbursement-batches') return json([]);
+  if (path === '/email-recipients' && method === 'GET') {
+    return json(SYSTEM_EMAIL_DEFINITIONS.map((d) => ({ ...d, automatic: { to: [], cc: [] }, extra: { to: [], cc: [] } })));
+  }
 
   // Fallback for anything not stubbed: succeed with an empty body so the UI
   // doesn't hard-crash while browsing demo mode.

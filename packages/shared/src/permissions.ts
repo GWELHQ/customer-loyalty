@@ -52,6 +52,8 @@ export enum Permission {
   FRAUD_MANAGE = 'fraud:manage',
   DISBURSEMENT_SETTINGS_MANAGE = 'disbursement_settings:manage',
   CUSTOMER_INACTIVITY_SETTINGS_MANAGE = 'customer_inactivity_settings:manage',
+  /** Add extra To/CC recipients to the emails the system sends — Admin and Super Admin only. */
+  EMAIL_RECIPIENTS_MANAGE = 'email_recipients:manage',
   SALES_APPROVE_ALL = 'sales:approve_all',
   SALES_APPROVE_OWN_STATION = 'sales:approve_own_station',
   /** Manually record a sale from the web portal (backfill/correction outside the normal Android flow). Granted only to Super Admin — see SUPER_ADMIN_PERMISSIONS. */
@@ -96,6 +98,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.FRAUD_MANAGE,
   Permission.DISBURSEMENT_SETTINGS_MANAGE,
   Permission.CUSTOMER_INACTIVITY_SETTINGS_MANAGE,
+  Permission.EMAIL_RECIPIENTS_MANAGE,
   Permission.SALES_APPROVE_ALL,
   Permission.SHIFTS_VIEW_ALL,
   Permission.APK_MANAGE,

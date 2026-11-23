@@ -11,6 +11,7 @@ import type {
   CustomerRegistrationRequest,
   DisbursementBatch,
   DisbursementSettings,
+  EmailRecipientList,
   FraudFlag,
   FraudFlagStatus,
   FraudFlagType,
@@ -35,6 +36,8 @@ import type {
   ShiftType,
   SmsDelivery,
   SpecialRateRequest,
+  SystemEmailRecipientsView,
+  SystemEmailType,
   Station,
   User,
   UserStatus,
@@ -403,6 +406,13 @@ export class LoyaltyApiClient {
     get: () => this.http.get<DisbursementSettings>('/disbursement-settings'),
     update: (input: Partial<{ minDisbursementAmount: number }>) =>
       this.http.patch<DisbursementSettings>('/disbursement-settings', input),
+  };
+
+  /** Extra To/CC recipients per system email — Admin/Super Admin only. */
+  emailRecipients = {
+    list: () => this.http.get<SystemEmailRecipientsView[]>('/email-recipients'),
+    update: (type: SystemEmailType, input: EmailRecipientList) =>
+      this.http.patch<EmailRecipientList>(`/email-recipients/${type}`, input),
   };
 
   customerInactivitySettings = {

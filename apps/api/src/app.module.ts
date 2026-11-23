@@ -12,6 +12,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { CustomerRegistrationsModule } from './customer-registrations/customer-registrations.module';
 import configuration from './config/configuration';
 import { EmailModule } from './common/email/email.module';
+import { EmailRecipientsModule } from './email-recipients/email-recipients.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { FirestoreModule } from './common/firestore/firestore.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -74,6 +75,7 @@ import { VehiclePlateChecksModule } from './vehicle-plate-checks/vehicle-plate-c
     SmsModule,
     FraudModule,
     SettingsModule,
+    EmailRecipientsModule,
     VehiclePlateChecksModule,
     JobsModule,
     ApkVersionsModule,

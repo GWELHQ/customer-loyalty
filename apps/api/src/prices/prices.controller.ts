@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Permission, Product, Role, UserStatus } from '@loyalty/shared';
+import { Permission, Product, Role, SystemEmailType, UserStatus } from '@loyalty/shared';
 import { assertStationAccessible } from '../common/access/station-scope';
 import { AuditService } from '../common/audit/audit.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -83,6 +83,7 @@ export class PricesController {
           `${actor.fullName} published a new ${price.product} price of ${formatEmailCurrency(price.pricePerLitre)} per litre for ${price.stationNameAtPrice}, effective ${formatEmailDate(price.effectiveFrom)}.`,
         ],
       },
+      { type: SystemEmailType.PRICE_PUBLISHED },
     );
 
     return price;
