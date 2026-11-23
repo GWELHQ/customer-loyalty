@@ -239,7 +239,7 @@ export const inputStyle: CSSProperties = {
   padding: '10px 12px',
   fontSize: 14,
   fontFamily: 'var(--font-body)',
-  background: 'var(--color-surface)',
+  backgroundColor: 'var(--color-surface)',
   color: 'var(--color-text)',
 };
 
